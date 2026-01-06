@@ -5,19 +5,44 @@ from types import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
         super().__init__(shape)
-        pass
+        self.data = data
+        self.indices = indices
+        self.indptr = indptr
+        self.nnz = len(data)
 
     def to_dense(self) -> DenseMatrix:
         """Преобразует CSC в плотную матрицу."""
-        pass
+        n, m = self.shape
+        mat = [[0]*m for _ in range(n)]
+        
+        for j in range(m):
+            start = self.indptr[j]
+            end = self.indptr[j+1]
+            for idx in range(start, end):
+                i = self.indices[idx]
+                mat[i][j] = self.data[idx]
+        
+        return mat
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSC матриц."""
-        pass
+        A = self.to_dense()
+        B = other.to_dense()
+        n, m = self.shape
+        
+        result = []
+        for i in range(n):
+            row = []
+            for j in range(m):
+                row.append(A[i][j] + B[i][j])
+            result.append(row)
+        
+        return CSCMatrix.from_dense(result)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
-        pass
+        new_data = [x * scalar for x in self.data]
+        return CSCMatrix(new_data, self.indices, self.indptr, self.shape)
 
     def transpose(self) -> 'Matrix':
         """
@@ -25,25 +50,56 @@ class CSCMatrix(Matrix):
         Hint:
         Результат - в CSR формате (с теми же данными, но с интерпретацией строк как столбцов).
         """
-        pass
+        coo = self._to_coo()
+        transposed = coo.transpose()
+        return transposed._to_csr()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
-        pass
+        A = self.to_dense()
+        B = other.to_dense()
+        n = len(A)
+        m = len(B[0]) if B else 0
+        
+        C = [[0]*m for _ in range(n)]
+        for i in range(n):
+            for j in range(m):
+                s = 0
+                for k in range(len(A[0])):
+                    s += A[i][k] * B[k][j]
+                C[i][j] = s
+        
+        return CSCMatrix.from_dense(C)
+
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
         """Создание CSC из плотной матрицы."""
-        pass
+        from COO import COOMatrix
+        coo = COOMatrix.from_dense(dense_matrix)
+        return coo._to_csc()
 
     def _to_csr(self) -> 'CSRMatrix':
         """
         Преобразование CSCMatrix в CSRMatrix.
         """
-        pass
+        return self.transpose()
 
     def _to_coo(self) -> 'COOMatrix':
         """
         Преобразование CSCMatrix в COOMatrix.
         """
-        pass
+        from COO import COOMatrix
+
+        data, rows, cols = [], [], []
+        _, m = self.shape
+        
+        for j in range(m):
+            start = self.indptr[j]
+            end = self.indptr[j+1]
+            for idx in range(start, end):
+                data.append(self.data[idx])
+                rows.append(self.indices[idx])
+                cols.append(j)
+        
+        return COOMatrix(data, rows, cols, self.shape)
