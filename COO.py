@@ -5,6 +5,20 @@ from types import COOData, COORows, COOCols, Shape, DenseMatrix
 class COOMatrix(Matrix):
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
         super().__init__(shape)
+        if not (len(data) == len(row) == len(col)):
+            raise ValueError("data, row и col должны быть одинаковой длины")
+
+        n, m = shape
+        if n < 0 or m < 0:
+            raise ValueError("Размеры матрицы не могут быть отрицательными")
+        
+        for r in row:
+            if not (0 <= r < n):
+                raise ValueError(f"Индекс строки {r} вне диапазона [0, {n-1}]")
+        for c in col:
+            if not (0 <= c < m):
+                raise ValueError(f"Индекс столбца {c} вне диапазона [0, {m-1}]")
+            
         self.data = list(data)
         self.rows = list(row)
         self.cols = list(col)

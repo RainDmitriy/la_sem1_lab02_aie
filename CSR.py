@@ -5,6 +5,27 @@ from types import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
         super().__init__(shape)
+
+        n, m = shape
+        if len(indptr) != n + 1:
+            raise ValueError(f"indptr должен иметь длину n+1 = {n+1}, получено {len(indptr)}")
+
+        for i in range(n):
+            if indptr[i] > indptr[i + 1]:
+                raise ValueError(f"indptr должен быть неубывающим: indptr[{i}] = {indptr[i]} > indptr[{i+1}] = {indptr[i+1]}")
+
+        if indptr[0] != 0:
+            raise ValueError(f"indptr[0] должен быть 0, получено {indptr[0]}")
+        if indptr[-1] != len(data):
+            raise ValueError(f"indptr[-1] должен быть равен len(data) = {len(data)}, получено {indptr[-1]}")
+
+        if len(data) != len(indices):
+            raise ValueError(f"data и indices должны быть одинаковой длины: data={len(data)}, indices={len(indices)}")
+
+        for col_idx in indices:
+            if not (0 <= col_idx < m):
+                raise ValueError(f"Индекс столбца {col_idx} вне диапазона [0, {m-1}]")
+            
         self.data = data
         self.indices = indices
         self.indptr = indptr

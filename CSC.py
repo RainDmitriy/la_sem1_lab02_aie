@@ -5,6 +5,27 @@ from types import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
         super().__init__(shape)
+
+        n, m = shape
+        if len(indptr) != m + 1:
+            raise ValueError(f"indptr должен иметь длину m+1 = {m+1}, получено {len(indptr)}")
+
+        for j in range(m):
+            if indptr[j] > indptr[j + 1]:
+                raise ValueError(f"indptr должен быть неубывающим: indptr[{j}] = {indptr[j]} > indptr[{j+1}] = {indptr[j+1]}")
+
+        if indptr[0] != 0:
+            raise ValueError(f"indptr[0] должен быть 0, получено {indptr[0]}")
+        if indptr[-1] != len(data):
+            raise ValueError(f"indptr[-1] должен быть равен len(data) = {len(data)}, получено {indptr[-1]}")
+
+        if len(data) != len(indices):
+            raise ValueError(f"data и indices должны быть одинаковой длины: data={len(data)}, indices={len(indices)}")
+
+        for row_idx in indices:
+            if not (0 <= row_idx < n):
+                raise ValueError(f"Индекс строки {row_idx} вне диапазона [0, {n-1}]")
+            
         self.data = data
         self.indices = indices
         self.indptr = indptr

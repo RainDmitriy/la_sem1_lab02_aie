@@ -66,6 +66,9 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     L_dense = L.to_dense()
     U_dense = U.to_dense()
 
+    if len(b) != n:
+        raise ValueError(f"Длина вектора b ({len(b)}) не равна размеру матрицы A ({n})")
+
     y = [0.0] * n
     for i in range(n):
         sum_val = 0.0
@@ -104,4 +107,3 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
         det *= U_dense[i][i]
     
     return det
-
