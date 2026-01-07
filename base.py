@@ -1,6 +1,10 @@
+# ==================== base.py (полная реализация) ====================
 from abc import ABC, abstractmethod
-from types import DenseMatrix, Shape
+from typing import List, Tuple
 
+# Определяем типы локально для совместимости
+DenseMatrix = List[List[float]]
+Shape = Tuple[int, int]
 
 class Matrix(ABC):
     def __init__(self, shape: Shape):
