@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from types import DenseMatrix, Shape
+from matrix_types import DenseMatrix, Shape
 
 
 class Matrix(ABC):
@@ -20,7 +20,16 @@ class Matrix(ABC):
     @abstractmethod
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Реализация сложения с другой матрицей."""
-        pass
+        a = self.to_dense()
+        b = other.to_dense()
+        n, m = self.shape
+        result = [[0 for _ in range(m)] for _ in range(n)]
+
+        for i in range(n):
+            for j in range(m):
+                result[i][j] = a[i][j] + b[i][j]
+
+        return DenseMatrix(result)
 
     def __mul__(self, scalar: float) -> 'Matrix':
         """Умножение на скаляр."""
@@ -29,7 +38,14 @@ class Matrix(ABC):
     @abstractmethod
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Реализация умножения на скаляр."""
-        pass
+        n, m = self.shape
+        result = [[0 for _ in range(m)] for _ in range(n)]
+
+        for i in range(n):
+            for j in range(m):
+                result[i][j] = self[i][j] * scalar
+
+        return DenseMatrix(result)    
 
     def __rmul__(self, scalar: float) -> 'Matrix':
         """Обратное умножение на скаляр."""
@@ -38,7 +54,14 @@ class Matrix(ABC):
     @abstractmethod
     def transpose(self) -> 'Matrix':
         """Транспонирование матрицы."""
-        pass
+        n, m = self.shape
+        result = [[0 for _ in range(m)] for _ in range(n)]
+
+        for i in range(n):
+            for j in range(m):
+                result[i][j] = self[j][i]
+
+        return DenseMatrix(result)    
 
     def __matmul__(self, other: 'Matrix') -> 'Matrix':
         """Умножение матриц."""
@@ -49,4 +72,17 @@ class Matrix(ABC):
     @abstractmethod
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Реализация умножения матриц."""
-        pass
+        a = self.to_dense()
+        b = other.to_dense()
+
+        n, m = self.shape
+        _, k = other.shape
+
+        result = [[0 for _ in range(k)] for _ in range(n)]
+
+        for i in range(n):
+            for j in range(k):
+                for t in range(m):
+                    result[i][j] += a[i][t] * b[t][j]
+
+        return DenseMatrix(result)
