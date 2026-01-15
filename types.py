@@ -1,22 +1,25 @@
-# types.py
-from typing import List, Tuple
-
 # Основные типы данных
-DenseMatrix = List[List[float]]  # Плотная матрица: [[row1], [row2], ...] как в NumPy
-Shape = Tuple[int, int]  # Размерность: (rows, cols)
-Vector = List[float]  # Вектор: [1.0, 2.0, 3.0]
+DenseMatrix = list[list[float]]  # Плотная матрица: [[row1], [row2], ...] как в NumPy
+Shape = tuple[int, int]  # Размерность: (rows, cols)
+Vector = list[float]  # Вектор: [1.0, 2.0, 3.0]
 
 # Для COO
-COOData = List[float]      # Ненулевые значения
-COORows = List[int]        # Индексы строк
-COOCols = List[int]        # Индексы столбцов
+COOData = list[float]      # Ненулевые значения
+COORows = list[int]        # Индексы строк
+COOCols = list[int]        # Индексы столбцов
 
-# Для CSR и CSC
-CSRData = CSCData = List[float]      # Ненулевые значения
-CSRIndices = CSCIndices = List[int]  # Колонки (CSR) или строки (CSC)
-CSRIndptr = CSCIndptr = List[int]    # Указатели начала строк (CSR) или колонок (CSC)
+# Для CSR
+CSRData = list[float]      # Ненулевые значения
+CSRIndices = list[int]     # Колонки (CSR)
+CSRIndptr = list[int]      # Указатели начала строк (CSR)
+
+# Для CSC
+CSCData = list[float]      # Ненулевые значения
+CSCIndices = list[int]     # Строки (CSC)
+CSCIndptr = list[int]      # Указатели начала колонок (CSC)
+
 
 # Типы для конструкторов
-COOArgs = Tuple[COOData, COORows, COOCols, Shape]
-CSRArgs = Tuple[CSRData, CSRIndices, CSRIndptr, Shape]
-CSCArgs = Tuple[CSCData, CSCIndices, CSCIndptr, Shape]
+COOArgs = tuple[COOData, COORows, COOCols, Shape]
+CSRArgs = tuple[CSRData, CSRIndices, CSRIndptr, Shape]
+CSCArgs = tuple[CSRData, CSRIndices, CSRIndptr, Shape]
