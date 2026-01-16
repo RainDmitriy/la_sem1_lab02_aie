@@ -1,15 +1,15 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from types import DenseMatrix, Shape
+from COO import COOMatrix
 
 
 class Matrix(ABC):
     def __init__(self, shape: Shape):
         self.shape = shape
 
-    @abstractmethod
     def to_dense(self) -> DenseMatrix:
         """Преобразует разреженную матрицу в плотную."""
-        pass
+        raise NotImplementedError
 
     def __add__(self, other: 'Matrix') -> 'Matrix':
         """Сложение матриц."""
@@ -17,28 +17,35 @@ class Matrix(ABC):
             raise ValueError("Размерности матриц не совпадают")
         return self._add_impl(other)
 
-    @abstractmethod
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Реализация сложения с другой матрицей."""
-        pass
+        a = self.to_dense()
+        b = other.to_dense()
+        rows, cols = self.shape
+        res = [[a[i][j] + b[i][j] for j in range(cols)] for i in range(rows)]
+        return COOMatrix.from_dense(res)
 
     def __mul__(self, scalar: float) -> 'Matrix':
         """Умножение на скаляр."""
         return self._mul_impl(scalar)
 
-    @abstractmethod
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Реализация умножения на скаляр."""
-        pass
+        a = self.to_dense()
+        rows, cols = self.shape
+        res = [[a[i][j] * scalar for j in range(cols)] for i in range(rows)]
+        return COOMatrix.from_dense(res)
 
     def __rmul__(self, scalar: float) -> 'Matrix':
         """Обратное умножение на скаляр."""
         return self.__mul__(scalar)
 
-    @abstractmethod
     def transpose(self) -> 'Matrix':
         """Транспонирование матрицы."""
-        pass
+        a = self.to_dense()
+        rows, cols = self.shape
+        res = [[a[i][j] for i in range(rows)] for j in range(cols)]
+        return COOMatrix.from_dense(res)
 
     def __matmul__(self, other: 'Matrix') -> 'Matrix':
         """Умножение матриц."""
@@ -46,7 +53,17 @@ class Matrix(ABC):
             raise ValueError("Несовместимые размерности для умножения")
         return self._matmul_impl(other)
 
-    @abstractmethod
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Реализация умножения матриц."""
-        pass
+        a = self.to_dense()
+        b = other.to_dense()
+        n = self.shape[0]
+        m = other.shape[1]
+        k = self.shape[1]
+        res = [[0.0 for _ in range(m)] for _ in range(n)]
+        for i in range(n):
+            for t in range(k):
+                if a[i][t] != 0:
+                    for j in range(m):
+                        res[i][j] += a[i][t] * b[t][j]
+        return COOMatrix.from_dense(res)
