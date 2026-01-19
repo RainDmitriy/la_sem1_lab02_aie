@@ -2,6 +2,7 @@ from base import Matrix
 from types import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 
 
+
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
         super().__init__(shape)
@@ -47,3 +48,4 @@ class CSCMatrix(Matrix):
         Преобразование CSCMatrix в COOMatrix.
         """
         pass
+
