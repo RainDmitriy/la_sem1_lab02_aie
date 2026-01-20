@@ -40,7 +40,6 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     """
     Решение СЛАУ Ax = b через LU-разложение.
     """
-    # Проверка размеров
     if A.shape[0] != A.shape[1] or len(b) != A.shape[0]:
         return None
 
