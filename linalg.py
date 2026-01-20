@@ -18,12 +18,11 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     
 
     for i in range(n_rows):
-        # 1. Считаем U (верхнюю треугольную)
+
         for k in range(i, n_rows):
             sum_upper = sum(L[i][j] * U[j][k] for j in range(i))
             U[i][k] = matrix[i][k] - sum_upper
 
-        # 2. Считаем L (нижнюю треугольную)
         for k in range(i, n_rows):
             if i == k:
                 L[i][i] = 1.0
@@ -54,13 +53,11 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     U = U_csc.to_dense()
     n = len(b)
 
-    # 1. Прямой ход: Ly = b
     y = [0.0] * n
     for i in range(n):
         sum_val = sum(L[i][j] * y[j] for j in range(i))
         y[i] = b[i] - sum_val
 
-    # 2. Обратный ход: Ux = y
     x = [0.0] * n
     for i in range(n - 1, -1, -1):
         sum_val = sum(U[i][j] * x[j] for j in range(i + 1, n))
