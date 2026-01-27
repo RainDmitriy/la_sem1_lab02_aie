@@ -21,117 +21,104 @@ def lu_decomposition(A: CSRMatrix) -> Optional[Tuple[CSRMatrix, CSRMatrix]]:
     L = CSRMatrix(L_data, L_indices, L_indptr, (n, n))
 
     for k in range(n - 1):
-        row_k = U.get_row(k)
-        u_kk = 0.0
-        for col, val in row_k:
-            if col == k:
-                u_kk = val
-                break
+
+        u_kk = U.get_element(k, k)
+
         if abs(u_kk) < 1e-10:
             pivot_found = False
             
             for i in range(k + 1, n):
-                row_i = U.get_row(i)
-                for col, val in row_i:
-                    if col == k and abs(val) > 1e-10:
-                        U.swap_rows(k, i)
-                        L.swap_rows(k, i)
-                        if k > 0:
-                            for j in range(k):
-                                l_kj = L.get_element(k, j)
-                                l_ij = L.get_element(i, j)
-                                
-                                row_k_l = L.get_row(k)
-                                row_i_l = L.get_row(i)
-                                
-                                new_row_k = [(c, v) for c, v in row_k_l if c != j]
-                                new_row_i = [(c, v) for c, v in row_i_l if c != j]
-                                
-                                if abs(l_ij) > 1e-12:
-                                    new_row_k.append((j, l_ij))
-                                if abs(l_kj) > 1e-12:
-                                    new_row_i.append((j, l_kj))
-                                
-                                L.set_row(k, sorted(new_row_k, key=lambda x: x[0]))
-                                L.set_row(i, sorted(new_row_i, key=lambda x: x[0]))
-                        
-                        pivot_found = True
-                        break
-                
-                if pivot_found:
+                u_ik = U.get_element(i, k)
+                if abs(u_ik) > 1e-10:
+
+                    U.swap_rows(k, i)
+
+                    if k > 0:
+                        for j in range(k):
+                            l_kj = L.get_element(k, j)
+                            l_ij = L.get_element(i, j)
+
+                            row_k = L.get_row(k)
+                            row_i = L.get_row(i)
+                            
+                            new_row_k = [(c, v) for c, v in row_k if c != j]
+                            new_row_i = [(c, v) for c, v in row_i if c != j]
+                            
+                            if abs(l_ij) > 1e-12:
+                                new_row_k.append((j, l_ij))
+                            if abs(l_kj) > 1e-12:
+                                new_row_i.append((j, l_kj))
+                            
+                            new_row_k.sort(key=lambda x: x[0])
+                            new_row_i.sort(key=lambda x: x[0])
+                            
+                            L.set_row(k, new_row_k)
+                            L.set_row(i, new_row_i)
+                    
+                    pivot_found = True
                     break
             
             if not pivot_found:
                 return None
-
-            row_k = U.get_row(k)
-            u_kk = 0.0
-            for col, val in row_k:
-                if col == k:
-                    u_kk = val
-                    break
+            
+            u_kk = U.get_element(k, k)
 
         for i in range(k + 1, n):
-            row_i = U.get_row(i)
-            
-            u_ik = 0.0
-            for col, val in row_i:
-                if col == k:
-                    u_ik = val
-                    break
-            
+            u_ik = U.get_element(i, k)
             if abs(u_ik) > 1e-12:
                 factor = u_ik / u_kk
 
-                l_row = L.get_row(i)
-                new_l_row = [(c, v) for c, v in l_row if c != k]
-                new_l_row.append((k, factor))
-                L.set_row(i, sorted(new_l_row, key=lambda x: x[0]))
+                row_i_L = L.get_row(i)
+                new_row_L = [(c, v) for c, v in row_i_L if c != k]
+                new_row_L.append((k, factor))
+                new_row_L.sort(key=lambda x: x[0])
+                L.set_row(i, new_row_L)
 
-                new_row_i = []
+                row_i_U = U.get_row(i)
+                row_k_U = U.get_row(k)
+                
+                new_row_U = []
+
                 p1, p2 = 0, 0
-                len1, len2 = len(row_i), len(row_k)
+                len1, len2 = len(row_i_U), len(row_k_U)
                 
                 while p1 < len1 and p2 < len2:
-                    j1, val1 = row_i[p1]
-                    j2, val2 = row_k[p2]
+                    j1, val1 = row_i_U[p1]
+                    j2, val2 = row_k_U[p2]
                     
                     if j1 < j2:
                         if j1 != k:
-                            new_row_i.append((j1, val1))
+                            new_row_U.append((j1, val1))
                         p1 += 1
                     elif j1 > j2:
                         if j2 >= k:
                             new_val = -factor * val2
                             if abs(new_val) > 1e-12:
-                                new_row_i.append((j2, new_val))
+                                new_row_U.append((j2, new_val))
                         p2 += 1
                     else:
-                        if j1 == k:
-                            new_val = 0.0
-                        else:
-                            new_val = val1 - factor * val2
-                        
+                        new_val = val1 - factor * val2
                         if abs(new_val) > 1e-12:
-                            new_row_i.append((j1, new_val))
+                            new_row_U.append((j1, new_val))
                         p1 += 1
                         p2 += 1
 
                 while p1 < len1:
-                    j1, val1 = row_i[p1]
+                    j1, val1 = row_i_U[p1]
                     if j1 != k:
-                        new_row_i.append((j1, val1))
+                        new_row_U.append((j1, val1))
                     p1 += 1
-                
+
                 while p2 < len2:
-                    j2, val2 = row_k[p2]
-                    if j2 > k:
+                    j2, val2 = row_k_U[p2]
+                    if j2 >= k:
                         new_val = -factor * val2
                         if abs(new_val) > 1e-12:
-                            new_row_i.append((j2, new_val))
+                            new_row_U.append((j2, new_val))
                     p2 += 1
-                
-                U.set_row(i, sorted(new_row_i, key=lambda x: x[0]))
+
+                new_row_U.sort(key=lambda x: x[0])
+                U.set_row(i, new_row_U)
     
     return L, U
 
@@ -163,7 +150,7 @@ def solve_SLAE_lu(A: CSRMatrix, b: Vector) -> Optional[Vector]:
         for col, val in row_U:
             if col > i:
                 sum_val += val * x[col]
-        
+
         diag = 0.0
         for col, val in row_U:
             if col == i:

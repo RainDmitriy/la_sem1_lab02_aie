@@ -60,14 +60,18 @@ class COOMatrix(Matrix):
             
             return COOMatrix(new_data, new_rows, new_cols, self.shape)
 
-        if hasattr(other, '_to_coo'):
-            return self._add_impl(other._to_coo())
+        try:
+            other_coo = other._to_coo()
+            return self._add_impl(other_coo)
+        except:
+            pass
 
         if self.shape[0] * self.shape[1] <= MAX_DENSE_SIZE:
-            other_coo = COOMatrix.from_dense(other.to_dense())
+            other_dense = other.to_dense()
+            other_coo = COOMatrix.from_dense(other_dense)
             return self._add_impl(other_coo)
         
-        raise ValueError("Нельзя складывать большие матрицы через dense")
+        raise ValueError("Нельзя складывать матрицы разных форматов")
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         new_data = [x * scalar for x in self.data]
@@ -81,18 +85,18 @@ class COOMatrix(Matrix):
         if isinstance(other, COOMatrix):
             result_dict = defaultdict(float)
 
-            row_groups = defaultdict(list)
+            row_dict = defaultdict(list)
             for i in range(self.nnz):
-                row_groups[self.row[i]].append((self.col[i], self.data[i]))
+                row_dict[self.row[i]].append((self.col[i], self.data[i]))
 
-            col_groups = defaultdict(list)
+            col_dict = defaultdict(list)
             for i in range(other.nnz):
-                col_groups[other.col[i]].append((other.row[i], other.data[i]))
+                col_dict[other.col[i]].append((other.row[i], other.data[i]))
 
-            for i, row_items in row_groups.items():
+            for i, row_items in row_dict.items():
                 for k, a_val in row_items:
-                    if k in col_groups:
-                        for j, b_val in col_groups[k]:
+                    if k in col_dict:
+                        for j, b_val in col_dict[k]:
                             result_dict[(i, j)] += a_val * b_val
 
             new_data, new_rows, new_cols = [], [], []
@@ -105,15 +109,19 @@ class COOMatrix(Matrix):
             return COOMatrix(new_data, new_rows, new_cols, 
                            (self.shape[0], other.shape[1]))
 
-        if hasattr(other, '_to_coo'):
-            return self._matmul_impl(other._to_coo())
+        try:
+            other_coo = other._to_coo()
+            return self._matmul_impl(other_coo)
+        except:
+            pass
 
         if self.shape[0] * self.shape[1] <= MAX_DENSE_SIZE and \
            other.shape[0] * other.shape[1] <= MAX_DENSE_SIZE:
-            other_coo = COOMatrix.from_dense(other.to_dense())
+            other_dense = other.to_dense()
+            other_coo = COOMatrix.from_dense(other_dense)
             return self._matmul_impl(other_coo)
         
-        raise ValueError("Нельзя умножать большие матрицы через dense")
+        raise ValueError("Нельзя умножать большие матрицы разных форматов")
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
@@ -144,7 +152,7 @@ class COOMatrix(Matrix):
         data = [d for _, _, d in items]
         indices = [r for _, r, _ in items]
         _, m = self.shape
-        
+
         indptr = [0] * (m + 1)
         for c, _, _ in items:
             indptr[c + 1] += 1
@@ -167,7 +175,7 @@ class COOMatrix(Matrix):
         data = [d for _, _, d in items]
         indices = [c for _, c, _ in items]
         n, _ = self.shape
-        
+
         indptr = [0] * (n + 1)
         for r, _, _ in items:
             indptr[r + 1] += 1
@@ -176,3 +184,6 @@ class COOMatrix(Matrix):
             indptr[i + 1] += indptr[i]
         
         return CSRMatrix(data, indices, indptr, self.shape)
+
+    def _to_coo(self) -> 'COOMatrix':
+        return self

@@ -51,9 +51,9 @@ class CSRMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         if not isinstance(other, CSRMatrix):
-            if hasattr(other, '_to_csr'):
+            try:
                 other = other._to_csr()
-            else:
+            except AttributeError:
                 if self.shape[0] * self.shape[1] <= MAX_DENSE_SIZE:
                     other_coo = COOMatrix.from_dense(other.to_dense())
                     other = other_coo._to_csr()
@@ -67,34 +67,28 @@ class CSRMatrix(Matrix):
             p1, p2 = self.indptr[i], other.indptr[i]
             end1, end2 = self.indptr[i + 1], other.indptr[i + 1]
             
-            while p1 < end1 and p2 < end2:
-                j1, j2 = self.indices[p1], other.indices[p2]
-                
-                if j1 < j2:
-                    result_data.append(self.data[p1])
-                    result_indices.append(j1)
-                    p1 += 1
-                elif j1 > j2:
-                    result_data.append(other.data[p2])
-                    result_indices.append(j2)
-                    p2 += 1
-                else:
-                    val = self.data[p1] + other.data[p2]
-                    if abs(val) > ZERO_THRESHOLD:
-                        result_data.append(val)
-                        result_indices.append(j1)
-                    p1 += 1
-                    p2 += 1
-            
+            merged = {}
+
             while p1 < end1:
-                result_data.append(self.data[p1])
-                result_indices.append(self.indices[p1])
+                j = self.indices[p1]
+                val = self.data[p1]
+                merged[j] = val
                 p1 += 1
-            
+
             while p2 < end2:
-                result_data.append(other.data[p2])
-                result_indices.append(other.indices[p2])
+                j = other.indices[p2]
+                val = other.data[p2]
+                if j in merged:
+                    merged[j] += val
+                else:
+                    merged[j] = val
                 p2 += 1
+
+            sorted_items = sorted(merged.items())
+            for j, val in sorted_items:
+                if abs(val) > ZERO_THRESHOLD:
+                    result_data.append(val)
+                    result_indices.append(j)
             
             result_indptr.append(len(result_data))
         
@@ -120,14 +114,16 @@ class CSRMatrix(Matrix):
         
         if isinstance(other, CSRMatrix):
             other_coo = other._to_coo()
-        elif hasattr(other, '_to_coo'):
-            other_coo = other._to_coo()
         else:
-            if self.shape[0] * self.shape[1] <= MAX_DENSE_SIZE and \
-               other.shape[0] * other.shape[1] <= MAX_DENSE_SIZE:
-                other_coo = COOMatrix.from_dense(other.to_dense())
-            else:
-                raise ValueError("Нельзя умножать большие матрицы через dense")
+            try:
+                other_coo = other._to_coo()
+            except AttributeError:
+                if self.shape[0] * self.shape[1] <= MAX_DENSE_SIZE and \
+                   other.shape[0] * other.shape[1] <= MAX_DENSE_SIZE:
+                    other_dense = other.to_dense()
+                    other_coo = COOMatrix.from_dense(other_dense)
+                else:
+                    raise ValueError("Нельзя умножать большие матрицы через dense")
         
         result_coo = self_coo._matmul_impl(other_coo)
         return result_coo._to_csr()
@@ -211,3 +207,6 @@ class CSRMatrix(Matrix):
                 col_indices.append(self.indices[idx])
         
         return COOMatrix(data, row_indices, col_indices, self.shape)
+
+    def _to_csr(self) -> 'CSRMatrix':
+        return self
