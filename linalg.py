@@ -4,12 +4,37 @@ from typing import Tuple, Optional, List
 
 
 def lu_decomposition_pivot(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix, List[int]]]:
-    """LU-разложение с частичным выбором ведущего элемента."""
+    """LU-разложение с частичным выбором ведущего элемента для разреженных матриц."""
     n = A.shape[0]
     if n != A.shape[1]:
         raise ValueError("LU-разложение применимо только к квадратным матрицам")
 
     dense = A.to_dense()
+    data, indices, indptr = [], [], [0] * (n + 1)
+
+    col_counts = [0] * n
+    for j in range(n):
+        for i in range(n):
+            if abs(dense[i][j]) > 1e-12:
+                col_counts[j] += 1
+
+    for j in range(n):
+        indptr[j + 1] = indptr[j] + col_counts[j]
+
+    data = [0.0] * indptr[n]
+    indices = [0] * indptr[n]
+    current_pos = indptr[:]
+
+    for j in range(n):
+        for i in range(n):
+            val = dense[i][j]
+            if abs(val) > 1e-12:
+                pos = current_pos[j]
+                data[pos] = val
+                indices[pos] = i
+                current_pos[j] += 1
+
+    LU_csc = CSCMatrix(data, indices, indptr, (n, n))
 
     perm = list(range(n))
 
