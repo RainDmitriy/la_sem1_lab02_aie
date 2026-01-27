@@ -1,5 +1,5 @@
 from base import Matrix
-from types1 import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
+from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 from base import TransposeDense
 
 
