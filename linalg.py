@@ -1,16 +1,15 @@
-from typing import List, Tuple, Optional
-from CSC import CSCMatrix
-from CSR import CSRMatrix
-
-Vector = List[float]
+from typing import Tuple, Optional, List
 
 
-def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
+# Используем строковые аннотации для избежания циклических импортов
+def lu_decomposition(A: 'CSCMatrix') -> Optional[Tuple['CSCMatrix', 'CSCMatrix']]:
     """
     LU-разложение для CSC матрицы.
     Возвращает (L, U) - нижнюю и верхнюю треугольные матрицы.
     Ожидается, что матрица L хранит единицы на главной диагонали.
     """
+    from CSC import CSCMatrix
+    
     if A.rows != A.cols:
         return None
     
@@ -24,13 +23,17 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     for i in range(n):
         # Верхняя треугольная матрица U
         for j in range(i, n):
-            s = sum(L[i][k] * U[k][j] for k in range(i))
+            s = 0.0
+            for k in range(i):
+                s += L[i][k] * U[k][j]
             U[i][j] = dense[i][j] - s
         
         # Нижняя треугольная матрица L (с единицами на диагонали)
         L[i][i] = 1.0
         for j in range(i + 1, n):
-            s = sum(L[j][k] * U[k][i] for k in range(i))
+            s = 0.0
+            for k in range(i):
+                s += L[j][k] * U[k][i]
             if U[i][i] == 0:
                 return None  # Матрица вырождена
             L[j][i] = (dense[j][i] - s) / U[i][i]
@@ -42,10 +45,12 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     return L_csc, U_csc
 
 
-def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
+def solve_SLAE_lu(A: 'CSCMatrix', b: List[float]) -> Optional[List[float]]:
     """
     Решение СЛАУ Ax = b через LU-разложение.
     """
+    from CSC import CSCMatrix
+    
     lu_result = lu_decomposition(A)
     if lu_result is None:
         return None
@@ -99,7 +104,7 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     return x
 
 
-def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
+def find_det_with_lu(A: 'CSCMatrix') -> Optional[float]:
     """
     Нахождение определителя через LU-разложение.
     det(A) = det(L) * det(U)
