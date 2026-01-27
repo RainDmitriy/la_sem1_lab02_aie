@@ -24,8 +24,6 @@ class CSCMatrix(Matrix):
         return CSCMatrix.from_dense(d1)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        if scalar == 0:
-            return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
         return CSCMatrix([v * scalar for v in self.data], self.indices, self.indptr, self.shape)
 
     def transpose(self) -> 'Matrix':
@@ -44,9 +42,8 @@ class CSCMatrix(Matrix):
         data, indices, indptr = [], [], [0]
         for j in range(cols):
             for i in range(rows):
-                val = dense_matrix[i][j]
-                if abs(val) > 1e-15:
-                    data.append(val)
+                if dense_matrix[i][j] != 0.0:
+                    data.append(dense_matrix[i][j])
                     indices.append(i)
             indptr.append(len(data))
         return cls(data, indices, indptr, (rows, cols))
