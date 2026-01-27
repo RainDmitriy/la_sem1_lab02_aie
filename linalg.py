@@ -36,7 +36,6 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
 
             L[k][i] = (dense[k][i] - sum_) / U[i][i]
 
-    from CSC import CSCMatrix
     L_csc = CSCMatrix.from_dense(L)
     U_csc = CSCMatrix.from_dense(U)
 
@@ -60,7 +59,7 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
         sum_ = 0.0
         for j in range(i):
             sum_ += dense_L[i][j] * y[j]
-        y[i] = b[i] - sum_  # L[i][i] = 1
+        y[i] = b[i] - sum_
 
     x = [0.0] * n
     dense_U = U.to_dense()

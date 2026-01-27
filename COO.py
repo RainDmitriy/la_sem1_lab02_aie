@@ -18,7 +18,6 @@ class COOMatrix(Matrix):
         self.nnz = len(data)
 
     def to_dense(self) -> DenseMatrix:
-        """Преобразует COO в плотную матрицу."""
         rows, cols = self.shape
         dense = [[0.0] * cols for _ in range(rows)]
 
@@ -28,21 +27,19 @@ class COOMatrix(Matrix):
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Сложение COO матриц."""
-        dense_a = self.to_dense()
-        dense_b = other.to_dense()
+        dense_self = self.to_dense()
+        dense_other = other.to_dense()
 
         rows, cols = self.shape
         result = [[0.0] * cols for _ in range(rows)]
 
         for i in range(rows):
             for j in range(cols):
-                result[i][j] = dense_a[i][j] + dense_b[i][j]
+                result[i][j] = dense_self[i][j] + dense_other[i][j]
 
         return COOMatrix.from_dense(result)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        """Умножение COO на скаляр."""
         if scalar == 0:
             return COOMatrix([], [], [], self.shape)
 
@@ -50,28 +47,26 @@ class COOMatrix(Matrix):
         return COOMatrix(new_data, self.row.copy(), self.col.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
-        """Транспонирование COO матрицы."""
         new_shape = (self.shape[1], self.shape[0])
-
         return COOMatrix(self.data.copy(), self.col.copy(), self.row.copy(), new_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """Умножение COO матриц."""
-        from CSR import CSRMatrix
-        csr_self = self._to_csr()
+        dense_self = self.to_dense()
+        dense_other = other.to_dense()
 
-        if not isinstance(other, CSRMatrix):
-            csr_other = CSRMatrix.from_dense(other.to_dense())
-        else:
-            csr_other = other
+        rows_a, cols_a = self.shape
+        rows_b, cols_b = other.shape
+        result = [[0.0] * cols_b for _ in range(rows_a)]
 
-        result_csr = csr_self._matmul_impl(csr_other)
+        for i in range(rows_a):
+            for j in range(cols_b):
+                for k in range(cols_a):
+                    result[i][j] += dense_self[i][k] * dense_other[k][j]
 
-        return result_csr._to_coo()
+        return COOMatrix.from_dense(result)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
-        """Создание COO из плотной матрицы."""
         rows = len(dense_matrix)
         cols = len(dense_matrix[0]) if rows > 0 else 0
 
@@ -90,9 +85,6 @@ class COOMatrix(Matrix):
         return cls(data, row_indices, col_indices, (rows, cols))
 
     def _to_csc(self) -> 'CSCMatrix':
-        """
-        Преобразование COOMatrix в CSCMatrix.
-        """
         from CSC import CSCMatrix
 
         sorted_indices = sorted(range(self.nnz), key=lambda i: (self.col[i], self.row[i]))
@@ -119,9 +111,6 @@ class COOMatrix(Matrix):
         return CSCMatrix(data, indices, indptr, self.shape)
 
     def _to_csr(self) -> 'CSRMatrix':
-        """
-        Преобразование COOMatrix в CSRMatrix.
-        """
         from CSR import CSRMatrix
 
         sorted_indices = sorted(range(self.nnz), key=lambda i: (self.row[i], self.col[i]))
