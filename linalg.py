@@ -1,5 +1,5 @@
 from CSR import CSRMatrix
-from types import Vector
+from mytypes import Vector
 from typing import Optional, Tuple, List
 
 def lu_decomposition(A: CSRMatrix) -> Optional[Tuple[CSRMatrix, CSRMatrix]]:

@@ -1,5 +1,5 @@
 from base import Matrix
-from types import COOData, COORows, COOCols, Shape, DenseMatrix
+from mytypes import COOData, COORows, COOCols, Shape, DenseMatrix
 from collections import defaultdict
 
 class COOMatrix(Matrix):

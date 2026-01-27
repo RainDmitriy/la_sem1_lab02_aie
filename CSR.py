@@ -1,5 +1,5 @@
 from base import Matrix
-from types import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
+from mytypes import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 from collections import defaultdict
 from typing import List, Tuple
 
