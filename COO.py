@@ -20,25 +20,24 @@ class COOMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение COO матриц."""
-        if isinstance(other, COOMatrix):
-            other_coo = other
-        else:
-            other_coo = other._to_coo()
+        other_coo = other._to_coo()
         result_dict = {}
         for idx in range(self.nnz):
             key = (self.row[idx], self.col[idx])
             result_dict[key] = self.data[idx]
         for idx in range(other_coo.nnz):
             key = (other_coo.row[idx], other_coo.col[idx])
-            if key in result_dict:
-                result_dict[key] += other_coo.data[idx]
-            else:
-                result_dict[key] = other_coo.data[idx]
+            current = result_dict.get(key, 0.0)
+            new_val = current + other_coo.data[idx]
+            if abs(new_val) > 1e-15:
+                result_dict[key] = new_val
+            elif key in result_dict:
+                del result_dict[key]
         new_data = []
         new_row = []
         new_col = []
         for (i, j), val in result_dict.items():
-            if abs(val) > 1e-12:
+            if abs(val) > 1e-15:
                 new_data.append(val)
                 new_row.append(i)
                 new_col.append(j)

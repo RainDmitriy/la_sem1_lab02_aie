@@ -41,28 +41,19 @@ class CSCMatrix(Matrix):
         Hint:
         Результат - в CSR формате (с теми же данными, но с интерпретацией строк как столбцов).
         """
-        from CSR import CSRMatrix
         n_rows, n_cols = self.shape
-        if self.nnz == 0:
-            return CSRMatrix([], [], [0] * (n_cols + 1), (n_cols, n_rows))
-        row_counts = [0] * n_cols
-        for j in range(n_cols):
-            row_counts[j] = self.indptr[j + 1] - self.indptr[j]
-        csr_indptr = [0] * (n_cols + 1)
-        for i in range(n_cols):
-            csr_indptr[i + 1] = csr_indptr[i] + row_counts[i]
-        csr_data = [0.0] * self.nnz
-        csr_indices = [0] * self.nnz
-        current_pos = csr_indptr.copy()
+        from COO import COOMatrix
+        coo_data = []
+        coo_row = []
+        coo_col = []
         for j in range(n_cols):
             for k in range(self.indptr[j], self.indptr[j + 1]):
-                i = self.indices[k]
-                val = self.data[k]
-                pos = current_pos[i]
-                csr_data[pos] = val
-                csr_indices[pos] = j
-                current_pos[i] += 1
-        return CSRMatrix(csr_data, csr_indices, csr_indptr, (n_cols, n_rows))
+                coo_data.append(self.data[k])
+                coo_row.append(self.indices[k])
+                coo_col.append(j)
+        coo = COOMatrix(coo_data, coo_row, coo_col, (n_rows, n_cols))
+        coo_t = coo.transpose()
+        return coo_t._to_csr()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
