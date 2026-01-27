@@ -33,7 +33,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
             for k in range(i):
                 s += L[j][k] * U[k][i]
             
-            if abs(U[i][i]) < 1e-10:
+            if abs(U[i][i]) < 1e-7:
                 return None  # Матрица вырождена
             
             L[j][i] = (dense[j][i] - s) / U[i][i]
@@ -73,7 +73,7 @@ def solve_SLAE_lu(A: CSCMatrix, b: List[float]) -> Optional[List[float]]:
         for j in range(i + 1, n):
             s += dense_U[i][j] * x[j]
         
-        if abs(dense_U[i][i]) < 1e-10:
+        if abs(dense_U[i][i]) < 1e-7:
             return None
         
         x[i] = (y[i] - s) / dense_U[i][i]
