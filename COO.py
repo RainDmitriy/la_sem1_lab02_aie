@@ -25,29 +25,22 @@ class COOMatrix(Matrix):
         if self.shape != other.shape:
             raise ValueError("Размерности матриц не совпадают")
         
-        # Если other тоже COO
-        if isinstance(other, COOMatrix):
-            # Создаем словари
-            dict1 = {}
-            for i in range(self.nnz):
-                key = (self.row[i], self.col[i])
-                dict1[key] = self.data[i]
+        # Если other тоже COO, складываем
+        if hasattr(other, 'row') and hasattr(other, 'col') and hasattr(other, 'data'):
+            # Создаем словари для быстрого сложения
+            dict1 = {(r, c): v for r, c, v in zip(self.row, self.col, self.data)}
+            dict2 = {(r, c): v for r, c, v in zip(other.row, other.col, other.data)}
             
-            dict2 = {}
-            for i in range(other.nnz):
-                key = (other.row[i], other.col[i])
-                dict2[key] = other.data[i]
+            # Объединяем ключи
+            all_keys = set(dict1.keys()) | set(dict2.keys())
             
-            # Объединяем
             result_data = []
             result_row = []
             result_col = []
             
-            all_keys = set(dict1.keys()) | set(dict2.keys())
             for r, c in sorted(all_keys):
                 val = dict1.get((r, c), 0.0) + dict2.get((r, c), 0.0)
-                # Убираем порог - храним все, что не точно 0
-                if val != 0.0:
+                if abs(val) > 1e-12:  # Учитываем численные погрешности
                     result_data.append(val)
                     result_row.append(r)
                     result_col.append(c)
@@ -66,7 +59,7 @@ class COOMatrix(Matrix):
             for i in range(rows):
                 for j in range(cols):
                     val = dense_self[i][j] + dense_other[i][j]
-                    if val != 0.0:
+                    if abs(val) > 1e-12:
                         result_data.append(val)
                         result_row.append(i)
                         result_col.append(j)
@@ -75,7 +68,7 @@ class COOMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
-        if scalar == 0.0:
+        if abs(scalar) < 1e-12:
             return COOMatrix([], [], [], self.shape)
         
         new_data = [val * scalar for val in self.data]
@@ -91,9 +84,16 @@ class COOMatrix(Matrix):
         if self.shape[1] != other.shape[0]:
             raise ValueError("Несовместимые размерности для умножения")
         
-        # Преобразуем self в CSR для умножения
+        # Преобразуем в CSR для эффективного умножения
         csr_self = self._to_csr()
-        return csr_self._matmul_impl(other)
+        result = csr_self._matmul_impl(other)
+        
+        # Если результат - CSR, преобразуем обратно в COO
+        if hasattr(result, '_to_coo'):
+            return result._to_coo()
+        else:
+            # Иначе преобразуем через плотную матрицу
+            return COOMatrix.from_dense(result.to_dense())
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
@@ -104,7 +104,7 @@ class COOMatrix(Matrix):
         
         for i, row in enumerate(dense_matrix):
             for j, val in enumerate(row):
-                if val != 0.0:
+                if abs(val) > 1e-12:
                     data.append(float(val))
                     rows.append(i)
                     cols.append(j)
