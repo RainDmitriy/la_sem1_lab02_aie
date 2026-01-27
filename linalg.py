@@ -1,167 +1,128 @@
-from CSR import CSRMatrix
+from CSC import CSCMatrix
 from mytypes import Vector
-from typing import Tuple, Optional, Dict
+from typing import Tuple, Optional, Dict, List
 from collections import defaultdict
 
-class LUDecomposition:
-    """Класс для выполнения LU разложения с выбором главного элемента."""
+THRESHOLD = 1e-10
+
+def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
+    """
+    LU-разложение для CSC матрицы.
+    Возвращает (L, U) в CSC формате.
+    L с единицами на диагонали.
+    """
+    n = A.shape[0]
     
-    def __init__(self, matrix: CSRMatrix):
-        self.matrix = matrix
-        self.n = matrix.shape[0]
-        self.L = None
-        self.U = None
-        self.pivots = list(range(self.n))
+    U_coo = A._to_coo()
+    U_data = U_coo.data.copy()
+    U_rows = U_coo.row.copy()
+    U_cols = U_coo.col.copy()
+
+    L_data = []
+    L_rows = []
+    L_cols = []
+
+    for i in range(n):
+        L_data.append(1.0)
+        L_rows.append(i)
+        L_cols.append(i)
     
-    def decompose(self) -> bool:
-        """Выполняет LU разложение с частичным выбором."""
-        U_data = self.matrix.data.copy()
-        U_indices = self.matrix.indices.copy()
-        U_indptr = self.matrix.indptr.copy()
+    L_coo = type(U_coo)(L_data, L_rows, L_cols, (n, n))
 
-        L_data = []
-        L_indices = []
-        L_indptr = [0] * (self.n + 1)
-        
-        for i in range(self.n):
-            L_data.append(1.0)
-            L_indices.append(i)
-            L_indptr[i + 1] = i + 1
+    U_dict = defaultdict(lambda: defaultdict(float))
+    for idx in range(len(U_data)):
+        i = U_rows[idx]
+        j = U_cols[idx]
+        U_dict[i][j] = U_data[idx]
+    
+    L_dict = defaultdict(lambda: defaultdict(float))
+    for idx in range(len(L_data)):
+        i = L_rows[idx]
+        j = L_cols[idx]
+        L_dict[i][j] = L_data[idx]
+    
+    for k in range(n - 1):
+        pivot = U_dict[k].get(k, 0.0)
 
-        U = CSRMatrix(U_data, U_indices, U_indptr, (self.n, self.n))
-        L = CSRMatrix(L_data, L_indices, L_indptr, (self.n, self.n))
-
-        def get_row_elements(mat: CSRMatrix, row: int) -> Dict[int, float]:
-            start = mat.indptr[row]
-            end = mat.indptr[row + 1]
-            result = {}
-            for idx in range(start, end):
-                col = mat.indices[idx]
-                result[col] = mat.data[idx]
-            return result
-        
-        def update_row(mat: CSRMatrix, row: int, elements: Dict[int, float]) -> CSRMatrix:
-            all_rows = []
-            for i in range(self.n):
-                if i == row:
-                    sorted_items = sorted((col, val) for col, val in elements.items() if abs(val) > 1e-12)
-                    all_rows.append(sorted_items)
-                else:
-                    start = mat.indptr[i]
-                    end = mat.indptr[i + 1]
-                    row_items = [(mat.indices[idx], mat.data[idx]) for idx in range(start, end)]
-                    all_rows.append(row_items)
-
-            new_data, new_indices, new_indptr = [], [], [0]
-            for row_items in all_rows:
-                for col, val in row_items:
-                    new_data.append(val)
-                    new_indices.append(col)
-                new_indptr.append(len(new_data))
-            
-            return CSRMatrix(new_data, new_indices, new_indptr, (self.n, self.n))
-
-        for k in range(self.n - 1):
+        if abs(pivot) < THRESHOLD:
+            max_val = 0.0
             max_row = k
-            max_val = abs(U.get_element(k, k) if hasattr(U, 'get_element') else 0.0)
-
-            row_k_elems = get_row_elements(U, k)
-            u_kk = row_k_elems.get(k, 0.0)
             
-            if abs(u_kk) < 1e-10:
-                for i in range(k + 1, self.n):
-                    row_i_elems = get_row_elements(U, i)
-                    val = abs(row_i_elems.get(k, 0.0))
-                    if val > max_val:
-                        max_val = val
-                        max_row = i
+            for i in range(k + 1, n):
+                val = abs(U_dict[i].get(k, 0.0))
+                if val > max_val:
+                    max_val = val
+                    max_row = i
+            
+            if max_val < THRESHOLD:
+                return None
+
+            U_dict[k], U_dict[max_row] = U_dict[max_row], U_dict[k]
+
+            for j in range(k):
+                L_dict[k][j], L_dict[max_row][j] = L_dict[max_row][j], L_dict[k][j]
+
+            pivot = U_dict[k].get(k, 0.0)
+
+        for i in range(k + 1, n):
+            factor = U_dict[i].get(k, 0.0) / pivot
+            
+            if abs(factor) > THRESHOLD:
+
+                L_dict[i][k] = factor
+                row_i = U_dict[i].copy()
+                row_k = U_dict[k]
+
+                for j in row_k:
+                    if j >= k:
+                        new_val = row_i.get(j, 0.0) - factor * row_k[j]
+                        if abs(new_val) > THRESHOLD:
+                            row_i[j] = new_val
+                        elif j in row_i:
+                            del row_i[j]
+
+                if k in row_i and abs(row_i[k]) < THRESHOLD:
+                    del row_i[k]
                 
-                if max_val < 1e-10:
-                    return False
-
-                row_k = get_row_elements(U, k)
-                row_max = get_row_elements(U, max_row)
-                U = update_row(U, k, row_max)
-                U = update_row(U, max_row, row_k)
-
-                if k > 0:
-                    for j in range(k):
-                        l_kj = L.get_element(k, j) if hasattr(L, 'get_element') else 0.0
-                        l_mj = L.get_element(max_row, j) if hasattr(L, 'get_element') else 0.0
-
-                        row_k_l = get_row_elements(L, k)
-                        row_max_l = get_row_elements(L, max_row)
-                        
-                        if abs(l_mj) > 1e-12:
-                            row_k_l[j] = l_mj
-                        elif j in row_k_l:
-                            del row_k_l[j]
-                        
-                        if abs(l_kj) > 1e-12:
-                            row_max_l[j] = l_kj
-                        elif j in row_max_l:
-                            del row_max_l[j]
-                        
-                        L = update_row(L, k, row_k_l)
-                        L = update_row(L, max_row, row_max_l)
-
-                row_k_elems = get_row_elements(U, k)
-                u_kk = row_k_elems.get(k, 0.0)
-
-            for i in range(k + 1, self.n):
-                row_i_elems = get_row_elements(U, i)
-                u_ik = row_i_elems.get(k, 0.0)
-                
-                if abs(u_ik) > 1e-12:
-                    factor = u_ik / u_kk
-
-                    row_i_l = get_row_elements(L, i)
-                    row_i_l[k] = factor
-                    L = update_row(L, i, row_i_l)
-
-                    new_row_i = {}
-
-                    for col, val in row_i_elems.items():
-                        if col != k:
-                            new_row_i[col] = val
-
-                    for col, val_k in row_k_elems.items():
-                        if col > k:
-                            current = new_row_i.get(col, 0.0)
-                            new_val = current - factor * val_k
-                            if abs(new_val) > 1e-12:
-                                new_row_i[col] = new_val
-                            elif col in new_row_i:
-                                del new_row_i[col]
-                    
-                    U = update_row(U, i, new_row_i)
-        
-        self.L = L
-        self.U = U
-        return True
+                U_dict[i] = row_i
     
-    def get_result(self) -> Optional[Tuple[CSRMatrix, CSRMatrix]]:
-        """Возвращает результат разложения (L, U)."""
-        if self.L is None or self.U is None:
-            return None
-        return self.L, self.U
+    U_final_data = []
+    U_final_rows = []
+    U_final_cols = []
+    
+    for i in sorted(U_dict.keys()):
+        for j in sorted(U_dict[i].keys()):
+            val = U_dict[i][j]
+            if abs(val) > THRESHOLD:
+                U_final_data.append(val)
+                U_final_rows.append(i)
+                U_final_cols.append(j)
+    
+    U_final_coo = type(U_coo)(U_final_data, U_final_rows, U_final_cols, (n, n))
 
+    L_final_data = []
+    L_final_rows = []
+    L_final_cols = []
+    
+    for i in sorted(L_dict.keys()):
+        for j in sorted(L_dict[i].keys()):
+            val = L_dict[i][j]
+            if abs(val) > THRESHOLD:
+                L_final_data.append(val)
+                L_final_rows.append(i)
+                L_final_cols.append(j)
+    
+    L_final_coo = type(U_coo)(L_final_data, L_final_rows, L_final_cols, (n, n))
+    
+    return L_final_coo._to_csc(), U_final_coo._to_csc()
 
-def lu_decomposition(A: CSRMatrix) -> Optional[Tuple[CSRMatrix, CSRMatrix]]:
-    """
-    LU-разложение матрицы A = L * U.
-    Возвращает (L, U) или None если матрица вырождена.
-    """
-    decomp = LUDecomposition(A)
-    if decomp.decompose():
-        return decomp.get_result()
-    return None
-
-
-def solve_SLAE_lu(A: CSRMatrix, b: Vector) -> Optional[Vector]:
+def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     """
     Решает систему линейных уравнений A*x = b через LU разложение.
     """
+    if len(b) != A.shape[0]:
+        raise ValueError(f"Размер вектора b ({len(b)}) не равен размеру матрицы A ({A.shape[0]})")
+    
     lu_result = lu_decomposition(A)
     if lu_result is None:
         return None
@@ -172,37 +133,45 @@ def solve_SLAE_lu(A: CSRMatrix, b: Vector) -> Optional[Vector]:
     y = [0.0] * n
     for i in range(n):
         sum_val = 0.0
-        start = L.indptr[i]
-        end = L.indptr[i + 1]
-        for idx in range(start, end):
-            j = L.indices[idx]
-            if j < i:
-                sum_val += L.data[idx] * y[j]
+        for j in range(i):
+            found = False
+            col_start = L.indptr[j]
+            col_end = L.indptr[j + 1]
+            for idx in range(col_start, col_end):
+                if L.indices[idx] == i:
+                    sum_val += L.data[idx] * y[j]
+                    found = True
+                    break
         y[i] = b[i] - sum_val
 
     x = [0.0] * n
     for i in range(n - 1, -1, -1):
         sum_val = 0.0
-        start = U.indptr[i]
-        end = U.indptr[i + 1]
 
         diag = 0.0
-        for idx in range(start, end):
-            j = U.indices[idx]
-            if j == i:
+        for j in range(i + 1, n):
+            col_start = U.indptr[j]
+            col_end = U.indptr[j + 1]
+            for idx in range(col_start, col_end):
+                if U.indices[idx] == i:
+                    sum_val += U.data[idx] * x[j]
+                    break
+
+        col_start = U.indptr[i]
+        col_end = U.indptr[i + 1]
+        for idx in range(col_start, col_end):
+            if U.indices[idx] == i:
                 diag = U.data[idx]
-            elif j > i:
-                sum_val += U.data[idx] * x[j]
+                break
         
-        if abs(diag) < 1e-12:
+        if abs(diag) < THRESHOLD:
             return None
         
         x[i] = (y[i] - sum_val) / diag
     
     return x
 
-
-def find_det_with_lu(A: CSRMatrix) -> Optional[float]:
+def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     """
     Вычисляет определитель матрицы через LU разложение.
     """
@@ -215,10 +184,10 @@ def find_det_with_lu(A: CSRMatrix) -> Optional[float]:
     
     det = 1.0
     for i in range(n):
-        start = U.indptr[i]
-        end = U.indptr[i + 1]
+        col_start = U.indptr[i]
+        col_end = U.indptr[i + 1]
         diag = 0.0
-        for idx in range(start, end):
+        for idx in range(col_start, col_end):
             if U.indices[idx] == i:
                 diag = U.data[idx]
                 break
