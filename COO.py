@@ -43,7 +43,7 @@ class COOMatrix(Matrix):
             for key in sorted(all_keys):
                 r, c = key
                 val = dict1.get(key, 0.0) + dict2.get(key, 0.0)
-                if abs(val) > 1e-12:  # Порог для избежания числового шума
+                if abs(val) > 1e-10:  # Порог для избежания числового шума
                     result_data.append(val)
                     result_row.append(r)
                     result_col.append(c)
@@ -56,7 +56,7 @@ class COOMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
-        if abs(scalar) < 1e-12:
+        if abs(scalar) < 1e-10:
             return COOMatrix([], [], [], self.shape)
         new_data = [val * scalar for val in self.data]
         return COOMatrix(new_data, self.row[:], self.col[:], self.shape)
@@ -71,39 +71,24 @@ class COOMatrix(Matrix):
         from CSR import CSRMatrix
         from CSC import CSCMatrix
         
-        if isinstance(other, CSRMatrix):
-            # COO * CSR
-            # Преобразуем COO в CSR для эффективного умножения
+        if isinstance(other, CSRMatrix) or isinstance(other, CSCMatrix) or isinstance(other, COOMatrix):
+            # Преобразуем в CSR для эффективного умножения
             csr_self = self._to_csr()
             return csr_self._matmul_impl(other)
-        elif isinstance(other, CSCMatrix):
-            # COO * CSC
-            # Преобразуем COO в CSR
-            csr_self = self._to_csr()
-            return csr_self._matmul_impl(other)
-        elif isinstance(other, COOMatrix):
-            # COO * COO - преобразуем обе в CSR
-            csr_self = self._to_csr()
-            csr_other = other._to_csr()
-            return csr_self._matmul_impl(csr_other)
         else:
-            # Общий случай
-            return COOMatrix.from_dense(self._dense_matmul(other))
-
-    def _dense_matmul(self, other: 'Matrix') -> DenseMatrix:
-        """Умножение через плотные матрицы."""
-        dense_self = self.to_dense()
-        dense_other = other.to_dense()
-        result = [[0.0] * other.cols for _ in range(self.rows)]
-        
-        for i in range(self.rows):
-            for k in range(self.cols):
-                val = dense_self[i][k]
-                if abs(val) > 1e-12:
-                    for j in range(other.cols):
-                        result[i][j] += val * dense_other[k][j]
-        
-        return result
+            # Общий случай - через плотные матрицы
+            dense_self = self.to_dense()
+            dense_other = other.to_dense()
+            result = [[0.0] * other.cols for _ in range(self.rows)]
+            
+            for i in range(self.rows):
+                for k in range(self.cols):
+                    val = dense_self[i][k]
+                    if abs(val) > 1e-10:
+                        for j in range(other.cols):
+                            result[i][j] += val * dense_other[k][j]
+            
+            return COOMatrix.from_dense(result)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
@@ -117,7 +102,7 @@ class COOMatrix(Matrix):
         for r in range(rows):
             for c in range(cols):
                 val = dense_matrix[r][c]
-                if abs(val) > 1e-12:
+                if abs(val) > 1e-10:
                     data.append(val)
                     row.append(r)
                     col.append(c)
