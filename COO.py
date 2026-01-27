@@ -1,5 +1,6 @@
 from base import Matrix
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
+from typing import Dict
 
 
 class COOMatrix(Matrix):
@@ -20,29 +21,33 @@ class COOMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Реализация сложения с другой матрицей."""
-        from COO import COOMatrix
+        from CSR import CSRMatrix
 
-        self_coo = self._to_coo()
-        other_coo = other._to_coo()
+        if isinstance(other, COOMatrix):
+            sum_dict: Dict[tuple, float] = {}
 
-        sum_dict = {}
+            for val, r, c in zip(self.data, self.row, self.col):
+                sum_dict[(r, c)] = sum_dict.get((r, c), 0.0) + val
 
-        for idx in range(len(self_coo.data)):
-            key = (self_coo.row[idx], self_coo.col[idx])
-            sum_dict[key] = sum_dict.get(key, 0.0) + self_coo.data[idx]
+            for val, r, c in zip(other.data, other.row, other.col):
+                sum_dict[(r, c)] = sum_dict.get((r, c), 0.0) + val
 
-        for idx in range(len(other_coo.data)):
-            key = (other_coo.row[idx], other_coo.col[idx])
-            sum_dict[key] = sum_dict.get(key, 0.0) + other_coo.data[idx]
+            new_data, new_row, new_col = [], [], []
+            for (r, c), val in sum_dict.items():
+                if abs(val) > 1e-12:
+                    new_data.append(val)
+                    new_row.append(r)
+                    new_col.append(c)
 
-        new_data, new_row, new_col = [], [], []
-        for (r, c), val in sum_dict.items():
-            if abs(val) > 1e-12:
-                new_data.append(val)
-                new_row.append(r)
-                new_col.append(c)
+            return COOMatrix(new_data, new_row, new_col, self.shape)
+        else:
+            csr_self = self._to_csr()
+            if isinstance(other, CSRMatrix):
+                csr_other = other
+            else:
+                csr_other = CSRMatrix.from_dense(other.to_dense())
 
-        return COOMatrix(new_data, new_row, new_col, self.shape)
+            return csr_self._add_impl(csr_other)._to_coo()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Реализация умножения на скаляр."""
@@ -59,12 +64,19 @@ class COOMatrix(Matrix):
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Реализация умножения матриц."""
         from CSR import CSRMatrix
+        from CSC import CSCMatrix
 
         csr_self = self._to_csr()
+
         if isinstance(other, COOMatrix):
             csr_other = other._to_csr()
+        elif isinstance(other, CSCMatrix):
+            csr_other = other._to_csr()
+        elif isinstance(other, CSRMatrix):
+            csr_other = other
         else:
             csr_other = CSRMatrix.from_dense(other.to_dense())
+
         result_csr = csr_self._matmul_impl(csr_other)
         return result_csr._to_coo()
 
@@ -128,7 +140,3 @@ class COOMatrix(Matrix):
             indptr[i + 1] += indptr[i]
 
         return CSRMatrix(data, indices, indptr, self.shape)
-
-    def _to_coo(self) -> 'COOMatrix':
-        """Преобразование COO в COO (возвращает копию)."""
-        return COOMatrix(self.data.copy(), self.row.copy(), self.col.copy(), self.shape)

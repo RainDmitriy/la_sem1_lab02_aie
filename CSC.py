@@ -22,15 +22,25 @@ class CSCMatrix(Matrix):
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Реализация сложения с другой матрицей."""
         from COO import COOMatrix
-        coo_self = self._to_coo()
+        from CSR import CSRMatrix
 
         if isinstance(other, CSCMatrix):
-            coo_other = other._to_coo()
+            csr_self = self._to_csr()
+            csr_other = other._to_csr()
+            result_csr = csr_self._add_impl(csr_other)
+            return result_csr._to_csc()
         else:
-            coo_other = COOMatrix.from_dense(other.to_dense())
+            coo_self = self._to_coo()
 
-        result_coo = coo_self._add_impl(coo_other)
-        return result_coo._to_csc()
+            if isinstance(other, COOMatrix):
+                coo_other = other
+            elif isinstance(other, CSRMatrix):
+                coo_other = other._to_coo()
+            else:
+                coo_other = COOMatrix.from_dense(other.to_dense())
+
+            result_coo = coo_self._add_impl(coo_other)
+            return result_coo._to_csc()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Реализация умножения на скаляр."""
@@ -83,10 +93,16 @@ class CSCMatrix(Matrix):
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Реализация умножения матриц."""
         from CSR import CSRMatrix
+        from COO import COOMatrix
+
         csr_self = self._to_csr()
 
         if isinstance(other, CSCMatrix):
             csr_other = other._to_csr()
+        elif isinstance(other, COOMatrix):
+            csr_other = other._to_csr()
+        elif isinstance(other, CSRMatrix):
+            csr_other = other
         else:
             csr_other = CSRMatrix.from_dense(other.to_dense())
 
