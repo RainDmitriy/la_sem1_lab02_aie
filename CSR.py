@@ -57,27 +57,31 @@ class CSRMatrix(Matrix):
                     col2 = other.indices[idx2]
                     
                     if col1 < col2:
+                        # Элемент только из первой матрицы
                         result_data.append(self.data[idx1])
                         result_indices.append(col1)
                         idx1 += 1
                     elif col1 > col2:
+                        # Элемент только из второй матрицы
                         result_data.append(other.data[idx2])
                         result_indices.append(col2)
                         idx2 += 1
                     else:
+                        # Элементы в одинаковой позиции - складываем
                         val = self.data[idx1] + other.data[idx2]
-                        result_data.append(val)
-                        result_indices.append(col1)
+                        if abs(val) > TOL:
+                            result_data.append(val)
+                            result_indices.append(col1)
                         idx1 += 1
                         idx2 += 1
                 
-                # Добавляем оставшиеся элементы из self
+                # Добавляем оставшиеся элементы из первой матрицы
                 while idx1 < self_end:
                     result_data.append(self.data[idx1])
                     result_indices.append(self.indices[idx1])
                     idx1 += 1
                 
-                # Добавляем оставшиеся элементы из other
+                # Добавляем оставшиеся элементы из второй матрицы
                 while idx2 < other_end:
                     result_data.append(other.data[idx2])
                     result_indices.append(other.indices[idx2])
@@ -113,16 +117,44 @@ class CSRMatrix(Matrix):
         if scalar == 0.0:
             return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
         
-        # Умножаем все значения, НЕ удаляя элементы
         new_data = [val * scalar for val in self.data]
         return CSRMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
-        """Транспонирование CSR матрицы через COO."""
-        # Преобразуем в COO, транспонируем, затем в CSC
-        coo = self._to_coo()
-        coo_t = coo.transpose()
-        return coo_t._to_csc()
+        """Транспонирование CSR матрицы."""
+        from CSC import CSCMatrix
+        
+        rows, cols = self.shape
+        
+        if self.nnz == 0:
+            return CSCMatrix([], [], [0] * (cols + 1), (cols, rows))
+        
+        # Подсчитываем количество ненулевых элементов в каждом столбце
+        col_counts = [0] * cols
+        for j in self.indices:
+            col_counts[j] += 1
+        
+        # Строим indptr для CSC
+        indptr = [0] * (cols + 1)
+        for j in range(cols):
+            indptr[j + 1] = indptr[j] + col_counts[j]
+        
+        # Рабочие массивы для заполнения
+        current_pos = indptr.copy()
+        data_csc = [0.0] * self.nnz
+        indices_csc = [0] * self.nnz
+        
+        # Заполняем CSC
+        for i in range(rows):
+            start, end = self.indptr[i], self.indptr[i + 1]
+            for idx in range(start, end):
+                j = self.indices[idx]
+                pos = current_pos[j]
+                data_csc[pos] = self.data[idx]
+                indices_csc[pos] = i
+                current_pos[j] += 1
+        
+        return CSCMatrix(data_csc, indices_csc, indptr, (cols, rows))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSR матриц."""
@@ -134,7 +166,8 @@ class CSRMatrix(Matrix):
         
         # Преобразуем other в CSR если нужно
         if not isinstance(other, CSRMatrix):
-            other_csr = CSRMatrix.from_dense(other.to_dense())
+            other_dense = other.to_dense()
+            other_csr = CSRMatrix.from_dense(other_dense)
         else:
             other_csr = other
         
@@ -161,7 +194,8 @@ class CSRMatrix(Matrix):
                     row_result[j] = row_result.get(j, 0.0) + val_A * val_B
             
             # Сохраняем ненулевые элементы
-            for j in sorted(row_result.keys()):
+            sorted_cols = sorted(row_result.keys())
+            for j in sorted_cols:
                 val = row_result[j]
                 if abs(val) > TOL:
                     result_data.append(val)
