@@ -1,5 +1,5 @@
 from base import Matrix
-from matrix_types import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
+from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
@@ -56,3 +56,4 @@ class CSCMatrix(Matrix):
     def _to_csr(self) -> 'CSRMatrix':
         from CSR import CSRMatrix
         return CSRMatrix.from_dense(self.to_dense())
+
