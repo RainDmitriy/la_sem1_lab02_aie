@@ -26,7 +26,7 @@ class COOMatrix(Matrix):
 
         res_data, res_row, res_col = [], [], []
         for (r, c), v in merged.items():
-            if abs(v) > TOLERANCE:
+            if v != 0.0:
                 res_data.append(v)
                 res_row.append(r)
                 res_col.append(c)
@@ -53,7 +53,7 @@ class COOMatrix(Matrix):
                     idx = (r1, c2)
                     temp_results[idx] = temp_results.get(idx, 0.0) + v1 * v2
         for (r, c), val in temp_results.items():
-            if abs(val) > TOLERANCE:
+            if val != 0.0:
                 res_rows.append(r)
                 res_cols.append(c)
                 res_data.append(val)
