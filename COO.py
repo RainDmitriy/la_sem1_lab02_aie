@@ -110,3 +110,4 @@ class COOMatrix(Matrix):
         for i in range(self.shape[0]):
             indptr[i + 1] += indptr[i]
         return CSRMatrix(self.data, self.col, indptr, self.shape)
+
