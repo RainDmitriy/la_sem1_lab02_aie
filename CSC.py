@@ -1,5 +1,10 @@
 from base import Matrix
 from mytypes import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
+from COO import COOMatrix
+
+ZERO_THRESHOLD = 1e-12
+MAX_DENSE_SIZE = 10000
+
 
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
@@ -29,9 +34,8 @@ class CSCMatrix(Matrix):
         self.nnz = len(data)
 
     def to_dense(self) -> DenseMatrix:
-        """Преобразует CSC в плотную матрицу."""
         n, m = self.shape
-        if n * m > 10000:
+        if n * m > MAX_DENSE_SIZE:
             raise MemoryError(f"Матрица {n}x{m} слишком большая для dense")
         
         mat = [[0.0] * m for _ in range(n)]
@@ -44,124 +48,64 @@ class CSCMatrix(Matrix):
         return mat
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Сложение CSC матриц."""
+        if isinstance(other, CSCMatrix):
+            self_coo = self._to_coo()
+            other_coo = other._to_coo()
+            result_coo = self_coo._add_impl(other_coo)
+            return result_coo._to_csc()
+        
         if hasattr(other, '_to_coo'):
             return self._to_coo()._add_impl(other)._to_csc()
         
-        if self.shape[0] * self.shape[1] <= 10000:
-            from COO import COOMatrix
+        if self.shape[0] * self.shape[1] <= MAX_DENSE_SIZE:
             other_coo = COOMatrix.from_dense(other.to_dense())
             return self._add_impl(other_coo)
         
         raise ValueError("Нельзя складывать большие матрицы через dense")
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        """Умножение CSC на скаляр."""
         new_data = [x * scalar for x in self.data]
         return CSCMatrix(new_data, self.indices, self.indptr, self.shape)
 
     def transpose(self) -> 'Matrix':
-        """
-        Транспонирование CSC матрицы.
-        Hint:
-        Результат - в CSR формате (с теми же данными, но с интерпретацией строк как столбцов).
-        """
         from CSR import CSRMatrix
-        from COO import COOMatrix
 
         coo = self._to_coo()
-
         transposed_coo = COOMatrix(
-            list(coo.data),
-            list(coo.col),
-            list(coo.row),
+            coo.data[:],
+            coo.col[:],
+            coo.row[:],
             (self.shape[1], self.shape[0])
         )
-
         return transposed_coo._to_csr()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """Умножение CSC матриц."""
+        self_coo = self._to_coo()
+        
         if isinstance(other, CSCMatrix):
-            A_n, A_k = self.shape
-            B_k, B_m = other.shape
-            
-            if A_k != B_k:
-                raise ValueError("Несовместимые размерности для умножения")
-
-            temp_result = [{} for _ in range(A_n)]
-
-            for j in range(B_m):
-                for b_pos in range(other.indptr[j], other.indptr[j + 1]):
-                    k = other.indices[b_pos]
-                    b_val = other.data[b_pos]
-
-                    for a_pos in range(self.indptr[k], self.indptr[k + 1]):
-                        i = self.indices[a_pos]
-                        a_val = self.data[a_pos]
-
-                        temp_result[i][j] = temp_result[i].get(j, 0.0) + a_val * b_val
-
-            result_data = []
-            result_indices = []
-            result_indptr = [0] * (B_m + 1)
-            
-            nnz_total = 0
-
-            for j in range(B_m):
-                result_indptr[j] = nnz_total
-
-                col_elements = []
-                for i in range(A_n):
-                    if j in temp_result[i]:
-                        val = temp_result[i][j]
-                        if abs(val) > 1e-12:
-                            col_elements.append((i, val))
-
-                col_elements.sort(key=lambda x: x[0])
-
-                for row_idx, val in col_elements:
-                    result_indices.append(row_idx)
-                    result_data.append(val)
-                    nnz_total += 1
-
-            result_indptr[B_m] = nnz_total
-
-            if result_indptr[-1] != len(result_data):
-                raise ValueError(
-                    f"Ошибка в создании CSC: indptr[-1]={result_indptr[-1]}, "
-                    f"len(data)={len(result_data)}"
-                )
-            
-            return CSCMatrix(result_data, result_indices, result_indptr, (A_n, B_m))
-
-        if hasattr(other, '_to_coo'):
-            return self._to_coo()._matmul_impl(other)._to_csc()
+            other_coo = other._to_coo()
+        elif hasattr(other, '_to_coo'):
+            other_coo = other._to_coo()
+        else:
+            if self.shape[0] * self.shape[1] <= MAX_DENSE_SIZE and \
+               other.shape[0] * other.shape[1] <= MAX_DENSE_SIZE:
+                other_coo = COOMatrix.from_dense(other.to_dense())
+            else:
+                raise ValueError("Нельзя умножать большие матрицы через dense")
         
-        if self.shape[0] * self.shape[1] <= 10000 and \
-        other.shape[0] * other.shape[1] <= 10000:
-            from COO import COOMatrix
-            other_coo = COOMatrix.from_dense(other.to_dense())
-            return self._matmul_impl(other_coo)
-        
-        raise ValueError("Нельзя умножать большие матрицы через dense")
+        result_coo = self_coo._matmul_impl(other_coo)
+        return result_coo._to_csc()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
-        """Создание CSC из плотной матрицы."""
-        from COO import COOMatrix
         return COOMatrix.from_dense(dense_matrix)._to_csc()
 
     def _to_csr(self) -> 'CSRMatrix':
-        """
-        Преобразование CSCMatrix в CSRMatrix.
-        """
-        return self.transpose()
+        from CSR import CSRMatrix
+        coo = self._to_coo()
+        return coo._to_csr()
 
     def _to_coo(self) -> 'COOMatrix':
-        """
-        Преобразование CSCMatrix в COOMatrix.
-        """
         from COO import COOMatrix
         
         data, rows, cols = [], [], []

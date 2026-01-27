@@ -2,6 +2,11 @@ from base import Matrix
 from mytypes import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 from collections import defaultdict
 from typing import List, Tuple
+from COO import COOMatrix
+
+ZERO_THRESHOLD = 1e-12
+MAX_DENSE_SIZE = 10000
+
 
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
@@ -31,9 +36,8 @@ class CSRMatrix(Matrix):
         self.nnz = len(data)
 
     def to_dense(self) -> DenseMatrix:
-        """Преобразует CSR в плотную матрицу."""
         n, m = self.shape
-        if n * m > 10000:
+        if n * m > MAX_DENSE_SIZE:
             raise MemoryError(f"Матрица {n}x{m} слишком большая для dense")
         
         mat = [[0.0] * m for _ in range(n)]
@@ -46,35 +50,63 @@ class CSRMatrix(Matrix):
         return mat
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Сложение через преобразование в COO."""
-        self_coo = self._to_coo()
-
-        if isinstance(other, CSRMatrix):
-            other_coo = other._to_coo()
-        elif hasattr(other, '_to_coo'):
-            other_coo = other._to_coo()
-        else:
-            if self.shape[0] * self.shape[1] <= 10000:
-                from COO import COOMatrix
-                other_coo = COOMatrix.from_dense(other.to_dense())
+        if not isinstance(other, CSRMatrix):
+            if hasattr(other, '_to_csr'):
+                other = other._to_csr()
             else:
-                raise ValueError("Нельзя складывать большие матрицы через dense")
-
-        result_coo = self_coo._add_impl(other_coo)
-
-        return result_coo._to_csr()
+                if self.shape[0] * self.shape[1] <= MAX_DENSE_SIZE:
+                    other_coo = COOMatrix.from_dense(other.to_dense())
+                    other = other_coo._to_csr()
+                else:
+                    raise ValueError("Нельзя складывать большие матрицы через dense")
+        
+        n, m = self.shape
+        result_data, result_indices, result_indptr = [], [], [0]
+        
+        for i in range(n):
+            p1, p2 = self.indptr[i], other.indptr[i]
+            end1, end2 = self.indptr[i + 1], other.indptr[i + 1]
+            
+            while p1 < end1 and p2 < end2:
+                j1, j2 = self.indices[p1], other.indices[p2]
+                
+                if j1 < j2:
+                    result_data.append(self.data[p1])
+                    result_indices.append(j1)
+                    p1 += 1
+                elif j1 > j2:
+                    result_data.append(other.data[p2])
+                    result_indices.append(j2)
+                    p2 += 1
+                else:
+                    val = self.data[p1] + other.data[p2]
+                    if abs(val) > ZERO_THRESHOLD:
+                        result_data.append(val)
+                        result_indices.append(j1)
+                    p1 += 1
+                    p2 += 1
+            
+            while p1 < end1:
+                result_data.append(self.data[p1])
+                result_indices.append(self.indices[p1])
+                p1 += 1
+            
+            while p2 < end2:
+                result_data.append(other.data[p2])
+                result_indices.append(other.indices[p2])
+                p2 += 1
+            
+            result_indptr.append(len(result_data))
+        
+        return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        """Умножение CSR на скаляр."""
         new_data = [x * scalar for x in self.data]
         return CSRMatrix(new_data, self.indices, self.indptr, self.shape)
 
     def transpose(self) -> 'Matrix':
-        """Транспонирование через COO."""
         from CSC import CSCMatrix
-
         coo = self._to_coo()
-
         transposed_coo = COOMatrix(
             coo.data[:],
             coo.col[:],
@@ -84,25 +116,22 @@ class CSRMatrix(Matrix):
         return transposed_coo._to_csc()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """Умножение через преобразование в COO."""
-
+        self_coo = self._to_coo()
+        
         if isinstance(other, CSRMatrix):
             other_coo = other._to_coo()
         elif hasattr(other, '_to_coo'):
             other_coo = other._to_coo()
         else:
-            if self.shape[0] * self.shape[1] <= 10000 and \
-            other.shape[0] * other.shape[1] <= 10000:
-                from COO import COOMatrix
+            if self.shape[0] * self.shape[1] <= MAX_DENSE_SIZE and \
+               other.shape[0] * other.shape[1] <= MAX_DENSE_SIZE:
                 other_coo = COOMatrix.from_dense(other.to_dense())
             else:
                 raise ValueError("Нельзя умножать большие матрицы через dense")
         
         result_coo = self_coo._matmul_impl(other_coo)
-
         return result_coo._to_csr()
 
-    """Методы для LU"""
     def get_row(self, i: int) -> List[Tuple[int, float]]:
         start = self.indptr[i]
         end = self.indptr[i + 1]
@@ -122,7 +151,7 @@ class CSRMatrix(Matrix):
         
         for row in all_rows:
             for col, val in row:
-                if abs(val) > 1e-12:
+                if abs(val) > ZERO_THRESHOLD:
                     new_data.append(val)
                     new_indices.append(col)
             new_indptr.append(len(new_data))
@@ -160,20 +189,14 @@ class CSRMatrix(Matrix):
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
-        """Создание CSR из плотной матрицы."""
-        from COO import COOMatrix
         return COOMatrix.from_dense(dense_matrix)._to_csr()
 
     def _to_csc(self) -> 'CSCMatrix':
-        """
-        Преобразование CSRMatrix в CSCMatrix.
-        """
-        return self.transpose()
+        from CSC import CSCMatrix
+        coo = self._to_coo()
+        return coo._to_csc()
 
     def _to_coo(self) -> 'COOMatrix':
-        """
-        Преобразование CSRMatrix в COOMatrix.
-        """
         from COO import COOMatrix
         
         n, m = self.shape
@@ -188,4 +211,3 @@ class CSRMatrix(Matrix):
                 col_indices.append(self.indices[idx])
         
         return COOMatrix(data, row_indices, col_indices, self.shape)
-    

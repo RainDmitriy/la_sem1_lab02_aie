@@ -2,15 +2,8 @@ from CSR import CSRMatrix
 from mytypes import Vector
 from typing import Optional, Tuple, List
 
-def lu_decomposition(A: CSRMatrix) -> Optional[Tuple[CSRMatrix, CSRMatrix]]:
-    """
-    LU-разложение для CSC матрицы.
-    Возвращает (L, U) - нижнюю и верхнюю треугольные матрицы.
-    Ожидается, что матрица L хранит единицы на главной диагонали.
-    """
-    if not isinstance(A, CSRMatrix):
-        A = A._to_csr()
 
+def lu_decomposition(A: CSRMatrix) -> Optional[Tuple[CSRMatrix, CSRMatrix]]:
     n = A.shape[0]
 
     U_data = A.data[:]
@@ -142,10 +135,8 @@ def lu_decomposition(A: CSRMatrix) -> Optional[Tuple[CSRMatrix, CSRMatrix]]:
     
     return L, U
 
+
 def solve_SLAE_lu(A: CSRMatrix, b: Vector) -> Optional[Vector]:
-    """
-    Решение СЛАУ Ax = b через LU-разложение.
-    """
     if len(b) != A.shape[0]:
         raise ValueError(f"Размер вектора b ({len(b)}) не равен размеру матрицы A ({A.shape[0]})")
     
@@ -186,11 +177,8 @@ def solve_SLAE_lu(A: CSRMatrix, b: Vector) -> Optional[Vector]:
     
     return x
 
+
 def find_det_with_lu(A: CSRMatrix) -> Optional[float]:
-    """
-    Нахождение определителя через LU-разложение.
-    det(A) = det(L) * det(U)
-    """
     lu_result = lu_decomposition(A)
     if lu_result is None:
         return None
