@@ -17,14 +17,13 @@ class CSRMatrix(Matrix):
         for i in range(rows):
             start = self.indptr[i]
             end = self.indptr[i + 1]
-            for k in range(start, end):
-                col = self.indices[k]
-                dense[i][col] = self.data[k]
+            for idx in range(start, end):
+                j = self.indices[idx]
+                dense[i][j] = self.data[idx]
         
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Сложение CSR матриц."""
         # Преобразуем в COO для сложения
         from COO import COOMatrix
         
@@ -34,17 +33,13 @@ class CSRMatrix(Matrix):
         return coo_result._to_csr()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        """Умножение CSR на скаляр."""
-        if abs(scalar) < 1e-7:
+        if scalar == 0.0:
             return CSRMatrix([], [], [0] * (self.rows + 1), self.shape)
+        
         new_data = [val * scalar for val in self.data]
         return CSRMatrix(new_data, self.indices[:], self.indptr[:], self.shape)
 
     def transpose(self) -> 'Matrix':
-        """
-        Транспонирование CSR матрицы.
-        Возвращает CSC матрицу.
-        """
         from CSC import CSCMatrix
         
         rows, cols = self.shape
@@ -52,7 +47,7 @@ class CSRMatrix(Matrix):
         if self.nnz == 0:
             return CSCMatrix([], [], [0] * (cols + 1), (cols, rows))
         
-        # Считаем количество элементов в каждом столбце
+        # Подсчитываем ненулевые элементы в каждом столбце
         col_counts = [0] * cols
         for j in self.indices:
             col_counts[j] += 1
@@ -62,7 +57,7 @@ class CSRMatrix(Matrix):
         for j in range(cols):
             csc_indptr[j + 1] = csc_indptr[j] + col_counts[j]
         
-        # Временный массив для текущих позиций
+        # Временный массив для позиций в каждом столбце
         temp_pos = csc_indptr[:]
         
         # Создаем массивы для CSC
@@ -81,81 +76,66 @@ class CSRMatrix(Matrix):
         return CSCMatrix(csc_data, csc_indices, csc_indptr, (cols, rows))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """Умножение CSR матриц."""
-        # Обработка разных типов матриц
-        from CSC import CSCMatrix
-        from COO import COOMatrix
+        # Используем алгоритм умножения разреженных матриц
+        result_rows = self.rows
+        result_cols = other.cols
         
+        # Если other - CSC, используем оптимизированный алгоритм
+        from CSC import CSCMatrix
         if isinstance(other, CSCMatrix):
-            # CSR * CSC - оптимальный случай
-            return self._multiply_csr_csc(other)
-        elif isinstance(other, COOMatrix):
-            # CSR * COO
-            other_csc = other._to_csc()
-            return self._multiply_csr_csc(other_csc)
-        elif isinstance(other, CSRMatrix):
-            # CSR * CSR
-            other_csc = other._to_csc()
-            return self._multiply_csr_csc(other_csc)
+            # CSR * CSC
+            result_data = []
+            result_indices = []
+            result_indptr = [0]
+            
+            for i in range(result_rows):
+                # Создаем временный массив для строки результата
+                temp_row = [0.0] * result_cols
+                
+                # Получаем строку i из CSR
+                row_start = self.indptr[i]
+                row_end = self.indptr[i + 1]
+                
+                for k in range(row_start, row_end):
+                    col_a = self.indices[k]
+                    val_a = self.data[k]
+                    
+                    # Добавляем вклад от столбца col_a матрицы other
+                    col_start = other.indptr[col_a]
+                    col_end = other.indptr[col_a + 1]
+                    
+                    for l in range(col_start, col_end):
+                        j = other.indices[l]
+                        temp_row[j] += val_a * other.data[l]
+                
+                # Формируем CSR строку результата
+                row_nnz = 0
+                for j in range(result_cols):
+                    if abs(temp_row[j]) > 1e-12:
+                        result_data.append(temp_row[j])
+                        result_indices.append(j)
+                        row_nnz += 1
+                
+                result_indptr.append(result_indptr[-1] + row_nnz)
+            
+            return CSRMatrix(result_data, result_indices, result_indptr, (result_rows, result_cols))
         else:
             # Общий случай
-            dense_result = self._dense_matmul(other)
-            return CSRMatrix.from_dense(dense_result)
-
-    def _multiply_csr_csc(self, csc: 'CSCMatrix') -> 'CSRMatrix':
-        """Умножение CSR на CSC."""
-        rows = self.rows
-        cols = csc.cols
-        
-        result_data = []
-        result_indices = []
-        result_indptr = [0]
-        
-        # Временный массив для строки результата
-        temp_row = [0.0] * cols
-        
-        for i in range(rows):
-            # Обнуляем временный массив
-            for j in range(cols):
-                temp_row[j] = 0.0
+            dense_other = other.to_dense()
+            result = [[0.0] * result_cols for _ in range(result_rows)]
             
-            # Умножаем строку i на все столбцы
-            for k in range(self.indptr[i], self.indptr[i + 1]):
-                col_a = self.indices[k]
-                val_a = self.data[k]
+            for i in range(result_rows):
+                row_start = self.indptr[i]
+                row_end = self.indptr[i + 1]
                 
-                # Добавляем вклад от столбца col_a матрицы csc
-                for l in range(csc.indptr[col_a], csc.indptr[col_a + 1]):
-                    j = csc.indices[l]
-                    temp_row[j] += val_a * csc.data[l]
+                for k in range(row_start, row_end):
+                    col_a = self.indices[k]
+                    val_a = self.data[k]
+                    
+                    for j in range(result_cols):
+                        result[i][j] += val_a * dense_other[col_a][j]
             
-            # Формируем CSR строку
-            row_nnz = 0
-            for j in range(cols):
-                if abs(temp_row[j]) > 1e-7:
-                    result_data.append(temp_row[j])
-                    result_indices.append(j)
-                    row_nnz += 1
-            
-            result_indptr.append(result_indptr[-1] + row_nnz)
-        
-        return CSRMatrix(result_data, result_indices, result_indptr, (rows, cols))
-
-    def _dense_matmul(self, other: 'Matrix') -> DenseMatrix:
-        """Умножение через плотные матрицы."""
-        dense_self = self.to_dense()
-        dense_other = other.to_dense()
-        rows, cols = self.rows, other.cols
-        result = [[0.0] * cols for _ in range(rows)]
-        
-        for i in range(rows):
-            for j in range(cols):
-                s = 0.0
-                for k in range(self.cols):
-                    s += dense_self[i][k] * dense_other[k][j]
-                result[i][j] = s
-        
-        return result
+            return CSRMatrix.from_dense(result)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
@@ -170,7 +150,7 @@ class CSRMatrix(Matrix):
             nnz_in_row = 0
             for j in range(cols):
                 val = dense_matrix[i][j]
-                if abs(val) > 1e-7:
+                if abs(val) > 1e-12:
                     data.append(val)
                     indices.append(j)
                     nnz_in_row += 1
@@ -186,7 +166,7 @@ class CSRMatrix(Matrix):
         if self.nnz == 0:
             return CSCMatrix([], [], [0] * (cols + 1), self.shape)
         
-        # Считаем количество элементов в каждом столбце
+        # Подсчитываем ненулевые элементы в каждом столбце
         col_counts = [0] * cols
         for j in self.indices:
             col_counts[j] += 1
@@ -196,7 +176,7 @@ class CSRMatrix(Matrix):
         for j in range(cols):
             csc_indptr[j + 1] = csc_indptr[j] + col_counts[j]
         
-        # Временный массив для текущих позиций
+        # Временный массив для позиций
         temp_pos = csc_indptr[:]
         
         # Создаем массивы для CSC
@@ -213,7 +193,7 @@ class CSRMatrix(Matrix):
                 temp_pos[j] += 1
         
         return CSCMatrix(csc_data, csc_indices, csc_indptr, self.shape)
-    
+
     def _to_coo(self) -> 'COOMatrix':
         from COO import COOMatrix
         
