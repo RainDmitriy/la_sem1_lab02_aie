@@ -12,43 +12,38 @@ class CSRMatrix(Matrix):
     def to_dense(self) -> DenseMatrix:
         rows, cols = self.shape
         dense = [[0.0] * cols for _ in range(rows)]
-
         for i in range(rows):
             for idx in range(self.indptr[i], self.indptr[i + 1]):
                 j = self.indices[idx]
                 dense[i][j] = self.data[idx]
-
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         if isinstance(other, CSRMatrix):
             rows, cols = self.shape
-            result_data = []
-            result_indices = []
+            result_data, result_indices = [], []
             result_indptr = [0]
 
             for i in range(rows):
-                idx1 = self.indptr[i]
-                idx2 = other.indptr[i]
-                end1 = self.indptr[i + 1]
-                end2 = other.indptr[i + 1]
+                idx1, idx2 = self.indptr[i], other.indptr[i]
+                end1, end2 = self.indptr[i + 1], other.indptr[i + 1]
 
                 while idx1 < end1 and idx2 < end2:
-                    col1 = self.indices[idx1]
-                    col2 = other.indices[idx2]
+                    col1, col2 = self.indices[idx1], other.indices[idx2]
 
                     if col1 < col2:
                         result_data.append(self.data[idx1])
                         result_indices.append(col1)
                         idx1 += 1
-                    elif col1 > col2:
+                    elif col2 < col1:
                         result_data.append(other.data[idx2])
                         result_indices.append(col2)
                         idx2 += 1
                     else:
                         val = self.data[idx1] + other.data[idx2]
-                        result_data.append(val)
-                        result_indices.append(col1)
+                        if abs(val) > 1e-12:
+                            result_data.append(val)
+                            result_indices.append(col1)
                         idx1 += 1
                         idx2 += 1
 
@@ -72,7 +67,7 @@ class CSRMatrix(Matrix):
             return coo_self._add_impl(coo_other)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        if scalar == 0:
+        if abs(scalar) < 1e-12:
             return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
         new_data = [val * scalar for val in self.data]
         return CSRMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
@@ -86,26 +81,26 @@ class CSRMatrix(Matrix):
         rows, cols = self.shape
         nnz = len(self.data)
 
-        data_csc = [0.0] * nnz
-        indices_csc = [0] * nnz
-        indptr_csc = [0] * (cols + 1)
+        data_T = [0.0] * nnz
+        indices_T = [0] * nnz
+        indptr_T = [0] * (cols + 1)
 
         for j in self.indices:
-            indptr_csc[j + 1] += 1
+            indptr_T[j + 1] += 1
 
         for j in range(1, cols + 1):
-            indptr_csc[j] += indptr_csc[j - 1]
+            indptr_T[j] += indptr_T[j - 1]
 
-        current_pos = indptr_csc.copy()
+        current_pos = indptr_T.copy()
         for i in range(rows):
             for idx in range(self.indptr[i], self.indptr[i + 1]):
                 j = self.indices[idx]
                 pos = current_pos[j]
-                data_csc[pos] = self.data[idx]
-                indices_csc[pos] = i
+                data_T[pos] = self.data[idx]
+                indices_T[pos] = i
                 current_pos[j] += 1
 
-        return CSCMatrix(data_csc, indices_csc, indptr_csc, (cols, rows))
+        return CSCMatrix(data_T, indices_T, indptr_T, (cols, rows))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         if isinstance(other, CSRMatrix):
@@ -117,8 +112,7 @@ class CSRMatrix(Matrix):
 
             B_T = other.transpose()
 
-            result_data = []
-            result_indices = []
+            result_data, result_indices = [], []
             result_indptr = [0]
 
             for i in range(A_rows):
@@ -132,12 +126,18 @@ class CSRMatrix(Matrix):
                         for b_idx in range(B_T.indptr[k], B_T.indptr[k + 1]):
                             j = B_T.indices[b_idx]
                             b_val = B_T.data[b_idx]
-                            row_result[j] = row_result.get(j, 0.0) + a_val * b_val
+
+                            if j in row_result:
+                                row_result[j] += a_val * b_val
+                            else:
+                                row_result[j] = a_val * b_val
 
                 sorted_cols = sorted(row_result.keys())
                 for j in sorted_cols:
-                    result_data.append(row_result[j])
-                    result_indices.append(j)
+                    val = row_result[j]
+                    if abs(val) > 1e-12:
+                        result_data.append(val)
+                        result_indices.append(j)
 
                 result_indptr.append(len(result_data))
 
@@ -152,14 +152,12 @@ class CSRMatrix(Matrix):
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
         rows = len(dense_matrix)
         cols = len(dense_matrix[0]) if rows > 0 else 0
-        data = []
-        indices = []
-        indptr = [0]
+        data, indices, indptr = [], [], [0]
 
         for i in range(rows):
             for j in range(cols):
                 val = dense_matrix[i][j]
-                if val != 0:
+                if abs(val) > 1e-12:
                     data.append(val)
                     indices.append(j)
             indptr.append(len(data))
@@ -173,9 +171,7 @@ class CSRMatrix(Matrix):
         from COO import COOMatrix
 
         rows, cols = self.shape
-        data = []
-        row_indices = []
-        col_indices = []
+        data, row_indices, col_indices = [], [], []
 
         for i in range(rows):
             for idx in range(self.indptr[i], self.indptr[i + 1]):
