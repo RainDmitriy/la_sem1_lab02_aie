@@ -1,6 +1,5 @@
 from base import Matrix
-from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
-
+from matrix_types import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
@@ -10,58 +9,50 @@ class CSRMatrix(Matrix):
         self.indptr = list(indptr)
 
     def to_dense(self) -> DenseMatrix:
-        r_count, c_count = self.shape
-        res = [[0.0 for _ in range(c_count)] for _ in range(r_count)]
-        for i in range(r_count):
-            for idx in range(self.indptr[i], self.indptr[i + 1]):
-                col = self.indices[idx]
-                res[i][col] = self.data[idx]
+        rows, cols = self.shape
+        res = [[0.0 for _ in range(cols)] for _ in range(rows)]
+        for i in range(rows):
+            for idx in range(self.indptr[i], self.indptr[i+1]):
+                res[i][self.indices[idx]] = self.data[idx]
         return res
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        # Самый надежный способ сложения разреженных матриц — через COO
-        from COO import COOMatrix
-        self_coo = self._to_coo()
-        other_coo = other._to_coo() if hasattr(other, '_to_coo') else COOMatrix.from_dense(other.to_dense())
-        return (self_coo + other_coo)._to_csr()
+        s_dense = self.to_dense()
+        o_dense = other.to_dense()
+        for i in range(self.shape[0]):
+            for j in range(self.shape[1]):
+                s_dense[i][j] += o_dense[i][j]
+        return CSRMatrix.from_dense(s_dense)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        return CSRMatrix([x * scalar for x in self.data], self.indices, self.indptr, self.shape)
+        return CSRMatrix([v * scalar for v in self.data], self.indices, self.indptr, self.shape)
 
     def transpose(self) -> 'Matrix':
-        """Транспонирование CSR дает CSC с теми же массивами."""
         from CSC import CSCMatrix
-        new_shape = (self.shape[1], self.shape[0])
-        return CSCMatrix(self.data, self.indices, self.indptr, new_shape)
+        return CSCMatrix(self.data, self.indices, self.indptr, (self.shape[1], self.shape[0]))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        # Используем алгоритм CSR * Dense для простоты и универсальности
-        b_dense = other.to_dense()
-        n_rows = self.shape[0]
-        n_cols_b = other.shape[1]
-
-        res = [[0.0 for _ in range(n_cols_b)] for _ in range(n_rows)]
-        for i in range(n_rows):
-            for k_idx in range(self.indptr[i], self.indptr[i + 1]):
-                col_a = self.indices[k_idx]
-                val_a = self.data[k_idx]
-                for j in range(n_cols_b):
-                    res[i][j] += val_a * b_dense[col_a][j]
-
-        return CSRMatrix.from_dense(res)
+        from COO import COOMatrix
+        res_coo = COOMatrix.from_dense(self.to_dense()) @ other
+        return CSRMatrix.from_dense(res_coo.to_dense())
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
+        rows = len(dense_matrix)
+        cols = len(dense_matrix[0]) if rows > 0 else 0
+        data, indices, indptr = [], [], [0]
+        for i in range(rows):
+            for j in range(cols):
+                if dense_matrix[i][j] != 0.0:
+                    data.append(dense_matrix[i][j])
+                    indices.append(j)
+            indptr.append(len(data))
+        return cls(data, indices, indptr, (rows, cols))
+
+    def _to_coo(self) -> 'COOMatrix':
         from COO import COOMatrix
-        return COOMatrix.from_dense(dense_matrix)._to_csr()
+        return COOMatrix.from_dense(self.to_dense())
 
     def _to_csc(self) -> 'CSCMatrix':
-        return self._to_coo()._to_csc()
-
-    def _to_coo(self):
-        from COO import COOMatrix
-        rows = []
-        for i in range(self.shape[0]):
-            for _ in range(self.indptr[i], self.indptr[i + 1]):
-                rows.append(i)
-        return COOMatrix(self.data, rows, self.indices, self.shape)
+        from CSC import CSCMatrix
+        return CSCMatrix.from_dense(self.to_dense())
