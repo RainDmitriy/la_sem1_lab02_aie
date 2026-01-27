@@ -10,7 +10,7 @@ class CSCMatrix(Matrix):
         self.indptr = indptr.copy()
 
     def to_dense(self) -> DenseMatrix:
-        """Преобразует разреженную матрицу в плотную."""
+        '''Преобразует разреженную матрицу в плотную.'''
         rows, cols = self.shape
         dense = [[0.0] * cols for _ in range(rows)]
         for j in range(cols):
@@ -22,7 +22,7 @@ class CSCMatrix(Matrix):
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Реализация сложения с другой матрицей."""
+        '''Реализация сложения с другой матрицей.'''
         from COO import COOMatrix
         from CSR import CSRMatrix
 
@@ -45,22 +45,22 @@ class CSCMatrix(Matrix):
             return result_coo._to_csc()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        """Реализация умножения на скаляр."""
+        '''Реализация умножения на скаляр.'''
         if abs(scalar) < 1e-12:
             return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
         new_data = [val * scalar for val in self.data]
         return CSCMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
-        """Транспонирование матрицы."""
+        '''Транспонирование матрицы.'''
         from CSR import CSRMatrix
 
         if len(self.data) == 0:
             return CSRMatrix([], [], [0] * (self.shape[0] + 1), (self.shape[1], self.shape[0]))
 
         rows, cols = self.shape
-
         row_counts = [0] * rows
+
         for j in range(cols):
             for idx in range(self.indptr[j], self.indptr[j + 1]):
                 i = self.indices[idx]
@@ -72,7 +72,6 @@ class CSCMatrix(Matrix):
 
         data_T = [0.0] * len(self.data)
         indices_T = [0] * len(self.indices)
-
         current_pos = indptr_T.copy()
 
         for j in range(cols):
@@ -86,7 +85,7 @@ class CSCMatrix(Matrix):
         return CSRMatrix(data_T, indices_T, indptr_T, (cols, rows))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """Реализация умножения матриц."""
+        '''Реализация умножения матриц.'''
         from CSR import CSRMatrix
         from COO import COOMatrix
 
@@ -106,7 +105,7 @@ class CSCMatrix(Matrix):
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
-        """Создание CSC из плотной матрицы."""
+        '''Создание CSC из плотной матрицы.'''
         rows = len(dense_matrix)
         cols = len(dense_matrix[0]) if rows > 0 else 0
         data, indices = [], []
@@ -130,13 +129,12 @@ class CSCMatrix(Matrix):
         return cls(data, indices, indptr, (rows, cols))
 
     def _to_csr(self) -> 'CSRMatrix':
-        """Преобразование CSC в CSR."""
+        '''Преобразование CSC в CSR.'''
         return self.transpose()
 
     def _to_coo(self) -> 'COOMatrix':
-        """Преобразование CSC в COO."""
+        '''Преобразование CSC в COO.'''
         from COO import COOMatrix
-
         rows, cols = self.shape
         data, row_indices, col_indices = [], [], []
 

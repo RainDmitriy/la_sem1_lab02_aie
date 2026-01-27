@@ -4,40 +4,13 @@ from typing import Tuple, Optional, List
 
 
 def lu_decomposition_pivot(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix, List[int]]]:
-    """LU-разложение с частичным выбором ведущего элемента для разреженных матриц."""
+    '''LU-разложение с частичным выбором ведущего элемента.'''
     n = A.shape[0]
     if n != A.shape[1]:
         raise ValueError("LU-разложение применимо только к квадратным матрицам")
 
     dense = A.to_dense()
-    data, indices, indptr = [], [], [0] * (n + 1)
-
-    col_counts = [0] * n
-    for j in range(n):
-        for i in range(n):
-            if abs(dense[i][j]) > 1e-12:
-                col_counts[j] += 1
-
-    for j in range(n):
-        indptr[j + 1] = indptr[j] + col_counts[j]
-
-    data = [0.0] * indptr[n]
-    indices = [0] * indptr[n]
-    current_pos = indptr[:]
-
-    for j in range(n):
-        for i in range(n):
-            val = dense[i][j]
-            if abs(val) > 1e-12:
-                pos = current_pos[j]
-                data[pos] = val
-                indices[pos] = i
-                current_pos[j] += 1
-
-    LU_csc = CSCMatrix(data, indices, indptr, (n, n))
-
     perm = list(range(n))
-
     LU = [row[:] for row in dense]
 
     for i in range(n):
@@ -84,7 +57,7 @@ def lu_decomposition_pivot(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix,
 
 
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
-    """LU-разложение без возврата перестановок (для совместимости)."""
+    '''LU-разложение без возврата перестановок (для совместимости).'''
     result = lu_decomposition_pivot(A)
     if result is None:
         return None
@@ -93,14 +66,13 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
 
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
-    """Решение СЛАУ Ax = b методом LU-разложения с выбором ведущего элемента."""
+    '''Решение СЛАУ Ax = b методом LU-разложения с выбором ведущего элемента.'''
     result = lu_decomposition_pivot(A)
     if result is None:
         return None
 
     L, U, perm = result
     n = len(b)
-
     b_perm = [b[perm[i]] for i in range(n)]
 
     dense_L = L.to_dense()
@@ -128,14 +100,13 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
 
 
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
-    """Вычисление определителя через LU-разложение."""
+    '''Вычисление определителя через LU-разложение.'''
     result = lu_decomposition_pivot(A)
     if result is None:
         return None
 
     _, U, perm = result
     dense_U = U.to_dense()
-
     det = 1.0
     n = A.shape[0]
 
