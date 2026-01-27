@@ -4,7 +4,7 @@ from CSR import CSRMatrix
 from type import Vector
 from typing import Tuple, Optional
 
-TOLERANCE = 1e-12
+TOLERANCE = 1e-8
 
 
 def value(csc: CSCMatrix, row: int, col: int) -> float:
@@ -88,25 +88,24 @@ def _solve_l(L: CSCMatrix, b: Vector) -> Vector:
 
 def _solve_u(U: CSCMatrix, y: Vector) -> Vector:
     """решение U*x = y (CSC)"""
+    U_csr = U._to_csr()
     n = len(y)
     x = [0.0] * n
 
     for i in range(n - 1, -1, -1):
+        start = U_csr.indptr[i]
+        end = U_csr.indptr[i + 1]
         total = y[i]
-        start = U.indptr[i]
-        end = U.indptr[i + 1]
-        diag_val = None
+        diag_val = 0.0
         for idx in range(start, end):
-            row = U.indices[idx]
-            if row == i:
-                diag_val = U.data[idx]
-            elif row > i:
-                total -= U.data[idx] * x[row]
-
-        if diag_val is None or abs(diag_val) < 1e-12:
+            col = U_csr.indices[idx]
+            if col == i:
+                diag_val = U_csr.data[idx]
+            elif col > i:
+                total -= U_csr.data[idx] * x[col]
+        if abs(diag_val) < TOLERANCE:
             return [float('nan')] * n
         x[i] = total / diag_val
-
     return x
 
 
@@ -146,7 +145,7 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
             if U.indices[idx] == i:
                 diagonal = U.data[idx]
                 break
-        if diagonal is 0.0 or abs(diagonal) < TOLERANCE:
+        if abs(diagonal) < TOLERANCE:
             return 0.0
         det *= diagonal
     return det
