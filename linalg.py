@@ -11,81 +11,96 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     """
     n = A.shape[0]
     if A.shape[0] != A.shape[1]:
-        raise ValueError("LU-разложение возможно только для квадратных матриц")
+        raise ValueError("Matrix must be square")
 
-    a_dense = A.to_dense()
-    l_dense = [[0.0] * n for _ in range(n)]
-    u_dense = [[0.0] * n for _ in range(n)]
+    l_data, l_indices, l_indptr = [], [], [0]
+    u_data, u_indices, u_indptr = [], [], [0]
+    workspace = [0.0] * n
+    active_rows = []
 
-    for i in range(n):
-        for k in range(i, n):
-            sum_u = 0.0
-            for p in range(i):
-                sum_u += l_dense[i][p] * u_dense[p][k]
-            u_dense[i][k] = a_dense[i][k] - sum_u
+    for j in range(n):
+        for idx in range(A.indptr[j], A.indptr[j+1]):
+            row = A.indices[idx]
+            workspace[row] = A.data[idx]
+            active_rows.append(row)
 
-        if abs(u_dense[i][i]) < 1e-12:
+        active_rows.sort()
+
+        for i in range(j):
+            if abs(workspace[i]) < 1e-15:
+                continue
+
+            u_val = workspace[i]
+            u_data.append(u_val)
+            u_indices.append(i)
+
+            for l_idx in range(l_indptr[i], l_indptr[i+1]):
+                l_row = l_indices[l_idx]
+                l_val = l_data[l_idx]
+                if l_row > i:
+                    if workspace[l_row] == 0.0:
+                        active_rows.append(l_row)
+                    workspace[l_row] -= l_val * u_val
+
+            workspace[i] = 0.0
+
+        diag_val = workspace[j]
+        if abs(diag_val) < 1e-15:
             return None
 
-        for k in range(i, n):
-            if i == k:
-                l_dense[i][i] = 1.0
+        u_data.append(diag_val)
+        u_indices.append(j)
+        u_indptr.append(len(u_data))
+
+        l_data.append(1.0)
+        l_indices.append(j)
+
+        active_rows = sorted(list(set(active_rows)))
+        for r in active_rows:
+            if r > j and abs(workspace[r]) > 1e-15:
+                l_data.append(workspace[r] / diag_val)
+                l_indices.append(r)
+                workspace[r] = 0.0
             else:
-                sum_l = 0.0
-                for p in range(i):
-                    sum_l += l_dense[k][p] * u_dense[p][i]
-                l_dense[k][i] = (a_dense[k][i] - sum_l) / u_dense[i][i]
+                workspace[r] = 0.0
 
-    L = CSCMatrix.from_dense(l_dense)
-    U = CSCMatrix.from_dense(u_dense)
+        l_indptr.append(len(l_data))
+        active_rows = []
 
-    return L, U
+    return (
+        CSCMatrix(l_data, l_indices, l_indptr, A.shape),
+        CSCMatrix(u_data, u_indices, u_indptr, A.shape)
+    )
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     """
     Решение СЛАУ Ax = b через LU-разложение.
     """
-    lu_res = lu_decomposition(A)
-    if lu_res is None:
-        return None
-
-    L, U = lu_res
+    res = lu_decomposition(A)
+    if not res: return None
+    L, U = res
     n = len(b)
+
     y = list(b)
-
     for j in range(n):
-        current_y = y[j]
-        start_ptr = L.indptr[j]
-        end_ptr = L.indptr[j+1]
-
-        for idx in range(start_ptr, end_ptr):
-            row_idx = L.indices[idx]
-            val = L.data[idx]
-            if row_idx > j:
-                y[row_idx] -= val * current_y
+        for idx in range(L.indptr[j], L.indptr[j+1]):
+            row = L.indices[idx]
+            if row > j:
+                y[row] -= L.data[idx] * y[j]
 
     x = list(y)
     for j in range(n - 1, -1, -1):
-        u_ii = 0.0
-        start_ptr = U.indptr[j]
-        end_ptr = U.indptr[j+1]
-
-        for idx in range(start_ptr, end_ptr):
+        diag_val = 0.0
+        for idx in range(U.indptr[j], U.indptr[j+1]):
             if U.indices[idx] == j:
-                u_ii = U.data[idx]
+                diag_val = U.data[idx]
                 break
 
-        if abs(u_ii) < 1e-12:
-            return None
-
-        x[j] /= u_ii
-        current_x = x[j]
-
-        for idx in range(start_ptr, end_ptr):
-            row_idx = U.indices[idx]
-            val = U.data[idx]
-            if row_idx < j:
-                x[row_idx] -= val * current_x
+        x[j] /= diag_val
+        for idx in range(U.indptr[j], U.indptr[j+1]):
+            row = U.indices[idx]
+            if row < j:
+                x[row] -= U.data[idx] * x[j]
 
     return x
 
@@ -94,20 +109,12 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     Нахождение определителя через LU-разложение.
     det(A) = det(L) * det(U)
     """
-    lu_res = lu_decomposition(A)
-    if lu_res is None:
-        return 0.0
-
-    _, U = lu_res
+    res = lu_decomposition(A)
+    if not res: return 0.0
+    _, U = res
     det = 1.0
-    n = U.shape[0]
-
-    for j in range(n):
-        diag_val = 0.0
+    for j in range(U.shape[1]):
         for idx in range(U.indptr[j], U.indptr[j+1]):
             if U.indices[idx] == j:
-                diag_val = U.data[idx]
-                break
-        det *= diag_val
-
+                det *= U.data[idx]
     return det
