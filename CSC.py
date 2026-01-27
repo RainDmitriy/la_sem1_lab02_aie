@@ -101,26 +101,28 @@ class CSCMatrix(Matrix):
             
             if A_k != B_k:
                 raise ValueError("Несовместимые размерности для умножения")
-            B_csr = other.transpose().transpose()
-            
-            result_data, result_indices, result_indptr = [], [], [0]
-            
+
             temp_result = [{} for _ in range(A_n)]
 
             for j in range(B_m):
-                for b_pos in range(B_csr.indptr[j], B_csr.indptr[j + 1]):
-                    k = B_csr.indices[b_pos]
-                    b_val = B_csr.data[b_pos]
-
+                for b_pos in range(other.indptr[j], other.indptr[j + 1]):
+                    k = other.indices[b_pos]
+                    b_val = other.data[b_pos]
                     for a_pos in range(self.indptr[k], self.indptr[k + 1]):
                         i = self.indices[a_pos]
                         a_val = self.data[a_pos]
 
-                        temp_result[i][j] = temp_result[i].get(j, 0.0) + a_val * b_val
+                        if j not in temp_result[i]:
+                            temp_result[i][j] = 0.0
+                        temp_result[i][j] += a_val * b_val
 
-            nnz_count = 0
+            result_data = []
+            result_indices = []
+            result_indptr = [0] * (B_m + 1)
+
             for j in range(B_m):
-                result_indptr.append(nnz_count)
+                if j > 0:
+                    result_indptr[j] = result_indptr[j-1]
 
                 col_elements = []
                 for i in range(A_n):
@@ -130,19 +132,20 @@ class CSCMatrix(Matrix):
                             col_elements.append((i, val))
 
                 col_elements.sort(key=lambda x: x[0])
-                
+
                 for i, val in col_elements:
                     result_indices.append(i)
                     result_data.append(val)
-                    nnz_count += 1
+                    result_indptr[j+1] += 1
 
-            result_indptr.append(nnz_count)
+            for j in range(B_m):
+                result_indptr[j+1] += result_indptr[j]
             
             return CSCMatrix(result_data, result_indices, result_indptr, (A_n, B_m))
 
         if hasattr(other, '_to_coo'):
             return self._to_coo()._matmul_impl(other)._to_csc()
-
+        
         if self.shape[0] * self.shape[1] <= 10000 and \
         other.shape[0] * other.shape[1] <= 10000:
             from COO import COOMatrix
