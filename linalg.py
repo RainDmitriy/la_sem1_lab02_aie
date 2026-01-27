@@ -1,15 +1,17 @@
-from CSC import CSCMatrix
-from CSR import CSRMatrix
-from types import Vector
+from base import Matrix
+from type import Vector
 from typing import Tuple, Optional, List
 
 
-def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
+# Импортируем классы внутри функций, где они нужны
+def lu_decomposition(A: 'CSCMatrix') -> Optional[Tuple['CSCMatrix', 'CSCMatrix']]:
     """
     LU-разложение для CSC матрицы.
     Возвращает (L, U) - нижнюю и верхнюю треугольные матрицы.
     Ожидается, что матрица L хранит единицы на главной диагонали.
     """
+    from CSC import CSCMatrix
+    
     n = A.shape[0]
     if n != A.shape[1]:
         raise ValueError("Матрица должна быть квадратной для LU-разложения")
@@ -21,7 +23,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     L = [[0.0] * n for _ in range(n)]
     U = [[0.0] * n for _ in range(n)]
     
-    # LU-разложение без выбора ведущего элемента
+    # LU-разложение
     for i in range(n):
         # Верхняя треугольная матрица U
         for k in range(i, n):
@@ -35,14 +37,12 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
             return None
         
         # Нижняя треугольная матрица L
-        for k in range(i, n):
-            if i == k:
-                L[i][i] = 1.0
-            else:
-                s = 0.0
-                for j in range(i):
-                    s += L[k][j] * U[j][i]
-                L[k][i] = (dense_A[k][i] - s) / U[i][i]
+        L[i][i] = 1.0
+        for k in range(i + 1, n):
+            s = 0.0
+            for j in range(i):
+                s += L[k][j] * U[j][i]
+            L[k][i] = (dense_A[k][i] - s) / U[i][i]
     
     # Преобразуем обратно в CSC
     L_csc = CSCMatrix.from_dense(L)
@@ -51,7 +51,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     return L_csc, U_csc
 
 
-def forward_substitution(L: CSCMatrix, b: Vector) -> Vector:
+def forward_substitution(L: 'CSCMatrix', b: Vector) -> Vector:
     """
     Прямой ход: решение Ly = b.
     L - нижняя треугольная матрица с единицами на диагонали.
@@ -67,12 +67,12 @@ def forward_substitution(L: CSCMatrix, b: Vector) -> Vector:
         s = 0.0
         for j in range(i):
             s += L_dense[i][j] * y[j]
-        y[i] = b[i] - s  # L[i][i] = 1
+        y[i] = b[i] - s
     
     return y
 
 
-def backward_substitution(U: CSCMatrix, y: Vector) -> Vector:
+def backward_substitution(U: 'CSCMatrix', y: Vector) -> Vector:
     """
     Обратный ход: решение Ux = y.
     U - верхняя треугольная матрица.
@@ -97,7 +97,7 @@ def backward_substitution(U: CSCMatrix, y: Vector) -> Vector:
     return x
 
 
-def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
+def solve_SLAE_lu(A: 'CSCMatrix', b: Vector) -> Optional[Vector]:
     """
     Решение СЛАУ Ax = b через LU-разложение.
     """
@@ -115,7 +115,7 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     return x
 
 
-def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
+def find_det_with_lu(A: 'CSCMatrix') -> Optional[float]:
     """
     Нахождение определителя через LU-разложение.
     det(A) = det(L) * det(U) = 1 * произведение диагональных элементов U
@@ -138,7 +138,7 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     return det
 
 
-def gaussian_elimination(A: CSCMatrix, b: Vector) -> Vector:
+def gaussian_elimination(A: 'CSCMatrix', b: Vector) -> Vector:
     """
     Решение СЛАУ методом Гаусса (для сравнения с LU-разложением).
     """
@@ -148,7 +148,7 @@ def gaussian_elimination(A: CSCMatrix, b: Vector) -> Vector:
     
     dense_A = A.to_dense()
     
-    # Копируем матрицу и вектор
+    # Создаем расширенную матрицу
     aug = [row[:] for row in dense_A]
     for i in range(n):
         aug[i].append(b[i])
@@ -192,7 +192,7 @@ def gaussian_elimination(A: CSCMatrix, b: Vector) -> Vector:
     return x
 
 
-def matrix_condition_number(A: CSCMatrix, norm_type: str = '1') -> float:
+def matrix_condition_number(A: 'CSCMatrix', norm_type: str = '1') -> float:
     """
     Вычисление числа обусловленности матрицы.
     norm_type: '1' для 1-нормы, 'inf' для бесконечной нормы
