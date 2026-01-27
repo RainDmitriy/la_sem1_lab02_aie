@@ -26,9 +26,10 @@ class COOMatrix(Matrix):
 
         res_data, res_row, res_col = [], [], []
         for (r, c), v in merged.items():
-            res_data.append(v)
-            res_row.append(r)
-            res_col.append(c)
+            if abs(v) > TOLERANCE:
+                res_data.append(v)
+                res_row.append(r)
+                res_col.append(c)
         return COOMatrix(res_data, res_row, res_col, self.shape)
 
 
