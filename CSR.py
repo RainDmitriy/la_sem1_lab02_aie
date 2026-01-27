@@ -85,6 +85,9 @@ class CSRMatrix(Matrix):
         n, m = self.shape
         new_shape = (m, n)
 
+        if self.nnz == 0:
+            return CSCMatrix([], [], [0] * (m + 1), new_shape)
+
         col_counts = [0] * m
         for j in self.indices:
             col_counts[j] += 1
@@ -95,17 +98,21 @@ class CSRMatrix(Matrix):
 
         new_data = [0.0] * self.nnz
         new_indices = [0] * self.nnz
-        positions = new_indptr.copy()
-        
+
+        current_pos = new_indptr.copy()
+
         for i in range(n):
             start = self.indptr[i]
             end = self.indptr[i + 1]
+            
             for idx in range(start, end):
-                j = self.indices[idx]
-                pos = positions[j]
-                new_data[pos] = self.data[idx]
+                col = self.indices[idx]
+                value = self.data[idx]
+
+                pos = current_pos[col]
+                new_data[pos] = value
                 new_indices[pos] = i
-                positions[j] += 1
+                current_pos[col] += 1
         
         return CSCMatrix(new_data, new_indices, new_indptr, new_shape)
 

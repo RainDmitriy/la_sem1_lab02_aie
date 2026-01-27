@@ -35,9 +35,10 @@ class COOMatrix(Matrix):
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
+        """Сложение COO матриц."""
         other_coo = self._convert_to_coo(other)
 
-        combined: Dict[Tuple[int, int], float] = {}
+        combined = {}
 
         for idx in range(self.nnz):
             key = (self.row[idx], self.col[idx])
@@ -45,13 +46,13 @@ class COOMatrix(Matrix):
 
         for idx in range(other_coo.nnz):
             key = (other_coo.row[idx], other_coo.col[idx])
-            if key in combined:
-                combined[key] += other_coo.data[idx]
-            else:
-                combined[key] = other_coo.data[idx]
+            combined[key] = combined.get(key, 0.0) + other_coo.data[idx]
 
         new_data, new_rows, new_cols = [], [], []
-        for (i, j), val in combined.items():
+
+        sorted_keys = sorted(combined.keys(), key=lambda x: (x[0], x[1]))
+        for (i, j) in sorted_keys:
+            val = combined[(i, j)]
             if abs(val) > 1e-12:
                 new_data.append(val)
                 new_rows.append(i)
@@ -71,37 +72,55 @@ class COOMatrix(Matrix):
         return COOMatrix(self.data.copy(), self.col.copy(), self.row.copy(), new_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        other_coo = self._convert_to_coo(other)
-        
-        rows_A, cols_A = self.shape
-        rows_B, cols_B = other_coo.shape
-        
-        if cols_A != rows_B:
-            raise ValueError("Размеры матриц несовместимы для умножения")
+        """Умножение COO матриц."""
+        if self.shape[1] != other.shape[0]:
+            raise ValueError(f"Неправильные размеры матриц")
 
-        A_by_row = defaultdict(list)
+        if not isinstance(other, COOMatrix):
+            if hasattr(other, '_to_coo'):
+                other = other._to_coo()
+            else:
+                other_dense = other.to_dense()
+                other = COOMatrix.from_dense(other_dense)
+
+        m, n = self.shape[0], other.shape[1]
+        k_dim = self.shape[1]
+
+        row_dict = {}
         for idx in range(self.nnz):
-            A_by_row[self.row[idx]].append((self.col[idx], self.data[idx]))
-        
-        B_by_col = defaultdict(list)
-        for idx in range(other_coo.nnz):
-            B_by_col[other_coo.col[idx]].append((other_coo.row[idx], other_coo.data[idx]))
+            i = self.row[idx]
+            j = self.col[idx]
+            if i not in row_dict:
+                row_dict[i] = []
+            row_dict[i].append((j, self.data[idx]))
 
-        result = defaultdict(float)
-        for i, A_elems in A_by_row.items():
-            for k, val_A in A_elems:
-                if k in B_by_col:
-                    for j, val_B in B_by_col[k]:
-                        result[(i, j)] += val_A * val_B
+        col_dict = {}
+        for idx in range(other.nnz):
+            i = other.row[idx]
+            j = other.col[idx]
+            if j not in col_dict:
+                col_dict[j] = []
+            col_dict[j].append((i, other.data[idx]))
 
-        new_data, new_rows, new_cols = [], [], []
-        for (i, j), val in result.items():
-            if abs(val) > 1e-12:
-                new_data.append(val)
-                new_rows.append(i)
-                new_cols.append(j)
+        result = {}
+        for i, row_items in row_dict.items():
+            row_result = {}
+            for k, a_val in row_items:
+                if k in col_dict:
+                    for j, b_val in col_dict[k]:
+                        row_result[j] = row_result.get(j, 0.0) + a_val * b_val
+
+            for j, val in row_result.items():
+                if abs(val) > 1e-12:
+                    result[(i, j)] = val
+
+        data, rows, cols = [], [], []
+        for (i, j), val in sorted(result.items()):
+            data.append(val)
+            rows.append(i)
+            cols.append(j)
         
-        return COOMatrix(new_data, new_rows, new_cols, (rows_A, cols_B))
+        return COOMatrix(data, rows, cols, (m, n))
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
@@ -176,7 +195,6 @@ class COOMatrix(Matrix):
         
         if hasattr(other, '_to_coo'):
             return other._to_coo()
-
         try:
             other_dense = other.to_dense()
             return COOMatrix.from_dense(other_dense)
