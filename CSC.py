@@ -48,20 +48,22 @@ class CSCMatrix(Matrix):
         return mat
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
+        self_coo = self._to_coo()
+        
         if isinstance(other, CSCMatrix):
-            self_coo = self._to_coo()
             other_coo = other._to_coo()
-            result_coo = self_coo._add_impl(other_coo)
-            return result_coo._to_csc()
+        else:
+            try:
+                other_coo = other._to_coo()
+            except AttributeError:
+                if self.shape[0] * self.shape[1] <= MAX_DENSE_SIZE:
+                    other_dense = other.to_dense()
+                    other_coo = COOMatrix.from_dense(other_dense)
+                else:
+                    raise ValueError("Нельзя складывать большие матрицы через dense")
         
-        if hasattr(other, '_to_coo'):
-            return self._to_coo()._add_impl(other)._to_csc()
-        
-        if self.shape[0] * self.shape[1] <= MAX_DENSE_SIZE:
-            other_coo = COOMatrix.from_dense(other.to_dense())
-            return self._add_impl(other_coo)
-        
-        raise ValueError("Нельзя складывать большие матрицы через dense")
+        result_coo = self_coo._add_impl(other_coo)
+        return result_coo._to_csc()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         new_data = [x * scalar for x in self.data]
@@ -108,8 +110,8 @@ class CSCMatrix(Matrix):
     def _to_coo(self) -> 'COOMatrix':
         from COO import COOMatrix
         
+        n, m = self.shape
         data, rows, cols = [], [], []
-        _, m = self.shape
         
         for j in range(m):
             start = self.indptr[j]
