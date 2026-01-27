@@ -43,7 +43,7 @@ class CSRMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
-        if abs(scalar) < 1e-12:
+        if abs(scalar) < 1e-10:
             return CSRMatrix([], [], [0] * (self.rows + 1), self.shape)
         new_data = [val * scalar for val in self.data]
         return CSRMatrix(new_data, self.indices[:], self.indptr[:], self.shape)
@@ -60,7 +60,7 @@ class CSRMatrix(Matrix):
         if self.nnz == 0:
             return CSCMatrix([], [], [0] * (cols + 1), (cols, rows))
         
-        # Подсчитываем количество элементов в каждом столбце
+        # Создаем временные структуры для транспонирования
         col_counts = [0] * cols
         for j in self.indices:
             col_counts[j] += 1
@@ -95,87 +95,63 @@ class CSRMatrix(Matrix):
         from CSC import CSCMatrix
         from COO import COOMatrix
         
-        if isinstance(other, CSCMatrix):
-            # CSR * CSC - оптимальный случай
-            return self._csr_matmul_csc(other)
-        elif isinstance(other, CSRMatrix):
-            # CSR * CSR - преобразуем второй множитель в CSC
-            other_csc = other._to_csc()
-            return self._csr_matmul_csc(other_csc)
-        elif isinstance(other, COOMatrix):
-            # CSR * COO - преобразуем в CSC
-            other_csc = other._to_csc()
-            return self._csr_matmul_csc(other_csc)
-        else:
-            # Общий случай
-            return CSRMatrix.from_dense(self._dense_matmul(other))
-
-    def _csr_matmul_csc(self, other: 'CSCMatrix') -> 'CSRMatrix':
-        """Умножение CSR на CSC."""
-        from COO import COOMatrix
-        
         result_rows = self.rows
         result_cols = other.cols
         
-        # Используем алгоритм умножения разреженных матриц
-        result_data = []
-        result_indices = []
-        result_indptr = [0]
-        
-        # Временный массив для хранения значений строки результата
-        temp_row = [0.0] * result_cols
-        temp_used = [False] * result_cols
-        
-        for i in range(result_rows):
-            # Очищаем временный массив
-            for j in range(result_cols):
-                temp_row[j] = 0.0
-                temp_used[j] = False
+        if isinstance(other, CSCMatrix):
+            # CSR * CSC - эффективный алгоритм
+            result_data = []
+            result_indices = []
+            result_indptr = [0]
             
-            # Умножаем строку i первой матрицы на столбцы второй матрицы
-            row_start = self.indptr[i]
-            row_end = self.indptr[i + 1]
-            
-            for k in range(row_start, row_end):
-                col_a = self.indices[k]
-                val_a = self.data[k]
+            for i in range(result_rows):
+                # Вектор для накопления результатов строки
+                row_result = {}
                 
-                # Получаем столбец col_a из второй матрицы
-                col_start = other.indptr[col_a]
-                col_end = other.indptr[col_a + 1]
+                # Ненулевые элементы в строке i текущей матрицы
+                row_start = self.indptr[i]
+                row_end = self.indptr[i + 1]
                 
-                for l in range(col_start, col_end):
-                    j = other.indices[l]
-                    val_b = other.data[l]
-                    temp_row[j] += val_a * val_b
-                    temp_used[j] = True
+                for k in range(row_start, row_end):
+                    col_a = self.indices[k]
+                    val_a = self.data[k]
+                    
+                    # Добавляем вклад от умножения на столбец col_a матрицы other
+                    col_start = other.indptr[col_a]
+                    col_end = other.indptr[col_a + 1]
+                    
+                    for l in range(col_start, col_end):
+                        j = other.indices[l]
+                        val_b = other.data[l]
+                        row_result[j] = row_result.get(j, 0.0) + val_a * val_b
+                
+                # Сортируем индексы столбцов и добавляем ненулевые элементы
+                sorted_cols = sorted(row_result.keys())
+                row_nnz = 0
+                for j in sorted_cols:
+                    val = row_result[j]
+                    if abs(val) > 1e-10:
+                        result_data.append(val)
+                        result_indices.append(j)
+                        row_nnz += 1
+                
+                result_indptr.append(result_indptr[-1] + row_nnz)
             
-            # Формируем CSR строку результата
-            row_nnz = 0
-            for j in range(result_cols):
-                if abs(temp_row[j]) > 1e-12:
-                    result_data.append(temp_row[j])
-                    result_indices.append(j)
-                    row_nnz += 1
+            return CSRMatrix(result_data, result_indices, result_indptr, (result_rows, result_cols))
+        else:
+            # Общий случай - через плотные матрицы
+            dense_self = self.to_dense()
+            dense_other = other.to_dense()
+            result = [[0.0] * result_cols for _ in range(result_rows)]
             
-            result_indptr.append(result_indptr[-1] + row_nnz)
-        
-        return CSRMatrix(result_data, result_indices, result_indptr, (result_rows, result_cols))
-
-    def _dense_matmul(self, other: 'Matrix') -> DenseMatrix:
-        """Умножение через плотные матрицы."""
-        dense_self = self.to_dense()
-        dense_other = other.to_dense()
-        result = [[0.0] * other.cols for _ in range(self.rows)]
-        
-        for i in range(self.rows):
-            for k in range(self.cols):
-                val = dense_self[i][k]
-                if abs(val) > 1e-12:
-                    for j in range(other.cols):
-                        result[i][j] += val * dense_other[k][j]
-        
-        return result
+            for i in range(result_rows):
+                for k in range(self.cols):
+                    val = dense_self[i][k]
+                    if abs(val) > 1e-10:
+                        for j in range(result_cols):
+                            result[i][j] += val * dense_other[k][j]
+            
+            return CSRMatrix.from_dense(result)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
@@ -190,7 +166,7 @@ class CSRMatrix(Matrix):
             nnz_in_row = 0
             for j in range(cols):
                 val = dense_matrix[i][j]
-                if abs(val) > 1e-12:
+                if abs(val) > 1e-10:
                     data.append(val)
                     indices.append(j)
                     nnz_in_row += 1
