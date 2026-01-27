@@ -1,6 +1,5 @@
 from base import Matrix
 from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
-from CSR import CSRMatrix
 from COO import COOMatrix
 
 class CSCMatrix(Matrix):
