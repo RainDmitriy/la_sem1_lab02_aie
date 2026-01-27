@@ -1,35 +1,22 @@
 from base import Matrix
 from mytypes import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
+from typing import List, Dict, Tuple
 from collections import defaultdict
-from typing import List, Tuple
-from COO import COOMatrix
-
-ZERO_THRESHOLD = 1e-12
-MAX_DENSE_SIZE = 10000
-
 
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
         super().__init__(shape)
+        
         n, m = shape
         if len(indptr) != n + 1:
-            raise ValueError(f"indptr должен иметь длину n+1 = {n+1}, получено {len(indptr)}")
-
-        for i in range(n):
-            if indptr[i] > indptr[i + 1]:
-                raise ValueError(f"indptr должен быть неубывающим: indptr[{i}] = {indptr[i]} > indptr[{i+1}] = {indptr[i+1]}")
-
+            raise ValueError(f"indptr должен иметь длину {n + 1}")
         if indptr[0] != 0:
-            raise ValueError(f"indptr[0] должен быть 0, получено {indptr[0]}")
+            raise ValueError("indptr[0] должен быть 0")
         if indptr[-1] != len(data):
-            raise ValueError(f"indptr[-1] должен быть равен len(data) = {len(data)}, получено {indptr[-1]}")
-
+            raise ValueError(f"indptr[-1] должен быть равен {len(data)}")
         if len(data) != len(indices):
-            raise ValueError(f"data и indices должны быть одинаковой длины: data={len(data)}, indices={len(indices)}")
-
-        for col_idx in indices:
-            if not (0 <= col_idx < m):
-                raise ValueError(f"Индекс столбца {col_idx} вне диапазона [0, {m-1}]")
+            raise ValueError("Длины data и indices должны совпадать")
+        
         self.data = data
         self.indices = indices
         self.indptr = indptr
@@ -37,35 +24,30 @@ class CSRMatrix(Matrix):
 
     def to_dense(self) -> DenseMatrix:
         n, m = self.shape
-        if n * m > MAX_DENSE_SIZE:
-            raise MemoryError(f"Матрица {n}x{m} слишком большая для dense")
+        dense = [[0.0] * m for _ in range(n)]
         
-        mat = [[0.0] * m for _ in range(n)]
         for i in range(n):
             start = self.indptr[i]
             end = self.indptr[i + 1]
             for idx in range(start, end):
                 j = self.indices[idx]
-                mat[i][j] = self.data[idx]
-        return mat
+                dense[i][j] = self.data[idx]
+        
+        return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Сложение CSR матриц."""
         if not isinstance(other, CSRMatrix):
-            if hasattr(other, '_to_csr'):
-                other = other._to_csr()
-            else:
-                other_coo = other._to_coo()
-                other = other_coo._to_csr()
+            other_csr = self._convert_to_csr(other)
+            other = other_csr
         
         n, m = self.shape
-        new_data, new_indices, new_indptr = [], [], [0]
+        result_data, result_indices, result_indptr = [], [], [0]
         
         for i in range(n):
             p1, p2 = self.indptr[i], other.indptr[i]
             end1, end2 = self.indptr[i + 1], other.indptr[i + 1]
             
-            merged = {}
+            merged: Dict[int, float] = {}
 
             while p1 < end1:
                 j = self.indices[p1]
@@ -80,107 +62,106 @@ class CSRMatrix(Matrix):
                     merged[j] = other.data[p2]
                 p2 += 1
 
-            sorted_items = sorted((j, val) for j, val in merged.items() if abs(val) > 1e-12)
-            for j, val in sorted_items:
-                new_data.append(val)
-                new_indices.append(j)
+            sorted_items = sorted((col, val) for col, val in merged.items() if abs(val) > 1e-12)
+            for col, val in sorted_items:
+                result_data.append(val)
+                result_indices.append(col)
             
-            new_indptr.append(len(new_data))
+            result_indptr.append(len(result_data))
         
-        return CSRMatrix(new_data, new_indices, new_indptr, self.shape)
+        return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        new_data = [x * scalar for x in self.data]
-        return CSRMatrix(new_data, self.indices, self.indptr, self.shape)
+        if abs(scalar) < 1e-12:
+            n, _ = self.shape
+            return CSRMatrix([], [], [0] * (n + 1), self.shape)
+        
+        new_data = [val * scalar for val in self.data]
+        return CSRMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
         from CSC import CSCMatrix
-        coo = self._to_coo()
-        transposed_coo = COOMatrix(
-            coo.data[:],
-            coo.col[:],
-            coo.row[:],
-            (self.shape[1], self.shape[0])
-        )
-        return transposed_coo._to_csc()
+        
+        n, m = self.shape
+        new_shape = (m, n)
+
+        col_counts = [0] * m
+        for j in self.indices:
+            col_counts[j] += 1
+
+        new_indptr = [0] * (m + 1)
+        for j in range(m):
+            new_indptr[j + 1] = new_indptr[j] + col_counts[j]
+
+        new_data = [0.0] * self.nnz
+        new_indices = [0] * self.nnz
+        positions = new_indptr.copy()
+        
+        for i in range(n):
+            start = self.indptr[i]
+            end = self.indptr[i + 1]
+            for idx in range(start, end):
+                j = self.indices[idx]
+                pos = positions[j]
+                new_data[pos] = self.data[idx]
+                new_indices[pos] = i
+                positions[j] += 1
+        
+        return CSCMatrix(new_data, new_indices, new_indptr, new_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        self_coo = self._to_coo()
+        if not isinstance(other, CSRMatrix):
+            other_csr = self._convert_to_csr(other)
+            other = other_csr
         
-        if isinstance(other, CSRMatrix):
-            other_coo = other._to_coo()
-        else:
-            try:
-                other_coo = other._to_coo()
-            except AttributeError:
-                if self.shape[0] * self.shape[1] <= MAX_DENSE_SIZE and \
-                   other.shape[0] * other.shape[1] <= MAX_DENSE_SIZE:
-                    other_dense = other.to_dense()
-                    other_coo = COOMatrix.from_dense(other_dense)
-                else:
-                    raise ValueError("Нельзя умножать большие матрицы через dense")
+        rows_A, cols_A = self.shape
+        rows_B, cols_B = other.shape
         
-        result_coo = self_coo._matmul_impl(other_coo)
-        return result_coo._to_csr()
+        if cols_A != rows_B:
+            raise ValueError("Размеры матриц несовместимы для умножения")
+        
+        result_data, result_indices, result_indptr = [], [], [0]
 
-    def get_row(self, i: int) -> List[Tuple[int, float]]:
-        start = self.indptr[i]
-        end = self.indptr[i + 1]
-        return [(self.indices[idx], self.data[idx]) for idx in range(start, end)]
+        B_by_row = []
+        for i in range(rows_B):
+            start = other.indptr[i]
+            end = other.indptr[i + 1]
+            row_dict = {}
+            for idx in range(start, end):
+                j = other.indices[idx]
+                row_dict[j] = other.data[idx]
+            B_by_row.append(row_dict)
+        
+        for i in range(rows_A):
+            row_start = self.indptr[i]
+            row_end = self.indptr[i + 1]
 
-    def set_row(self, i: int, elements: List[Tuple[int, float]]):
-        n, m = self.shape
-        
-        all_rows = []
-        for row_idx in range(n):
-            if row_idx == i:
-                all_rows.append(sorted(elements, key=lambda x: x[0]))
-            else:
-                all_rows.append(self.get_row(row_idx))
-        
-        new_data, new_indices, new_indptr = [], [], [0]
-        
-        for row in all_rows:
-            for col, val in row:
-                if abs(val) > ZERO_THRESHOLD:
-                    new_data.append(val)
-                    new_indices.append(col)
-            new_indptr.append(len(new_data))
-        
-        self.data = new_data
-        self.indices = new_indices
-        self.indptr = new_indptr
-        self.nnz = len(new_data)
+            row_result: Dict[int, float] = {}
 
-    def swap_rows(self, i: int, j: int):
-        if i == j:
-            return
-        
-        row_i = self.get_row(i)
-        row_j = self.get_row(j)
-        
-        self.set_row(i, row_j)
-        self.set_row(j, row_i)
+            for idx_A in range(row_start, row_end):
+                k = self.indices[idx_A]
+                val_A = self.data[idx_A]
 
-    def get_element(self, i: int, j: int) -> float:
-        start = self.indptr[i]
-        end = self.indptr[i + 1]
+                if k < len(B_by_row):
+                    for j, val_B in B_by_row[k].items():
+                        if j not in row_result:
+                            row_result[j] = 0.0
+                        row_result[j] += val_A * val_B
+
+            sorted_cols = sorted(col for col in row_result if abs(row_result[col]) > 1e-12)
+            for col in sorted_cols:
+                result_data.append(row_result[col])
+                result_indices.append(col)
+            
+            result_indptr.append(len(result_data))
         
-        left, right = start, end - 1
-        while left <= right:
-            mid = (left + right) // 2
-            col = self.indices[mid]
-            if col == j:
-                return self.data[mid]
-            elif col < j:
-                left = mid + 1
-            else:
-                right = mid - 1
-        return 0.0
+        return CSRMatrix(result_data, result_indices, result_indptr, (rows_A, cols_B))
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
-        return COOMatrix.from_dense(dense_matrix)._to_csr()
+        from COO import COOMatrix
+        coo = COOMatrix.from_dense(dense_matrix)
+        return coo._to_csr()
 
     def _to_csc(self) -> 'CSCMatrix':
         from CSC import CSCMatrix
@@ -191,17 +172,28 @@ class CSRMatrix(Matrix):
         from COO import COOMatrix
         
         n, m = self.shape
-        data, row_indices, col_indices = [], [], []
+        data, rows, cols = [], [], []
         
         for i in range(n):
             start = self.indptr[i]
             end = self.indptr[i + 1]
             for idx in range(start, end):
                 data.append(self.data[idx])
-                row_indices.append(i)
-                col_indices.append(self.indices[idx])
+                rows.append(i)
+                cols.append(self.indices[idx])
         
-        return COOMatrix(data, row_indices, col_indices, self.shape)
+        return COOMatrix(data, rows, cols, self.shape)
 
-    def _to_csr(self) -> 'CSRMatrix':
-        return self
+    def _convert_to_csr(self, other: 'Matrix') -> 'CSRMatrix':
+        """Вспомогательный метод для преобразования к CSR."""
+        if isinstance(other, CSRMatrix):
+            return other
+        
+        if hasattr(other, '_to_csr'):
+            return other._to_csr()
+
+        try:
+            coo = other._to_coo()
+            return coo._to_csr()
+        except:
+            raise ValueError("Невозможно преобразовать матрицу к CSR")
