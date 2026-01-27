@@ -1,4 +1,4 @@
-# types.py
+# type.py
 from typing import List, Tuple
 
 # Основные типы данных
@@ -19,4 +19,5 @@ CSRIndptr = CSCIndptr = List[int]    # Указатели начала стро�
 # Типы для конструкторов
 COOArgs = Tuple[COOData, COORows, COOCols, Shape]
 CSRArgs = Tuple[CSRData, CSRIndices, CSRIndptr, Shape]
+
 CSCArgs = Tuple[CSCData, CSCIndices, CSCIndptr, Shape]
