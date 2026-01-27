@@ -1,11 +1,5 @@
-from base import Matrix, DenseMatrix, Shape
-from typing import List
-from COO import COOMatrix
-from CSC import CSCMatrix
-
-CSRData = List[float]
-CSRIndices = List[int]
-CSRIndptr = List[int]
+from base import Matrix
+from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 
 
 class CSRMatrix(Matrix):
@@ -17,6 +11,7 @@ class CSRMatrix(Matrix):
         self.nnz = len(data)
 
     def to_dense(self) -> DenseMatrix:
+        """Преобразует CSR в плотную матрицу."""
         rows, cols = self.shape
         dense = [[0.0] * cols for _ in range(rows)]
         
@@ -30,27 +25,38 @@ class CSRMatrix(Matrix):
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        # Преобразуем в COO для сложения
+        """Сложение CSR матриц."""
+        # Импортируем внутри метода для избежания циклического импорта
+        from COO import COOMatrix
+        
         coo_self = self._to_coo()
         return coo_self._add_impl(other)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
+        """Умножение CSR на скаляр."""
         if scalar == 0:
             return CSRMatrix([], [], [0] * (self.rows + 1), self.shape)
         new_data = [val * scalar for val in self.data]
         return CSRMatrix(new_data, self.indices[:], self.indptr[:], self.shape)
 
     def transpose(self) -> 'Matrix':
-        # Транспонирование CSR -> CSC
+        """
+        Транспонирование CSR матрицы.
+        Результат - в CSC формате.
+        """
         return self._to_csc()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
+        """Умножение CSR матриц."""
+        # Импортируем внутри метода
         from CSC import CSCMatrix
+        from COO import COOMatrix
+        
+        result_rows = self.rows
+        result_cols = other.cols
         
         if isinstance(other, CSCMatrix):
-            # CSR * CSC
-            result_rows = self.rows
-            result_cols = other.cols
+            # CSR * CSC - оптимальный случай
             result_data = []
             result_indices = []
             result_indptr = [0]
@@ -86,11 +92,17 @@ class CSRMatrix(Matrix):
                 result_indptr.append(result_indptr[-1] + row_nnz)
             
             return CSRMatrix(result_data, result_indices, result_indptr, (result_rows, result_cols))
+        elif isinstance(other, CSRMatrix):
+            # CSR * CSR - преобразуем второй множитель в CSC
+            other_csc = other._to_csc()
+            return self._matmul_impl(other_csc)
+        elif isinstance(other, COOMatrix):
+            # CSR * COO - преобразуем в CSC
+            other_csc = other._to_csc()
+            return self._matmul_impl(other_csc)
         else:
-            # Для других форматов преобразуем в плотный
+            # Общий случай
             dense_other = other.to_dense()
-            result_rows = self.rows
-            result_cols = other.cols
             result = [[0.0] * result_cols for _ in range(result_rows)]
             
             for i in range(self.rows):
@@ -108,6 +120,7 @@ class CSRMatrix(Matrix):
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
+        """Создание CSR из плотной матрицы."""
         rows = len(dense_matrix)
         cols = len(dense_matrix[0]) if rows > 0 else 0
         
@@ -128,6 +141,12 @@ class CSRMatrix(Matrix):
         return cls(data, indices, indptr, (rows, cols))
 
     def _to_csc(self) -> 'CSCMatrix':
+        """
+        Преобразование CSRMatrix в CSCMatrix.
+        """
+        # Импортируем внутри метода
+        from CSC import CSCMatrix
+        
         rows, cols = self.shape
         
         if self.nnz == 0:
@@ -162,8 +181,13 @@ class CSRMatrix(Matrix):
                 current_pos[j] += 1
         
         return CSCMatrix(csc_data, csc_indices, csc_indptr, (rows, cols))
-
+    
     def _to_coo(self) -> 'COOMatrix':
+        """
+        Преобразование CSRMatrix в COOMatrix.
+        """
+        from COO import COOMatrix
+        
         data = self.data[:]
         rows = []
         cols = self.indices[:]
