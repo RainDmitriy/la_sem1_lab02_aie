@@ -1,5 +1,5 @@
 from base import Matrix
-from matrix_types import COOData, COORows, COOCols, Shape, DenseMatrix
+from type import COOData, COORows, COOCols, Shape, DenseMatrix
 
 class COOMatrix(Matrix):
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
@@ -67,3 +67,4 @@ class COOMatrix(Matrix):
     # Добавим метод, который требуют тесты для конвертации из других форматов
     def _to_coo(self) -> 'COOMatrix':
         return self
+
