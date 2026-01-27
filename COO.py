@@ -4,7 +4,6 @@ from type import COOData, COORows, COOCols, Shape, DenseMatrix
 class COOMatrix(Matrix):
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
         super().__init__(shape)
-        # Тесты требуют именно такие имена атрибутов
         self.data = list(data)
         self.row = list(row)
         self.col = list(col)
@@ -74,3 +73,4 @@ class COOMatrix(Matrix):
 
     def _to_coo(self):
         return self
+
