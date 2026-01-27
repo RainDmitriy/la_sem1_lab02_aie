@@ -1,6 +1,5 @@
 from base import Matrix
 from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix, COOData, COORows, COOCols
-from CSR import CSRMatrix
 from COO import COOMatrix
 from collections import defaultdict
 

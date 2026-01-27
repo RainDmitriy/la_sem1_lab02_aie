@@ -2,7 +2,7 @@ from base import Matrix
 from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix, COOData, COORows, COOCols
 from COO import COOMatrix
 from collections import defaultdict
-from CSC import CSCMatrix
+
 
 
 class CSRMatrix(Matrix):
@@ -75,6 +75,7 @@ class CSRMatrix(Matrix):
         Транспонирование CSR матрицы.
         Просто создаём CSC с теми же данными, но меняем размерность.
         """
+        from CSC import CSCMatrix
 
         transposed_shape = (self.shape[1], self.shape[0])
         return CSCMatrix(
@@ -86,6 +87,8 @@ class CSRMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение матриц напрямую в разреженном формате."""
+        from CSC import CSCMatrix
+
         rows_A, cols_A = self.shape
 
         if isinstance(other, CSRMatrix):
