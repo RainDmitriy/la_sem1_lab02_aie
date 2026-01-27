@@ -1,6 +1,5 @@
 from base import Matrix
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
-from CSR import CSRMatrix
 
 
 class COOMatrix(Matrix):
@@ -17,7 +16,8 @@ class COOMatrix(Matrix):
         dense = [[0.0] * cols for _ in range(rows)]
         
         for i in range(self.nnz):
-            dense[self.row[i]][self.col[i]] = self.data[i]
+            r, c = self.row[i], self.col[i]
+            dense[r][c] = self.data[i]
         
         return dense
 
@@ -26,39 +26,39 @@ class COOMatrix(Matrix):
         if self.shape != other.shape:
             raise ValueError("Размерности матриц не совпадают")
         
-        # Если other тоже COO, используем эффективный алгоритм
+        # Если other тоже COO, складываем
         if isinstance(other, COOMatrix):
-            # Создаем словари для быстрого сложения
-            dict1 = {}
+            # Создаем словари для сложения
+            self_dict = {}
             for i in range(self.nnz):
                 key = (self.row[i], self.col[i])
-                dict1[key] = self.data[i]
+                self_dict[key] = self.data[i]
             
-            dict2 = {}
+            other_dict = {}
             for i in range(other.nnz):
                 key = (other.row[i], other.col[i])
-                dict2[key] = other.data[i]
+                other_dict[key] = other.data[i]
             
             # Объединяем
             result_data = []
             result_row = []
             result_col = []
             
-            all_keys = set(dict1.keys()) | set(dict2.keys())
-            for r, c in sorted(all_keys):
-                val = dict1.get((r, c), 0.0) + dict2.get((r, c), 0.0)
-                if abs(val) > 1e-12:  # Учитываем численные погрешности
+            all_keys = set(self_dict.keys()) | set(other_dict.keys())
+            for key in sorted(all_keys):
+                val = self_dict.get(key, 0.0) + other_dict.get(key, 0.0)
+                if abs(val) > 1e-12:
                     result_data.append(val)
-                    result_row.append(r)
-                    result_col.append(c)
+                    result_row.append(key[0])
+                    result_col.append(key[1])
             
             return COOMatrix(result_data, result_row, result_col, self.shape)
         else:
-            # Иначе преобразуем в плотные матрицы
+            # Иначе преобразуем обе в плотные
             dense_self = self.to_dense()
             dense_other = other.to_dense()
-            rows, cols = self.shape
             
+            rows, cols = self.shape
             result_data = []
             result_row = []
             result_col = []
@@ -91,10 +91,9 @@ class COOMatrix(Matrix):
         if self.shape[1] != other.shape[0]:
             raise ValueError("Несовместимые размерности для умножения")
         
-        # Преобразуем в CSR для эффективного умножения
+        # Преобразуем self в CSR для эффективного умножения
         csr_self = self._to_csr()
-        result_csr = csr_self._matmul_impl(other)
-        return result_csr._to_coo()
+        return csr_self._matmul_impl(other)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
@@ -117,6 +116,7 @@ class COOMatrix(Matrix):
         """
         Преобразование COOMatrix в CSCMatrix.
         """
+        # Импортируем здесь, чтобы избежать циклического импорта
         from CSC import CSCMatrix
         
         if self.nnz == 0:
@@ -145,6 +145,7 @@ class COOMatrix(Matrix):
         """
         Преобразование COOMatrix в CSRMatrix.
         """
+        # Импортируем здесь, чтобы избежать циклического импорта
         from CSR import CSRMatrix
         
         if self.nnz == 0:
