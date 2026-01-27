@@ -67,28 +67,31 @@ class CSCMatrix(Matrix):
         Результат - в CSR формате (с теми же данными, но с интерпретацией строк как столбцов).
         """
         from CSR import CSRMatrix
-        
+    
         n, m = self.shape
         nnz = self.nnz
-        
+
         row_counts = [0] * n
         for row in self.indices:
             row_counts[row] += 1
-        
+
         indptr_csr = [0] * (n + 1)
         for i in range(n):
             indptr_csr[i + 1] = indptr_csr[i] + row_counts[i]
-        
-        current_pos = indptr_csr.copy()
+
         data_csr = [0.0] * nnz
         indices_csr = [0] * nnz
-        
+        current_pos = indptr_csr.copy()
+
         for j in range(m):
             for pos in range(self.indptr[j], self.indptr[j + 1]):
                 i = self.indices[pos]
+                val = self.data[pos]
+
                 csr_pos = current_pos[i]
-                data_csr[csr_pos] = self.data[pos]
+                data_csr[csr_pos] = val
                 indices_csr[csr_pos] = j
+                
                 current_pos[i] += 1
         
         return CSRMatrix(data_csr, indices_csr, indptr_csr, (m, n))
@@ -108,21 +111,21 @@ class CSCMatrix(Matrix):
                 for b_pos in range(other.indptr[j], other.indptr[j + 1]):
                     k = other.indices[b_pos]
                     b_val = other.data[b_pos]
+
                     for a_pos in range(self.indptr[k], self.indptr[k + 1]):
                         i = self.indices[a_pos]
                         a_val = self.data[a_pos]
 
-                        if j not in temp_result[i]:
-                            temp_result[i][j] = 0.0
-                        temp_result[i][j] += a_val * b_val
+                        temp_result[i][j] = temp_result[i].get(j, 0.0) + a_val * b_val
 
             result_data = []
             result_indices = []
             result_indptr = [0] * (B_m + 1)
+            
+            nnz_total = 0
 
             for j in range(B_m):
-                if j > 0:
-                    result_indptr[j] = result_indptr[j-1]
+                result_indptr[j] = nnz_total
 
                 col_elements = []
                 for i in range(A_n):
@@ -133,13 +136,18 @@ class CSCMatrix(Matrix):
 
                 col_elements.sort(key=lambda x: x[0])
 
-                for i, val in col_elements:
-                    result_indices.append(i)
+                for row_idx, val in col_elements:
+                    result_indices.append(row_idx)
                     result_data.append(val)
-                    result_indptr[j+1] += 1
+                    nnz_total += 1
 
-            for j in range(B_m):
-                result_indptr[j+1] += result_indptr[j]
+            result_indptr[B_m] = nnz_total
+
+            if result_indptr[-1] != len(result_data):
+                raise ValueError(
+                    f"Ошибка в создании CSC: indptr[-1]={result_indptr[-1]}, "
+                    f"len(data)={len(result_data)}"
+                )
             
             return CSCMatrix(result_data, result_indices, result_indptr, (A_n, B_m))
 

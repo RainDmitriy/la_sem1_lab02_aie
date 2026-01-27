@@ -38,34 +38,39 @@ class COOMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение COO матриц."""
-        if isinstance(other, COOMatrix):
-            merged = defaultdict(float)
-            
-            for i in range(self.nnz):
-                key = (self.row[i], self.col[i])
-                merged[key] += self.data[i]
-            
-            for i in range(other.nnz):
-                key = (other.row[i], other.col[i])
-                merged[key] += other.data[i]
-            
-            new_data, new_row, new_col = [], [], []
-            for (r, c), val in merged.items():
-                if abs(val) > 1e-12:
-                    new_data.append(val)
-                    new_row.append(r)
-                    new_col.append(c)
-            
-            return COOMatrix(new_data, new_row, new_col, self.shape)
+        ZERO_THRESHOLD = 1e-12
 
-        if hasattr(other, '_to_coo'):
-            return self._add_impl(other._to_coo())
+        if not isinstance(other, COOMatrix):
+            if hasattr(other, "_to_coo"):
+                other = other._to_coo()
+            else:
+                n, m = self.shape
+                if n * m <= 10000:
+                    other = COOMatrix.from_dense(other.to_dense())
+                else:
+                    raise ValueError("Нельзя складывать большие матрицы разных форматов через dense")
+        merged = {}
 
-        if self.shape[0] * self.shape[1] <= 10000:
-            other_coo = COOMatrix.from_dense(other.to_dense())
-            return self._add_impl(other_coo)
+        for value, r, c in zip(self.data, self.row, self.col):
+            key = (r, c)
+            merged[key] = merged.get(key, 0.0) + value
+
+        for value, r, c in zip(other.data, other.row, other.col):
+            key = (r, c)
+            merged[key] = merged.get(key, 0.0) + value
+
+        new_data, new_rows, new_cols = [], [], []
         
-        raise ValueError("Нельзя складывать большие матрицы через dense")
+        for (r, c), value in merged.items():
+            if abs(value) > ZERO_THRESHOLD:
+                new_data.append(value)
+                new_rows.append(r)
+                new_cols.append(c)
+
+        if len(new_data) == 0:
+            return COOMatrix([], [], [], self.shape)
+        
+        return COOMatrix(new_data, new_rows, new_cols, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
