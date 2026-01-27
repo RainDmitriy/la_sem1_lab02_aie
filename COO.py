@@ -1,4 +1,3 @@
-# ==================== COO.py (полная реализация) ====================
 from base import Matrix
 from typing import List, Tuple
 
@@ -12,7 +11,6 @@ class COOMatrix(Matrix):
         if len(data) != len(rows) or len(data) != len(cols):
             raise ValueError("Длины data, rows и cols должны совпадать")
 
-        # Проверяем индексы на корректность
         for r, c in zip(rows, cols):
             if r < 0 or r >= shape[0] or c < 0 or c >= shape[1]:
                 raise ValueError(f"Индекс ({r}, {c}) вне границ матрицы {shape}")
@@ -38,7 +36,6 @@ class COOMatrix(Matrix):
         from CSR import CSRMatrix
 
         if isinstance(other, (COOMatrix, CSRMatrix, CSCMatrix)):
-            # Преобразуем обе матрицы в плотные для сложения
             dense_a = self.to_dense()
             dense_b = other.to_dense()
 
@@ -56,7 +53,6 @@ class COOMatrix(Matrix):
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
         if scalar == 0:
-            # Возвращаем пустую COO матрицу
             return COOMatrix([], [], [], self.shape)
 
         new_data = [val * scalar for val in self.data]
@@ -64,7 +60,6 @@ class COOMatrix(Matrix):
 
     def transpose(self) -> 'Matrix':
         """Транспонирование COO матрицы."""
-        # Меняем строки и столбцы местами
         new_shape = (self.shape[1], self.shape[0])
         return COOMatrix(self.data.copy(), self.cols.copy(), self.rows.copy(), new_shape)
 
@@ -72,7 +67,6 @@ class COOMatrix(Matrix):
         """Умножение COO матриц."""
         from CSR import CSRMatrix
 
-        # Преобразуем обе матрицы в CSR для эффективного умножения
         if not isinstance(other, CSRMatrix):
             other_csr = CSRMatrix.from_dense(other.to_dense())
         else:
@@ -80,10 +74,8 @@ class COOMatrix(Matrix):
 
         self_csr = CSRMatrix.from_dense(self.to_dense())
 
-        # Выполняем умножение через CSR
         result_csr = self_csr._matmul_impl(other_csr)
 
-        # Преобразуем результат обратно в COO
         return COOMatrix.from_dense(result_csr.to_dense())
 
     @classmethod
@@ -112,7 +104,6 @@ class COOMatrix(Matrix):
         """
         from CSC import CSCMatrix
 
-        # Сортируем по столбцам, затем по строкам
         sorted_indices = sorted(range(self.nnz), key=lambda i: (self.cols[i], self.rows[i]))
 
         data = []
@@ -123,7 +114,6 @@ class COOMatrix(Matrix):
         for idx in sorted_indices:
             col = self.cols[idx]
 
-            # Заполняем indptr для пропущенных столбцов
             while current_col < col:
                 indptr[current_col + 1] = len(data)
                 current_col += 1
@@ -131,7 +121,6 @@ class COOMatrix(Matrix):
             data.append(self.data[idx])
             indices.append(self.rows[idx])
 
-        # Заполняем indptr для оставшихся столбцов
         while current_col < self.shape[1]:
             indptr[current_col + 1] = len(data)
             current_col += 1
@@ -144,7 +133,6 @@ class COOMatrix(Matrix):
         """
         from CSR import CSRMatrix
 
-        # Сортируем по строкам, затем по столбцам
         sorted_indices = sorted(range(self.nnz), key=lambda i: (self.rows[i], self.cols[i]))
 
         data = []
@@ -155,7 +143,6 @@ class COOMatrix(Matrix):
         for idx in sorted_indices:
             row = self.rows[idx]
 
-            # Заполняем indptr для пропущенных строк
             while current_row < row:
                 indptr[current_row + 1] = len(data)
                 current_row += 1
@@ -163,9 +150,9 @@ class COOMatrix(Matrix):
             data.append(self.data[idx])
             indices.append(self.cols[idx])
 
-        # Заполняем indptr для оставшихся строк
         while current_row < self.shape[0]:
             indptr[current_row + 1] = len(data)
             current_row += 1
+
 
         return CSRMatrix(data, indices, indptr, self.shape)
