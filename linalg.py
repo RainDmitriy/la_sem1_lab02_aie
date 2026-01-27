@@ -1,6 +1,6 @@
 from CSR import CSRMatrix
 from mytypes import Vector
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict
 from collections import defaultdict
 
 class LUDecomposition:
