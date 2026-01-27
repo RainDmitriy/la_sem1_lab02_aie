@@ -1,5 +1,5 @@
 from base import Matrix
-from type import COOData, COORows, COOCols, Shape, DenseMatrix
+from type import COOData, COORows, COOCols, Shape, DenseMatrix, TOLERANCE
 
 class COOMatrix(Matrix):
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
@@ -26,7 +26,7 @@ class COOMatrix(Matrix):
 
         res_data, res_row, res_col = [], [], []
         for (r, c), v in merged.items():
-            if v != 0:
+            if abs(v) > TOLERANCE:
                 res_data.append(v)
                 res_row.append(r)
                 res_col.append(c)
@@ -53,9 +53,10 @@ class COOMatrix(Matrix):
                     idx = (r1, c2)
                     temp_results[idx] = temp_results.get(idx, 0.0) + v1 * v2
         for (r, c), val in temp_results.items():
-            res_rows.append(r)
-            res_cols.append(c)
-            res_data.append(val)
+            if abs(val) > TOLERANCE:
+                res_rows.append(r)
+                res_cols.append(c)
+                res_data.append(val)
         return COOMatrix(res_data, res_rows, res_cols, (self.shape[0], other.shape[1]))
 
     @classmethod
@@ -67,7 +68,7 @@ class COOMatrix(Matrix):
         for i in range(rows):
             for j in range(cols):
                 val = dense_matrix[i][j]
-                if val != 0:
+                if abs(val) > TOLERANCE:
                     data.append(float(val))
                     row_indices.append(i)
                     col_indices.append(j)

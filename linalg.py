@@ -1,6 +1,6 @@
 from CSC import CSCMatrix
 from CSR import CSRMatrix
-from type import Vector
+from type import Vector, TOLERANCE
 from typing import Tuple, Optional
 
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
@@ -27,7 +27,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         active_rows.sort()
 
         for i in range(j):
-            if abs(workspace[i]) < 1e-15:
+            if abs(workspace[i]) < TOLERANCE:
                 continue
 
             u_val = workspace[i]
@@ -45,7 +45,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
             workspace[i] = 0.0
 
         diag_val = workspace[j]
-        if abs(diag_val) < 1e-15:
+        if abs(diag_val) < TOLERANCE:
             return None
 
         u_data.append(diag_val)
@@ -57,7 +57,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
 
         active_rows = sorted(list(set(active_rows)))
         for r in active_rows:
-            if r > j and abs(workspace[r]) > 1e-15:
+            if r > j and abs(workspace[r]) > TOLERANCE:
                 l_data.append(workspace[r] / diag_val)
                 l_indices.append(r)
                 workspace[r] = 0.0

@@ -1,5 +1,5 @@
 from base import Matrix
-from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
+from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix, TOLERANCE
 
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
@@ -68,7 +68,7 @@ class CSRMatrix(Matrix):
             count = 0
             for j in range(n_cols):
                 val = dense_matrix[i][j]
-                if val != 0:
+                if abs(val) > TOLERANCE:
                     data.append(float(val))
                     indices.append(j)
                     count += 1
