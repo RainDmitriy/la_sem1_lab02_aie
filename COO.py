@@ -91,32 +91,9 @@ class COOMatrix(Matrix):
         if self.shape[1] != other.shape[0]:
             raise ValueError("Несовместимые размерности для умножения")
         
-        # Преобразуем self в плотный формат для простоты
-        dense_self = self.to_dense()
-        
-        if isinstance(other, COOMatrix):
-            dense_other = other.to_dense()
-        else:
-            dense_other = other.to_dense()
-        
-        rows_A, cols_A = self.shape
-        rows_B, cols_B = other.shape
-        
-        result_data = []
-        result_row = []
-        result_col = []
-        
-        for i in range(rows_A):
-            for j in range(cols_B):
-                val = 0.0
-                for k in range(cols_A):
-                    val += dense_self[i][k] * dense_other[k][j]
-                if val != 0.0:
-                    result_data.append(val)
-                    result_row.append(i)
-                    result_col.append(j)
-        
-        return COOMatrix(result_data, result_row, result_col, (rows_A, cols_B))
+        # Преобразуем self в CSR для умножения
+        csr_self = self._to_csr()
+        return csr_self._matmul_impl(other)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
