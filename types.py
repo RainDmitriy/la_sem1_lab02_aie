@@ -6,6 +6,7 @@ DenseMatrix = List[List[float]]  # Плотная матрица: [[row1], [row2
 Shape = Tuple[int, int]  # Размерность: (rows, cols)
 Vector = List[float]  # Вектор: [1.0, 2.0, 3.0]
 
+
 # Для COO
 COOData = List[float]      # Ненулевые значения
 COORows = List[int]        # Индексы строк
