@@ -19,8 +19,8 @@ class COOMatrix(Matrix):
             if not (0 <= c < m):
                 raise ValueError(f"Индекс столбца {c} вне диапазона [0, {m-1}]")
         self.data = data
-        self.rows = row
-        self.cols = col
+        self.row = row
+        self.col = col
         self.nnz = len(data)
 
     def to_dense(self) -> DenseMatrix:
