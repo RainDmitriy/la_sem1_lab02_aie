@@ -50,18 +50,16 @@ class CSRMatrix(Matrix):
         return mat
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
+        """Сложение CSR матриц."""
         if not isinstance(other, CSRMatrix):
-            try:
+            if hasattr(other, '_to_csr'):
                 other = other._to_csr()
-            except AttributeError:
-                if self.shape[0] * self.shape[1] <= MAX_DENSE_SIZE:
-                    other_coo = COOMatrix.from_dense(other.to_dense())
-                    other = other_coo._to_csr()
-                else:
-                    raise ValueError("Нельзя складывать большие матрицы через dense")
+            else:
+                other_coo = other._to_coo()
+                other = other_coo._to_csr()
         
         n, m = self.shape
-        result_data, result_indices, result_indptr = [], [], [0]
+        new_data, new_indices, new_indptr = [], [], [0]
         
         for i in range(n):
             p1, p2 = self.indptr[i], other.indptr[i]
@@ -71,28 +69,25 @@ class CSRMatrix(Matrix):
 
             while p1 < end1:
                 j = self.indices[p1]
-                val = self.data[p1]
-                merged[j] = val
+                merged[j] = self.data[p1]
                 p1 += 1
 
             while p2 < end2:
                 j = other.indices[p2]
-                val = other.data[p2]
                 if j in merged:
-                    merged[j] += val
+                    merged[j] += other.data[p2]
                 else:
-                    merged[j] = val
+                    merged[j] = other.data[p2]
                 p2 += 1
 
-            sorted_items = sorted(merged.items())
+            sorted_items = sorted((j, val) for j, val in merged.items() if abs(val) > 1e-12)
             for j, val in sorted_items:
-                if abs(val) > ZERO_THRESHOLD:
-                    result_data.append(val)
-                    result_indices.append(j)
+                new_data.append(val)
+                new_indices.append(j)
             
-            result_indptr.append(len(result_data))
+            new_indptr.append(len(new_data))
         
-        return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
+        return CSRMatrix(new_data, new_indices, new_indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         new_data = [x * scalar for x in self.data]
