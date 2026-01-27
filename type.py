@@ -1,6 +1,8 @@
 # type.py
 from typing import List, Tuple
 
+TOLERANCE = 1e-15
+
 # Основные типы данных
 DenseMatrix = List[List[float]]  # Плотная матрица: [[row1], [row2], ...] как в NumPy
 Shape = Tuple[int, int]  # Размерность: (rows, cols)
