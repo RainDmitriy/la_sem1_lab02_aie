@@ -17,14 +17,15 @@ class CSCMatrix(Matrix):
         return res
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        s_dense = self.to_dense()
-        o_dense = other.to_dense()
+        d1, d2 = self.to_dense(), other.to_dense()
         for i in range(self.shape[0]):
             for j in range(self.shape[1]):
-                s_dense[i][j] += o_dense[i][j]
-        return CSCMatrix.from_dense(s_dense)
+                d1[i][j] += d2[i][j]
+        return CSCMatrix.from_dense(d1)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
+        if scalar == 0:
+            return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
         return CSCMatrix([v * scalar for v in self.data], self.indices, self.indptr, self.shape)
 
     def transpose(self) -> 'Matrix':
@@ -43,17 +44,17 @@ class CSCMatrix(Matrix):
         data, indices, indptr = [], [], [0]
         for j in range(cols):
             for i in range(rows):
-                if dense_matrix[i][j] != 0.0:
-                    data.append(dense_matrix[i][j])
+                val = dense_matrix[i][j]
+                if abs(val) > 1e-15:
+                    data.append(val)
                     indices.append(i)
             indptr.append(len(data))
         return cls(data, indices, indptr, (rows, cols))
 
-    def _to_coo(self) -> 'COOMatrix':
+    def _to_coo(self):
         from COO import COOMatrix
         return COOMatrix.from_dense(self.to_dense())
 
-    def _to_csr(self) -> 'CSRMatrix':
+    def _to_csr(self):
         from CSR import CSRMatrix
         return CSRMatrix.from_dense(self.to_dense())
-
