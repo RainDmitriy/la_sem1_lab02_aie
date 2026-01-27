@@ -29,11 +29,8 @@ class CSCMatrix(Matrix):
         if self.shape != other.shape:
             raise ValueError("Размерности матриц не совпадают")
         
-        # Проверяем, является ли other CSC
-        is_other_csc = (hasattr(other, 'indices') and hasattr(other, 'indptr') 
-                       and hasattr(other, 'data') and hasattr(other, 'nnz'))
-        
-        if is_other_csc:
+        # Если other тоже CSC
+        if type(other).__name__ == 'CSCMatrix':
             # Преобразуем в CSR для сложения
             csr_self = self._to_csr()
             csr_other = other._to_csr()
@@ -43,16 +40,27 @@ class CSCMatrix(Matrix):
             # Иначе преобразуем в плотные
             dense_self = self.to_dense()
             dense_other = other.to_dense()
+            rows, cols = self.shape
             
-            return CSCMatrix.from_dense(
-                [[dense_self[i][j] + dense_other[i][j] 
-                  for j in range(self.shape[1])] 
-                 for i in range(self.shape[0])]
-            )
+            data = []
+            indices = []
+            indptr = [0]
+            
+            for j in range(cols):
+                col_nnz = 0
+                for i in range(rows):
+                    val = dense_self[i][j] + dense_other[i][j]
+                    if val != 0.0:
+                        data.append(val)
+                        indices.append(i)
+                        col_nnz += 1
+                indptr.append(indptr[-1] + col_nnz)
+            
+            return CSCMatrix(data, indices, indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
-        if abs(scalar) < 1e-12:
+        if scalar == 0.0:
             return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
         
         new_data = [val * scalar for val in self.data]
@@ -63,7 +71,6 @@ class CSCMatrix(Matrix):
         Транспонирование CSC матрицы.
         Результат - в CSR формате.
         """
-        # Транспонирование CSC эквивалентно преобразованию в CSR
         return self._to_csr()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
@@ -85,27 +92,19 @@ class CSCMatrix(Matrix):
         rows = len(dense_matrix)
         cols = len(dense_matrix[0])
         
-        # Собираем ненулевые элементы
-        elements = []
+        data = []
+        indices = []
+        indptr = [0]
+        
         for j in range(cols):
+            col_nnz = 0
             for i in range(rows):
                 val = dense_matrix[i][j]
-                if abs(val) > 1e-12:
-                    elements.append((j, i, val))  # (col, row, val)
-        
-        # Сортируем по столбцам, затем по строкам
-        elements.sort()
-        
-        data = [float(elem[2]) for elem in elements]
-        indices = [elem[1] for elem in elements]
-        
-        # Строим indptr
-        indptr = [0] * (cols + 1)
-        for elem in elements:
-            indptr[elem[0] + 1] += 1
-        
-        for j in range(cols):
-            indptr[j + 1] += indptr[j]
+                if val != 0.0:
+                    data.append(float(val))
+                    indices.append(i)
+                    col_nnz += 1
+            indptr.append(indptr[-1] + col_nnz)
         
         return cls(data, indices, indptr, (rows, cols))
 
