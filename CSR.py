@@ -1,5 +1,7 @@
 from base import Matrix
 from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
+from CSC import CSCMatrix
+from COO import COOMatrix
 
 
 class CSRMatrix(Matrix):
@@ -16,11 +18,10 @@ class CSRMatrix(Matrix):
         dense = [[0.0] * cols for _ in range(rows)]
         
         for i in range(rows):
-            start = self.indptr[i]
-            end = self.indptr[i + 1]
-            for k in range(start, end):
-                col = self.indices[k]
-                dense[i][col] = self.data[k]
+            start, end = self.indptr[i], self.indptr[i + 1]
+            for idx in range(start, end):
+                j = self.indices[idx]
+                dense[i][j] = self.data[idx]
         
         return dense
 
@@ -29,71 +30,81 @@ class CSRMatrix(Matrix):
         if self.shape != other.shape:
             raise ValueError("Размерности матриц не совпадают")
         
-        # Если other не CSR, преобразуем его в CSR
-        if not isinstance(other, CSRMatrix):
-            if hasattr(other, '_to_csr'):
-                other_csr = other._to_csr()
-            else:
-                other_csr = CSRMatrix.from_dense(other.to_dense())
-        else:
-            other_csr = other
-        
-        rows, cols = self.shape
-        result_data = []
-        result_indices = []
-        result_indptr = [0]
-        
-        for i in range(rows):
-            # Получаем элементы текущей строки из обеих матриц
-            self_start = self.indptr[i]
-            self_end = self.indptr[i + 1]
-            other_start = other_csr.indptr[i]
-            other_end = other_csr.indptr[i + 1]
+        # Если other тоже CSR, используем эффективный алгоритм
+        if isinstance(other, CSRMatrix):
+            rows, cols = self.shape
+            result_data = []
+            result_indices = []
+            result_indptr = [0]
             
-            idx_self = self_start
-            idx_other = other_start
-            
-            # Слияние двух отсортированных списков (по столбцам)
-            while idx_self < self_end and idx_other < other_end:
-                col_self = self.indices[idx_self]
-                col_other = other_csr.indices[idx_other]
+            for i in range(rows):
+                # Получаем индексы и значения для текущей строки
+                self_start = self.indptr[i]
+                self_end = self.indptr[i + 1]
+                other_start = other.indptr[i]
+                other_end = other.indptr[i + 1]
                 
-                if col_self < col_other:
-                    result_data.append(self.data[idx_self])
-                    result_indices.append(col_self)
-                    idx_self += 1
-                elif col_self > col_other:
-                    result_data.append(other_csr.data[idx_other])
-                    result_indices.append(col_other)
-                    idx_other += 1
-                else:  # col_self == col_other
-                    val = self.data[idx_self] + other_csr.data[idx_other]
-                    if val != 0:
-                        result_data.append(val)
-                        result_indices.append(col_self)
-                    idx_self += 1
-                    idx_other += 1
+                # Слияние двух отсортированных списков
+                idx1, idx2 = self_start, other_start
+                while idx1 < self_end and idx2 < other_end:
+                    col1 = self.indices[idx1]
+                    col2 = other.indices[idx2]
+                    
+                    if col1 < col2:
+                        result_data.append(self.data[idx1])
+                        result_indices.append(col1)
+                        idx1 += 1
+                    elif col1 > col2:
+                        result_data.append(other.data[idx2])
+                        result_indices.append(col2)
+                        idx2 += 1
+                    else:
+                        val = self.data[idx1] + other.data[idx2]
+                        if abs(val) > 1e-12:
+                            result_data.append(val)
+                            result_indices.append(col1)
+                        idx1 += 1
+                        idx2 += 1
+                
+                # Добавляем оставшиеся элементы
+                while idx1 < self_end:
+                    result_data.append(self.data[idx1])
+                    result_indices.append(self.indices[idx1])
+                    idx1 += 1
+                
+                while idx2 < other_end:
+                    result_data.append(other.data[idx2])
+                    result_indices.append(other.indices[idx2])
+                    idx2 += 1
+                
+                result_indptr.append(len(result_data))
             
-            # Добавляем оставшиеся элементы из первой матрицы
-            while idx_self < self_end:
-                result_data.append(self.data[idx_self])
-                result_indices.append(self.indices[idx_self])
-                idx_self += 1
+            return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
+        else:
+            # Преобразуем в плотный формат
+            dense_self = self.to_dense()
+            dense_other = other.to_dense()
+            rows, cols = self.shape
             
-            # Добавляем оставшиеся элементы из второй матрицы
-            while idx_other < other_end:
-                result_data.append(other_csr.data[idx_other])
-                result_indices.append(other_csr.indices[idx_other])
-                idx_other += 1
+            data = []
+            indices = []
+            indptr = [0]
             
-            result_indptr.append(len(result_data))
-        
-        return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
+            for i in range(rows):
+                row_nnz = 0
+                for j in range(cols):
+                    val = dense_self[i][j] + dense_other[i][j]
+                    if abs(val) > 1e-12:
+                        data.append(val)
+                        indices.append(j)
+                        row_nnz += 1
+                indptr.append(indptr[-1] + row_nnz)
+            
+            return CSRMatrix(data, indices, indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
-        if scalar == 0:
-            # Возвращаем нулевую матрицу
+        if abs(scalar) < 1e-12:
             return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
         
         new_data = [val * scalar for val in self.data]
@@ -114,47 +125,48 @@ class CSRMatrix(Matrix):
         rows_A, cols_A = self.shape
         rows_B, cols_B = other.shape
         
-        # Если other не CSR, преобразуем в CSR
-        if not isinstance(other, CSRMatrix):
-            if hasattr(other, '_to_csr'):
-                other_csr = other._to_csr()
-            else:
-                other_csr = CSRMatrix.from_dense(other.to_dense())
-        else:
+        # Преобразуем other в CSR если нужно
+        if isinstance(other, CSRMatrix):
             other_csr = other
+        elif isinstance(other, CSCMatrix):
+            other_csr = other._to_csr()
+        elif isinstance(other, COOMatrix):
+            other_csr = other._to_csr()
+        else:
+            other_csr = CSRMatrix.from_dense(other.to_dense())
         
         # Алгоритм умножения CSR матриц
         result_data = []
         result_indices = []
         result_indptr = [0]
         
-        # Временный массив для накопления результатов строки
-        temp = [0.0] * cols_B
-        
+        # Для каждой строки в A
         for i in range(rows_A):
-            # Обнуляем временный массив
-            for j in range(cols_B):
-                temp[j] = 0.0
+            # Словарь для накопления результатов строки
+            row_result = {}
+            start_A, end_A = self.indptr[i], self.indptr[i + 1]
             
-            # Умножаем строку i матрицы A на матрицу B
-            for k_idx in range(self.indptr[i], self.indptr[i + 1]):
-                k = self.indices[k_idx]
-                a_val = self.data[k_idx]
+            # Проходим по ненулевым элементам строки i в A
+            for idx_A in range(start_A, end_A):
+                k = self.indices[idx_A]
+                val_A = self.data[idx_A]
                 
-                # Добавляем вклад от строки k матрицы B
-                for b_idx in range(other_csr.indptr[k], other_csr.indptr[k + 1]):
-                    j = other_csr.indices[b_idx]
-                    temp[j] += a_val * other_csr.data[b_idx]
+                # Добавляем вклад от строки k в B
+                start_B, end_B = other_csr.indptr[k], other_csr.indptr[k + 1]
+                for idx_B in range(start_B, end_B):
+                    j = other_csr.indices[idx_B]
+                    val_B = other_csr.data[idx_B]
+                    
+                    row_result[j] = row_result.get(j, 0.0) + val_A * val_B
             
-            # Сохраняем ненулевые элементы строки результата
-            row_nnz = 0
-            for j in range(cols_B):
-                if temp[j] != 0:
-                    result_data.append(temp[j])
+            # Сохраняем ненулевые элементы
+            for j in sorted(row_result.keys()):
+                val = row_result[j]
+                if abs(val) > 1e-12:
+                    result_data.append(val)
                     result_indices.append(j)
-                    row_nnz += 1
             
-            result_indptr.append(result_indptr[-1] + row_nnz)
+            result_indptr.append(len(result_data))
         
         return CSRMatrix(result_data, result_indices, result_indptr, (rows_A, cols_B))
 
@@ -172,14 +184,14 @@ class CSRMatrix(Matrix):
         indptr = [0]
         
         for i in range(rows):
-            nnz_in_row = 0
+            row_nnz = 0
             for j in range(cols):
                 val = dense_matrix[i][j]
-                if val != 0:
+                if abs(val) > 1e-12:
                     data.append(val)
                     indices.append(j)
-                    nnz_in_row += 1
-            indptr.append(indptr[-1] + nnz_in_row)
+                    row_nnz += 1
+            indptr.append(indptr[-1] + row_nnz)
         
         return cls(data, indices, indptr, (rows, cols))
 
@@ -194,31 +206,32 @@ class CSRMatrix(Matrix):
         if self.nnz == 0:
             return CSCMatrix([], [], [0] * (cols + 1), self.shape)
         
-        # Подсчет количества ненулевых элементов в каждом столбце
+        # Подсчитываем количество ненулевых элементов в каждом столбце
         col_counts = [0] * cols
-        for col in self.indices:
-            col_counts[col] += 1
+        for j in self.indices:
+            col_counts[j] += 1
         
         # Строим indptr для CSC
         indptr = [0] * (cols + 1)
         for j in range(cols):
             indptr[j + 1] = indptr[j] + col_counts[j]
         
-        # Рабочие массивы для построения
+        # Рабочие массивы для заполнения
         current_pos = indptr.copy()
-        new_data = [0.0] * self.nnz
-        new_indices = [0] * self.nnz
+        data_csc = [0.0] * self.nnz
+        indices_csc = [0] * self.nnz
         
-        # Заполняем CSC данные
+        # Заполняем CSC
         for i in range(rows):
-            for k in range(self.indptr[i], self.indptr[i + 1]):
-                j = self.indices[k]
+            start, end = self.indptr[i], self.indptr[i + 1]
+            for idx in range(start, end):
+                j = self.indices[idx]
                 pos = current_pos[j]
-                new_data[pos] = self.data[k]
-                new_indices[pos] = i
+                data_csc[pos] = self.data[idx]
+                indices_csc[pos] = i
                 current_pos[j] += 1
         
-        return CSCMatrix(new_data, new_indices, indptr, self.shape)
+        return CSCMatrix(data_csc, indices_csc, indptr, self.shape)
     
     def _to_coo(self) -> 'COOMatrix':
         """
@@ -234,9 +247,10 @@ class CSRMatrix(Matrix):
         cols = []
         
         for i in range(self.shape[0]):
-            for k in range(self.indptr[i], self.indptr[i + 1]):
-                data.append(self.data[k])
+            start, end = self.indptr[i], self.indptr[i + 1]
+            for idx in range(start, end):
+                data.append(self.data[idx])
                 rows.append(i)
-                cols.append(self.indices[k])
+                cols.append(self.indices[idx])
         
         return COOMatrix(data, rows, cols, self.shape)
