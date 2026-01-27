@@ -95,11 +95,56 @@ class CSCMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
+        if isinstance(other, CSCMatrix):
+            A_n, A_k = self.shape
+            B_k, B_m = other.shape
+            
+            if A_k != B_k:
+                raise ValueError("Несовместимые размерности для умножения")
+            B_csr = other.transpose().transpose()
+            
+            result_data, result_indices, result_indptr = [], [], [0]
+            
+            temp_result = [{} for _ in range(A_n)]
+
+            for j in range(B_m):
+                for b_pos in range(B_csr.indptr[j], B_csr.indptr[j + 1]):
+                    k = B_csr.indices[b_pos]
+                    b_val = B_csr.data[b_pos]
+
+                    for a_pos in range(self.indptr[k], self.indptr[k + 1]):
+                        i = self.indices[a_pos]
+                        a_val = self.data[a_pos]
+
+                        temp_result[i][j] = temp_result[i].get(j, 0.0) + a_val * b_val
+
+            nnz_count = 0
+            for j in range(B_m):
+                result_indptr.append(nnz_count)
+
+                col_elements = []
+                for i in range(A_n):
+                    if j in temp_result[i]:
+                        val = temp_result[i][j]
+                        if abs(val) > 1e-12:
+                            col_elements.append((i, val))
+
+                col_elements.sort(key=lambda x: x[0])
+                
+                for i, val in col_elements:
+                    result_indices.append(i)
+                    result_data.append(val)
+                    nnz_count += 1
+
+            result_indptr.append(nnz_count)
+            
+            return CSCMatrix(result_data, result_indices, result_indptr, (A_n, B_m))
+
         if hasattr(other, '_to_coo'):
             return self._to_coo()._matmul_impl(other)._to_csc()
-        
+
         if self.shape[0] * self.shape[1] <= 10000 and \
-           other.shape[0] * other.shape[1] <= 10000:
+        other.shape[0] * other.shape[1] <= 10000:
             from COO import COOMatrix
             other_coo = COOMatrix.from_dense(other.to_dense())
             return self._matmul_impl(other_coo)
