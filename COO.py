@@ -69,7 +69,7 @@ class COOMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение матриц напрямую в разреженном формате."""
-        # Для умножения преобразуем в CSR (оптимальнее для умножения)
+        # Для умножения преобразуем в CSR
         csr_self = self._to_csr()
         return csr_self._matmul_impl(other)
 
@@ -85,7 +85,7 @@ class COOMatrix(Matrix):
         for i in range(rows):
             for j in range(cols):
                 val = dense_matrix[i][j]
-                if abs(val) > 1e-12:  # Порог для нуля
+                if abs(val) > 1e-12:
                     data.append(val)
                     row_indices.append(i)
                     col_indices.append(j)
@@ -107,6 +107,7 @@ class COOMatrix(Matrix):
         col_counts = [0] * cols
         for j in self.col:
             col_counts[j] += 1
+
         indptr = [0] * (cols + 1)
         for j in range(cols):
             indptr[j + 1] = indptr[j] + col_counts[j]

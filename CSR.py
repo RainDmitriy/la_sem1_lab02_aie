@@ -4,7 +4,6 @@ from COO import COOMatrix
 from collections import defaultdict
 
 
-
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
         super().__init__(shape)
@@ -73,11 +72,12 @@ class CSRMatrix(Matrix):
     def transpose(self) -> 'Matrix':
         """
         Транспонирование CSR матрицы.
-        Просто создаём CSC с теми же данными, но меняем размерность.
+        Результат - CSC матрица с теми же данными.
         """
         from CSC import CSCMatrix
 
         transposed_shape = (self.shape[1], self.shape[0])
+
         return CSCMatrix(
             data=self.data.copy(),
             indices=self.indices.copy(),
@@ -87,9 +87,9 @@ class CSRMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение матриц напрямую в разреженном формате."""
-        from CSC import CSCMatrix
-
         rows_A, cols_A = self.shape
+
+        from CSC import CSCMatrix
 
         if isinstance(other, CSRMatrix):
             rows_B, cols_B = other.shape
@@ -105,6 +105,7 @@ class CSRMatrix(Matrix):
                 for pos_A in range(start_A, end_A):
                     col_A = self.indices[pos_A]
                     val_A = self.data[pos_A]
+
                     start_B, end_B = other.indptr[col_A], other.indptr[col_A + 1]
 
                     for pos_B in range(start_B, end_B):
@@ -131,15 +132,20 @@ class CSRMatrix(Matrix):
 
             for i in range(rows_A):
                 row_result = defaultdict(float)
+
                 start_A, end_A = self.indptr[i], self.indptr[i + 1]
+
                 for pos_A in range(start_A, end_A):
                     k = self.indices[pos_A]
                     val_A = self.data[pos_A]
+
                     start_B, end_B = other.indptr[k], other.indptr[k + 1]
+
                     for pos_B in range(start_B, end_B):
                         j = other.indices[pos_B]
                         val_B = other.data[pos_B]
                         row_result[j] += val_A * val_B
+
                 sorted_cols = sorted(row_result.keys())
                 for col in sorted_cols:
                     val = row_result[col]
@@ -181,36 +187,7 @@ class CSRMatrix(Matrix):
         """
         Преобразование CSRMatrix в CSCMatrix напрямую.
         """
-        rows, cols = self.shape
-
-        col_counts = [0] * cols
-        for i in range(rows):
-            start, end = self.indptr[i], self.indptr[i + 1]
-            for pos in range(start, end):
-                j = self.indices[pos]
-                col_counts[j] += 1
-
-        csc_indptr = [0] * (cols + 1)
-        for j in range(cols):
-            csc_indptr[j + 1] = csc_indptr[j] + col_counts[j]
-
-        csc_data = [0.0] * len(self.data)
-        csc_indices = [0] * len(self.indices)
-
-        current_pos = csc_indptr.copy()
-
-        for i in range(rows):
-            start, end = self.indptr[i], self.indptr[i + 1]
-            for pos in range(start, end):
-                j = self.indices[pos]
-                val = self.data[pos]
-
-                csc_pos = current_pos[j]
-                csc_data[csc_pos] = val
-                csc_indices[csc_pos] = i
-                current_pos[j] += 1
-
-        return CSCMatrix(csc_data, csc_indices, csc_indptr, self.shape)
+        return self.transpose()
 
     def _to_coo(self) -> 'COOMatrix':
         """

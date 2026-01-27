@@ -74,10 +74,10 @@ class CSCMatrix(Matrix):
         Транспонирование CSC матрицы.
         Результат - в CSR формате.
         """
-
         from CSR import CSRMatrix
 
         transposed_shape = (self.shape[1], self.shape[0])
+
         return CSRMatrix(
             data=self.data.copy(),
             indices=self.indices.copy(),
@@ -87,8 +87,7 @@ class CSCMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение матриц напрямую в разреженном формате."""
-        # Для умножения лучше преобразовать в CSR
-        csr_self = self.transpose().transpose()  # Получаем CSR через двойное транспонирование
+        csr_self = self.transpose().transpose()
         return csr_self._matmul_impl(other)
 
     @classmethod
@@ -97,54 +96,17 @@ class CSCMatrix(Matrix):
         rows = len(dense_matrix)
         cols = len(dense_matrix[0]) if rows > 0 else 0
 
-        data = []
-        indices = []
-        col_indices = []
-
-        for j in range(cols):
-            for i in range(rows):
-                val = dense_matrix[i][j]
-                if abs(val) > 1e-12:
-                    data.append(val)
-                    indices.append(i)
-                    col_indices.append(j)
-
-        if not data:
-            return cls([], [], [0] * (cols + 1), (rows, cols))
-
-        col_counts = [0] * cols
-        for j in col_indices:
-            col_counts[j] += 1
-
-        indptr = [0] * (cols + 1)
-        for j in range(cols):
-            indptr[j + 1] = indptr[j] + col_counts[j]
-
-        temp_data = [0.0] * len(data)
-        temp_indices = [0] * len(indices)
-        next_pos = indptr.copy()
-
-        sorted_indices = sorted(range(len(data)), key=lambda idx: (col_indices[idx], indices[idx]))
-
-        for idx in sorted_indices:
-            col = col_indices[idx]
-            pos = next_pos[col]
-            temp_data[pos] = data[idx]
-            temp_indices[pos] = indices[idx]
-            next_pos[col] += 1
-
-        return cls(temp_data, temp_indices, indptr, (rows, cols))
+        coo = COOMatrix.from_dense(dense_matrix)
+        return coo._to_csc()
 
     def _to_csr(self) -> 'CSRMatrix':
         """
         Преобразование CSCMatrix в CSRMatrix.
         """
-        return self.transpose().transpose()
+        return self.transpose()
 
     def _to_coo(self) -> 'COOMatrix':
-        """
-        Преобразование CSCMatrix в COOMatrix.
-        """
+        """Преобразование CSCMatrix в COOMatrix."""
         rows, cols = self.shape
         data = []
         row_indices = []
