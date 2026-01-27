@@ -1,5 +1,5 @@
 from base import Matrix
-from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
+from types import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 
 
 class CSRMatrix(Matrix):
@@ -29,7 +29,7 @@ class CSRMatrix(Matrix):
         if self.shape != other.shape:
             raise ValueError("Размерности матриц не совпадают")
         
-        # Если other тоже CSR, складываем
+        # Если other тоже CSR
         if isinstance(other, CSRMatrix):
             rows, cols = self.shape
             result_data = []
@@ -37,7 +37,6 @@ class CSRMatrix(Matrix):
             result_indptr = [0]
             
             for i in range(rows):
-                # Получаем элементы строки i из обеих матриц
                 self_start = self.indptr[i]
                 self_end = self.indptr[i + 1]
                 other_start = other.indptr[i]
@@ -45,7 +44,6 @@ class CSRMatrix(Matrix):
                 
                 idx1, idx2 = self_start, other_start
                 
-                # Слияние двух отсортированных списков
                 while idx1 < self_end and idx2 < other_end:
                     col1 = self.indices[idx1]
                     col2 = other.indices[idx2]
@@ -60,19 +58,17 @@ class CSRMatrix(Matrix):
                         idx2 += 1
                     else:
                         val = self.data[idx1] + other.data[idx2]
-                        if abs(val) > 1e-12:
+                        if val != 0.0:
                             result_data.append(val)
                             result_indices.append(col1)
                         idx1 += 1
                         idx2 += 1
                 
-                # Остатки из первой матрицы
                 while idx1 < self_end:
                     result_data.append(self.data[idx1])
                     result_indices.append(self.indices[idx1])
                     idx1 += 1
                 
-                # Остатки из второй матрицы
                 while idx2 < other_end:
                     result_data.append(other.data[idx2])
                     result_indices.append(other.indices[idx2])
@@ -85,8 +81,8 @@ class CSRMatrix(Matrix):
             # Иначе преобразуем в плотные
             dense_self = self.to_dense()
             dense_other = other.to_dense()
-            
             rows, cols = self.shape
+            
             data = []
             indices = []
             indptr = [0]
@@ -95,7 +91,7 @@ class CSRMatrix(Matrix):
                 row_nnz = 0
                 for j in range(cols):
                     val = dense_self[i][j] + dense_other[i][j]
-                    if abs(val) > 1e-12:
+                    if val != 0.0:
                         data.append(val)
                         indices.append(j)
                         row_nnz += 1
@@ -105,7 +101,7 @@ class CSRMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
-        if abs(scalar) < 1e-12:
+        if scalar == 0.0:
             return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
         
         new_data = [val * scalar for val in self.data]
@@ -126,7 +122,7 @@ class CSRMatrix(Matrix):
         rows_A, cols_A = self.shape
         rows_B, cols_B = other.shape
         
-        # Если other не CSR, преобразуем
+        # Если other тоже CSR
         if isinstance(other, CSRMatrix):
             other_csr = other
         else:
@@ -142,7 +138,7 @@ class CSRMatrix(Matrix):
         # Для каждой строки в A
         for i in range(rows_A):
             # Словарь для накопления результатов строки
-            row_dict = {}
+            row_result = {}
             start_A, end_A = self.indptr[i], self.indptr[i + 1]
             
             # Умножаем на строки в B
@@ -156,12 +152,12 @@ class CSRMatrix(Matrix):
                     j = other_csr.indices[idx_B]
                     val_B = other_csr.data[idx_B]
                     
-                    row_dict[j] = row_dict.get(j, 0.0) + val_A * val_B
+                    row_result[j] = row_result.get(j, 0.0) + val_A * val_B
             
             # Сохраняем ненулевые элементы
-            for j in sorted(row_dict.keys()):
-                val = row_dict[j]
-                if abs(val) > 1e-12:
+            for j in sorted(row_result.keys()):
+                val = row_result[j]
+                if val != 0.0:
                     result_data.append(val)
                     result_indices.append(j)
             
@@ -186,8 +182,8 @@ class CSRMatrix(Matrix):
             row_nnz = 0
             for j in range(cols):
                 val = dense_matrix[i][j]
-                if abs(val) > 1e-12:
-                    data.append(val)
+                if val != 0.0:
+                    data.append(float(val))
                     indices.append(j)
                     row_nnz += 1
             indptr.append(indptr[-1] + row_nnz)
@@ -198,12 +194,10 @@ class CSRMatrix(Matrix):
         """
         Преобразование CSRMatrix в CSCMatrix.
         """
-        # Импортируем здесь, чтобы избежать циклического импорта
-        from CSC import CSCMatrix
-        
         rows, cols = self.shape
         
         if self.nnz == 0:
+            from CSC import CSCMatrix
             return CSCMatrix([], [], [0] * (cols + 1), self.shape)
         
         # Подсчитываем количество ненулевых элементов в каждом столбце
@@ -216,7 +210,7 @@ class CSRMatrix(Matrix):
         for j in range(cols):
             indptr[j + 1] = indptr[j] + col_counts[j]
         
-        # Рабочие массивы
+        # Рабочие массивы для заполнения
         current_pos = indptr.copy()
         data_csc = [0.0] * self.nnz
         indices_csc = [0] * self.nnz
@@ -231,16 +225,15 @@ class CSRMatrix(Matrix):
                 indices_csc[pos] = i
                 current_pos[j] += 1
         
+        from CSC import CSCMatrix
         return CSCMatrix(data_csc, indices_csc, indptr, self.shape)
     
     def _to_coo(self) -> 'COOMatrix':
         """
         Преобразование CSRMatrix в COOMatrix.
         """
-        # Импортируем здесь, чтобы избежать циклического импорта
-        from COO import COOMatrix
-        
         if self.nnz == 0:
+            from COO import COOMatrix
             return COOMatrix([], [], [], self.shape)
         
         data = []
@@ -254,4 +247,5 @@ class CSRMatrix(Matrix):
                 rows.append(i)
                 cols.append(self.indices[idx])
         
+        from COO import COOMatrix
         return COOMatrix(data, rows, cols, self.shape)
