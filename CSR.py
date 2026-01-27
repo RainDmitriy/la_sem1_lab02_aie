@@ -72,18 +72,43 @@ class CSRMatrix(Matrix):
     def transpose(self) -> 'Matrix':
         """
         Транспонирование CSR матрицы.
-        Результат - CSC матрица с теми же данными.
+        Результат - CSC матрица.
         """
         from CSC import CSCMatrix
 
-        transposed_shape = (self.shape[1], self.shape[0])
+        rows, cols = self.shape
+        nnz = len(self.data)
 
-        return CSCMatrix(
-            data=self.data.copy(),
-            indices=self.indices.copy(),
-            indptr=self.indptr.copy(),
-            shape=transposed_shape
-        )
+        if nnz == 0:
+            return CSCMatrix([], [], [0] * (cols + 1), (cols, rows))
+
+        col_counts = [0] * cols
+        for i in range(rows):
+            start, end = self.indptr[i], self.indptr[i + 1]
+            for pos in range(start, end):
+                j = self.indices[pos]
+                col_counts[j] += 1
+
+        csc_indptr = [0] * (cols + 1)
+        for j in range(cols):
+            csc_indptr[j + 1] = csc_indptr[j] + col_counts[j]
+
+        csc_data = [0.0] * nnz
+        csc_indices = [0] * nnz
+        current_pos = csc_indptr.copy()
+
+        for i in range(rows):
+            start, end = self.indptr[i], self.indptr[i + 1]
+            for pos in range(start, end):
+                j = self.indices[pos]
+                val = self.data[pos]
+
+                csc_pos = current_pos[j]
+                csc_data[csc_pos] = val
+                csc_indices[csc_pos] = i
+                current_pos[j] += 1
+
+        return CSCMatrix(csc_data, csc_indices, csc_indptr, (cols, rows))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение матриц напрямую в разреженном формате."""
@@ -185,7 +210,7 @@ class CSRMatrix(Matrix):
 
     def _to_csc(self) -> 'CSCMatrix':
         """
-        Преобразование CSRMatrix в CSCMatrix напрямую.
+        Преобразование CSRMatrix в CSCMatrix.
         """
         return self.transpose()
 

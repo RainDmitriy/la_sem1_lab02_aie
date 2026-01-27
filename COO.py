@@ -45,7 +45,8 @@ class COOMatrix(Matrix):
         row_indices = []
         col_indices = []
 
-        for (r, c), val in result_dict.items():
+        for (r, c) in sorted(result_dict.keys(), key=lambda x: (x[0], x[1])):
+            val = result_dict[(r, c)]
             if abs(val) > 1e-12:
                 data.append(val)
                 row_indices.append(r)
@@ -69,9 +70,13 @@ class COOMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение матриц напрямую в разреженном формате."""
-        # Для умножения преобразуем в CSR
         csr_self = self._to_csr()
-        return csr_self._matmul_impl(other)
+        result = csr_self._matmul_impl(other)
+
+        if isinstance(result, COOMatrix):
+            return result
+        else:
+            return result._to_coo()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
@@ -103,7 +108,6 @@ class COOMatrix(Matrix):
 
         if nnz == 0:
             return CSCMatrix([], [], [0] * (cols + 1), self.shape)
-
         col_counts = [0] * cols
         for j in self.col:
             col_counts[j] += 1
@@ -149,7 +153,9 @@ class COOMatrix(Matrix):
 
         temp_data = [0.0] * nnz
         temp_indices = [0] * nnz
+
         next_pos = indptr.copy()
+
         sorted_indices = sorted(range(nnz), key=lambda i: (self.row[i], self.col[i]))
 
         for idx in sorted_indices:

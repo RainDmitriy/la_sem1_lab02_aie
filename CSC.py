@@ -72,23 +72,60 @@ class CSCMatrix(Matrix):
     def transpose(self) -> 'Matrix':
         """
         Транспонирование CSC матрицы.
-        Результат - в CSR формате.
+        Результат - CSR матрица.
         """
         from CSR import CSRMatrix
 
-        transposed_shape = (self.shape[1], self.shape[0])
+        rows, cols = self.shape
+        nnz = len(self.data)
 
-        return CSRMatrix(
-            data=self.data.copy(),
-            indices=self.indices.copy(),
-            indptr=self.indptr.copy(),
-            shape=transposed_shape
-        )
+        if nnz == 0:
+            return CSRMatrix([], [], [0] * (rows + 1), (cols, rows))
+
+        row_counts = [0] * rows
+        for j in range(cols):
+            start, end = self.indptr[j], self.indptr[j + 1]
+            for pos in range(start, end):
+                i = self.indices[pos]
+                row_counts[i] += 1
+
+        csr_indptr = [0] * (rows + 1)
+        for i in range(rows):
+            csr_indptr[i + 1] = csr_indptr[i] + row_counts[i]
+
+        csr_data = [0.0] * nnz
+        csr_indices = [0] * nnz
+
+        current_pos = csr_indptr.copy()
+
+        for j in range(cols):
+            start, end = self.indptr[j], self.indptr[j + 1]
+            for pos in range(start, end):
+                i = self.indices[pos]
+                val = self.data[pos]
+
+                csr_pos = current_pos[i]
+                csr_data[csr_pos] = val
+                csr_indices[csr_pos] = j
+                current_pos[i] += 1
+
+        return CSRMatrix(csr_data, csr_indices, csr_indptr, (cols, rows))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение матриц напрямую в разреженном формате."""
-        csr_self = self.transpose().transpose()
-        return csr_self._matmul_impl(other)
+        csr_self = self.transpose().transpose()  # Двойное транспонирование = CSR
+
+        from CSR import CSRMatrix
+        from CSC import CSCMatrix
+
+        if isinstance(other, CSRMatrix):
+            return csr_self._matmul_impl(other)
+        elif isinstance(other, CSCMatrix):
+            csr_other = other.transpose().transpose()
+            return csr_self._matmul_impl(csr_other)
+        else:
+            other_csr = other._to_csr() if hasattr(other, '_to_csr') else CSRMatrix.from_dense(other.to_dense())
+            return csr_self._matmul_impl(other_csr)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
