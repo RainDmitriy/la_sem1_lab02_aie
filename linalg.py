@@ -1,15 +1,13 @@
 from typing import Tuple, Optional, List
+from CSC import CSCMatrix
 
 
-# Используем строковые аннотации для избежания циклических импортов
-def lu_decomposition(A: 'CSCMatrix') -> Optional[Tuple['CSCMatrix', 'CSCMatrix']]:
+def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     """
     LU-разложение для CSC матрицы.
     Возвращает (L, U) - нижнюю и верхнюю треугольные матрицы.
     Ожидается, что матрица L хранит единицы на главной диагонали.
     """
-    from CSC import CSCMatrix
-    
     if A.rows != A.cols:
         return None
     
@@ -34,8 +32,10 @@ def lu_decomposition(A: 'CSCMatrix') -> Optional[Tuple['CSCMatrix', 'CSCMatrix']
             s = 0.0
             for k in range(i):
                 s += L[j][k] * U[k][i]
-            if U[i][i] == 0:
+            
+            if abs(U[i][i]) < 1e-12:
                 return None  # Матрица вырождена
+            
             L[j][i] = (dense[j][i] - s) / U[i][i]
     
     # Преобразуем L и U в CSC
@@ -45,12 +45,10 @@ def lu_decomposition(A: 'CSCMatrix') -> Optional[Tuple['CSCMatrix', 'CSCMatrix']
     return L_csc, U_csc
 
 
-def solve_SLAE_lu(A: 'CSCMatrix', b: List[float]) -> Optional[List[float]]:
+def solve_SLAE_lu(A: CSCMatrix, b: List[float]) -> Optional[List[float]]:
     """
     Решение СЛАУ Ax = b через LU-разложение.
     """
-    from CSC import CSCMatrix
-    
     lu_result = lu_decomposition(A)
     if lu_result is None:
         return None
@@ -60,51 +58,30 @@ def solve_SLAE_lu(A: 'CSCMatrix', b: List[float]) -> Optional[List[float]]:
     
     # Прямой ход: Ly = b
     y = [0.0] * n
+    dense_L = L.to_dense()
     for i in range(n):
         s = 0.0
-        # Получаем i-ю строку L
         for j in range(i):
-            # Ищем элемент L[i][j]
-            col_start = L.indptr[j]
-            col_end = L.indptr[j + 1]
-            for k in range(col_start, col_end):
-                if L.indices[k] == i:
-                    s += L.data[k] * y[j]
-                    break
+            s += dense_L[i][j] * y[j]
         y[i] = b[i] - s
     
     # Обратный ход: Ux = y
     x = [0.0] * n
+    dense_U = U.to_dense()
     for i in range(n - 1, -1, -1):
         s = 0.0
-        # Получаем i-ю строку U
         for j in range(i + 1, n):
-            # Ищем элемент U[i][j]
-            col_start = U.indptr[j]
-            col_end = U.indptr[j + 1]
-            for k in range(col_start, col_end):
-                if U.indices[k] == i:
-                    s += U.data[k] * x[j]
-                    break
+            s += dense_U[i][j] * x[j]
         
-        # Ищем диагональный элемент U[i][i]
-        diag = 0.0
-        col_start = U.indptr[i]
-        col_end = U.indptr[i + 1]
-        for k in range(col_start, col_end):
-            if U.indices[k] == i:
-                diag = U.data[k]
-                break
-        
-        if diag == 0:
+        if abs(dense_U[i][i]) < 1e-12:
             return None
         
-        x[i] = (y[i] - s) / diag
+        x[i] = (y[i] - s) / dense_U[i][i]
     
     return x
 
 
-def find_det_with_lu(A: 'CSCMatrix') -> Optional[float]:
+def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     """
     Нахождение определителя через LU-разложение.
     det(A) = det(L) * det(U)
@@ -115,19 +92,10 @@ def find_det_with_lu(A: 'CSCMatrix') -> Optional[float]:
     
     _, U = lu_result
     det = 1.0
+    dense_U = U.to_dense()
     
     # Определитель U - произведение диагональных элементов
     for i in range(A.rows):
-        # Ищем диагональный элемент U[i][i]
-        found = False
-        col_start = U.indptr[i]
-        col_end = U.indptr[i + 1]
-        for k in range(col_start, col_end):
-            if U.indices[k] == i:
-                det *= U.data[k]
-                found = True
-                break
-        if not found:
-            det *= 0.0
+        det *= dense_U[i][i]
     
     return det
