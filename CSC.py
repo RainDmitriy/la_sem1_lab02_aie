@@ -59,11 +59,12 @@ class CSCMatrix(Matrix):
             return CSRMatrix([], [], [0] * (self.shape[0] + 1), (self.shape[1], self.shape[0]))
 
         rows, cols = self.shape
-        row_counts = [0] * rows
 
+        row_counts = [0] * rows
         for j in range(cols):
             for idx in range(self.indptr[j], self.indptr[j + 1]):
-                row_counts[self.indices[idx]] += 1
+                i = self.indices[idx]
+                row_counts[i] += 1
 
         indptr_T = [0] * (rows + 1)
         for i in range(rows):
@@ -130,33 +131,7 @@ class CSCMatrix(Matrix):
 
     def _to_csr(self) -> 'CSRMatrix':
         """Преобразование CSC в CSR."""
-        from CSR import CSRMatrix
-
-        rows, cols = self.shape
-        row_counts = [0] * rows
-
-        for j in range(cols):
-            for idx in range(self.indptr[j], self.indptr[j + 1]):
-                row_counts[self.indices[idx]] += 1
-
-        indptr = [0] * (rows + 1)
-        for i in range(rows):
-            indptr[i + 1] = indptr[i] + row_counts[i]
-
-        data = [0.0] * len(self.data)
-        indices = [0] * len(self.indices)
-
-        current_pos = indptr.copy()
-
-        for j in range(cols):
-            for idx in range(self.indptr[j], self.indptr[j + 1]):
-                i = self.indices[idx]
-                pos = current_pos[i]
-                data[pos] = self.data[idx]
-                indices[pos] = j
-                current_pos[i] += 1
-
-        return CSRMatrix(data, indices, indptr, self.shape)
+        return self.transpose()
 
     def _to_coo(self) -> 'COOMatrix':
         """Преобразование CSC в COO."""

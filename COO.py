@@ -74,32 +74,9 @@ class COOMatrix(Matrix):
         rows_A, cols_A = self.shape
         rows_B, cols_B = other.shape
 
-        result = {}
-
-        for idx in range(len(self.data)):
-            i = self.row[idx]
-            k = self.col[idx]
-            val_A = self.data[idx]
-
-            if k < len(other_csr.indptr) - 1:
-                row_start = other_csr.indptr[k]
-                row_end = other_csr.indptr[k + 1]
-
-                for b_idx in range(row_start, row_end):
-                    j = other_csr.indices[b_idx]
-                    val_B = other_csr.data[b_idx]
-
-                    key = (i, j)
-                    result[key] = result.get(key, 0.0) + val_A * val_B
-
-        data, row_indices, col_indices = [], [], []
-        for (i, j), val in result.items():
-            if abs(val) > 1e-12:
-                data.append(val)
-                row_indices.append(i)
-                col_indices.append(j)
-
-        return COOMatrix(data, row_indices, col_indices, (rows_A, cols_B))
+        csr_self = self._to_csr()
+        result_csr = csr_self._matmul_impl(other_csr)
+        return result_csr._to_coo()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
