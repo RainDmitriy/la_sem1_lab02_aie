@@ -23,12 +23,14 @@ class CSRMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSR матриц."""
+        from COO import COOMatrix
         coo_self = self._to_coo()
-        if isinstance(other, CSRMatrix):
-            coo_other = other._to_coo()
+        if isinstance(other, COOMatrix):
+            coo_other = other
         else:
             coo_other = other._to_coo()
-        return coo_self._add_impl(coo_other)._to_csr()
+        result_coo = coo_self._add_impl(coo_other)
+        return result_coo._to_csr()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""

@@ -23,12 +23,14 @@ class CSCMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSC матриц."""
+        from COO import COOMatrix
         coo_self = self._to_coo()
-        if isinstance(other, CSCMatrix):
-            coo_other = other._to_coo()
+        if isinstance(other, COOMatrix):
+            coo_other = other
         else:
             coo_other = other._to_coo()
-        return coo_self._add_impl(coo_other)._to_csc()
+        result_coo = coo_self._add_impl(coo_other)
+        return result_coo._to_csc()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""

@@ -20,7 +20,10 @@ class COOMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение COO матриц."""
-        other_coo = other._to_coo()
+        if isinstance(other, COOMatrix):
+            other_coo = other
+        else:
+            other_coo = other._to_coo()
         result_dict = {}
         for idx in range(self.nnz):
             key = (self.row[idx], self.col[idx])
@@ -29,7 +32,7 @@ class COOMatrix(Matrix):
             key = (other_coo.row[idx], other_coo.col[idx])
             current = result_dict.get(key, 0.0)
             new_val = current + other_coo.data[idx]
-            if abs(new_val) > 1e-15:
+            if abs(new_val) > 1e-14:
                 result_dict[key] = new_val
             elif key in result_dict:
                 del result_dict[key]
@@ -37,10 +40,9 @@ class COOMatrix(Matrix):
         new_row = []
         new_col = []
         for (i, j), val in result_dict.items():
-            if abs(val) > 1e-15:
-                new_data.append(val)
-                new_row.append(i)
-                new_col.append(j)
+            new_data.append(val)
+            new_row.append(i)
+            new_col.append(j)
         return COOMatrix(new_data, new_row, new_col, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
@@ -160,3 +162,5 @@ class COOMatrix(Matrix):
             indptr[current_row + 1] = indptr[current_row]
         return CSRMatrix(data, indices, indptr, self.shape)
 
+    def _to_coo(self) -> 'COOMatrix':
+        return self
