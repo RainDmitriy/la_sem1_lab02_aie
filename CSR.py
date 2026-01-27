@@ -30,7 +30,7 @@ class CSRMatrix(Matrix):
             raise ValueError("Размерности матриц не совпадают")
         
         # Если other тоже CSR
-        if isinstance(other, CSRMatrix):
+        if self.__class__.__name__ == other.__class__.__name__ and other.__class__.__name__ == 'CSRMatrix':
             rows, cols = self.shape
             result_data = []
             result_indices = []
@@ -122,13 +122,15 @@ class CSRMatrix(Matrix):
         rows_A, cols_A = self.shape
         rows_B, cols_B = other.shape
         
-        # Если other тоже CSR
-        if isinstance(other, CSRMatrix):
+        # Проверяем тип other
+        if hasattr(other, '__class__') and other.__class__.__name__ == 'CSRMatrix':
             other_csr = other
         else:
             # Преобразуем other в CSR
-            from CSR import CSRMatrix
-            other_csr = CSRMatrix.from_dense(other.to_dense())
+            if hasattr(other, '_to_csr'):
+                other_csr = other._to_csr()
+            else:
+                other_csr = CSRMatrix.from_dense(other.to_dense())
         
         # Алгоритм умножения CSR матриц
         result_data = []
@@ -249,4 +251,3 @@ class CSRMatrix(Matrix):
         
         from COO import COOMatrix
         return COOMatrix(data, rows, cols, self.shape)
-
