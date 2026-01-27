@@ -33,7 +33,7 @@ class CSCMatrix(Matrix):
         csr_self = self._to_csr()
         
         # Если other тоже CSC, преобразуем его в CSR
-        if isinstance(other, CSCMatrix):
+        if hasattr(other, '__class__') and other.__class__.__name__ == 'CSCMatrix':
             csr_other = other._to_csr()
         else:
             # Иначе преобразуем other в CSR
