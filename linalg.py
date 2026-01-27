@@ -1,17 +1,15 @@
-from base import Matrix
+from CSC import CSCMatrix
+from CSR import CSRMatrix
 from type import Vector
 from typing import Tuple, Optional, List
 
 
-# Импортируем классы внутри функций, где они нужны
-def lu_decomposition(A: 'CSCMatrix') -> Optional[Tuple['CSCMatrix', 'CSCMatrix']]:
+def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     """
     LU-разложение для CSC матрицы.
     Возвращает (L, U) - нижнюю и верхнюю треугольные матрицы.
     Ожидается, что матрица L хранит единицы на главной диагонали.
     """
-    from CSC import CSCMatrix
-    
     n = A.shape[0]
     if n != A.shape[1]:
         raise ValueError("Матрица должна быть квадратной для LU-разложения")
@@ -51,7 +49,7 @@ def lu_decomposition(A: 'CSCMatrix') -> Optional[Tuple['CSCMatrix', 'CSCMatrix']
     return L_csc, U_csc
 
 
-def forward_substitution(L: 'CSCMatrix', b: Vector) -> Vector:
+def forward_substitution(L: CSCMatrix, b: Vector) -> Vector:
     """
     Прямой ход: решение Ly = b.
     L - нижняя треугольная матрица с единицами на диагонали.
@@ -72,7 +70,7 @@ def forward_substitution(L: 'CSCMatrix', b: Vector) -> Vector:
     return y
 
 
-def backward_substitution(U: 'CSCMatrix', y: Vector) -> Vector:
+def backward_substitution(U: CSCMatrix, y: Vector) -> Vector:
     """
     Обратный ход: решение Ux = y.
     U - верхняя треугольная матрица.
@@ -97,7 +95,7 @@ def backward_substitution(U: 'CSCMatrix', y: Vector) -> Vector:
     return x
 
 
-def solve_SLAE_lu(A: 'CSCMatrix', b: Vector) -> Optional[Vector]:
+def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     """
     Решение СЛАУ Ax = b через LU-разложение.
     """
@@ -115,7 +113,7 @@ def solve_SLAE_lu(A: 'CSCMatrix', b: Vector) -> Optional[Vector]:
     return x
 
 
-def find_det_with_lu(A: 'CSCMatrix') -> Optional[float]:
+def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     """
     Нахождение определителя через LU-разложение.
     det(A) = det(L) * det(U) = 1 * произведение диагональных элементов U
@@ -138,7 +136,7 @@ def find_det_with_lu(A: 'CSCMatrix') -> Optional[float]:
     return det
 
 
-def gaussian_elimination(A: 'CSCMatrix', b: Vector) -> Vector:
+def gaussian_elimination(A: CSCMatrix, b: Vector) -> Vector:
     """
     Решение СЛАУ методом Гаусса (для сравнения с LU-разложением).
     """
@@ -192,7 +190,7 @@ def gaussian_elimination(A: 'CSCMatrix', b: Vector) -> Vector:
     return x
 
 
-def matrix_condition_number(A: 'CSCMatrix', norm_type: str = '1') -> float:
+def matrix_condition_number(A: CSCMatrix, norm_type: str = '1') -> float:
     """
     Вычисление числа обусловленности матрицы.
     norm_type: '1' для 1-нормы, 'inf' для бесконечной нормы
