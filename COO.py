@@ -1,5 +1,5 @@
 from base import Matrix
-from types import COOData, COORows, COOCols, Shape, DenseMatrix
+from type import COOData, COORows, COOCols, Shape, DenseMatrix
 from CSR import CSRMatrix
 from CSC import CSCMatrix
 
