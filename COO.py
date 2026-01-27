@@ -18,12 +18,20 @@ class COOMatrix(Matrix):
 
     def _add_impl(self, other: 'COOMatrix') -> 'COOMatrix':
         """Сложение COO матриц."""
-        return COOMatrix(
-            data=self.data + other.data,
-            row=self.row + other.row,
-            col=self.col + other.col,
-            shape=self.shape
-        )
+        merged = {}
+        for r, c, v in zip(self.row, self.col, self.data):
+            merged[(r, c)] = merged.get((r, c), 0.0) + v
+        for r, c, v in zip(other.row, other.col, other.data):
+            merged[(r, c)] = merged.get((r, c), 0.0) + v
+
+        res_data, res_row, res_col = [], [], []
+        for (r, c), v in merged.items():
+            if v != 0:
+                res_data.append(v)
+                res_row.append(r)
+                res_col.append(c)
+        return COOMatrix(res_data, res_row, res_col, self.shape)
+
 
     def _mul_impl(self, scalar: float) -> 'COOMatrix':
         """Умножение COO на скаляр."""
