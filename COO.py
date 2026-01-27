@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List, Tuple, Dict, TYPE_CHECKING
 from base import Matrix
-from types import COOData, COORows, COOCols, Shape, DenseMatrix
+from type import COOData, COORows, COOCols, Shape, DenseMatrix
 if TYPE_CHECKING:
     from CSR import CSRMatrix
     from CSC import CSCMatrix
