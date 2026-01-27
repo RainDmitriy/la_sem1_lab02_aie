@@ -31,8 +31,8 @@ class COOMatrix(Matrix):
         
         mat = [[0.0] * m for _ in range(n)]
         for i in range(self.nnz):
-            r = self.rows[i]
-            c = self.cols[i]
+            r = self.row[i]
+            c = self.col[i]
             mat[r][c] = self.data[i]
         return mat
 
@@ -42,21 +42,21 @@ class COOMatrix(Matrix):
             merged = defaultdict(float)
             
             for i in range(self.nnz):
-                key = (self.rows[i], self.cols[i])
+                key = (self.row[i], self.col[i])
                 merged[key] += self.data[i]
             
             for i in range(other.nnz):
-                key = (other.rows[i], other.cols[i])
+                key = (other.row[i], other.col[i])
                 merged[key] += other.data[i]
             
-            new_data, new_rows, new_cols = [], [], []
+            new_data, new_row, new_col = [], [], []
             for (r, c), val in merged.items():
                 if abs(val) > 1e-12:
                     new_data.append(val)
-                    new_rows.append(r)
-                    new_cols.append(c)
+                    new_row.append(r)
+                    new_col.append(c)
             
-            return COOMatrix(new_data, new_rows, new_cols, self.shape)
+            return COOMatrix(new_data, new_row, new_col, self.shape)
 
         if hasattr(other, '_to_coo'):
             return self._add_impl(other._to_coo())
@@ -70,12 +70,12 @@ class COOMatrix(Matrix):
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
         new_data = [x * scalar for x in self.data]
-        return COOMatrix(new_data, self.rows, self.cols, self.shape)
+        return COOMatrix(new_data, self.row, self.col, self.shape)
 
     def transpose(self) -> 'Matrix':
         """Транспонирование COO матрицы."""
         new_shape = (self.shape[1], self.shape[0])
-        return COOMatrix(self.data, self.cols, self.rows, new_shape)
+        return COOMatrix(self.data, self.col, self.row, new_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение COO матриц."""
@@ -84,11 +84,11 @@ class COOMatrix(Matrix):
 
             row_groups = defaultdict(list)
             for i in range(self.nnz):
-                row_groups[self.rows[i]].append((self.cols[i], self.data[i]))
+                row_groups[self.row[i]].append((self.col[i], self.data[i]))
 
             col_groups = defaultdict(list)
             for i in range(other.nnz):
-                col_groups[other.cols[i]].append((other.rows[i], other.data[i]))
+                col_groups[other.col[i]].append((other.row[i], other.data[i]))
 
             for i, row_items in row_groups.items():
                 for k, a_val in row_items:
@@ -96,14 +96,14 @@ class COOMatrix(Matrix):
                         for j, b_val in col_groups[k]:
                             result_dict[(i, j)] += a_val * b_val
 
-            new_data, new_rows, new_cols = [], [], []
+            new_data, new_row, new_col = [], [], []
             for (r, c), val in result_dict.items():
                 if abs(val) > 1e-12:
                     new_data.append(val)
-                    new_rows.append(r)
-                    new_cols.append(c)
+                    new_row.append(r)
+                    new_col.append(c)
             
-            return COOMatrix(new_data, new_rows, new_cols, 
+            return COOMatrix(new_data, new_row, new_col, 
                            (self.shape[0], other.shape[1]))
 
         if hasattr(other, '_to_coo'):
@@ -119,19 +119,19 @@ class COOMatrix(Matrix):
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
         """Создание COO из плотной матрицы."""
-        rows = len(dense_matrix)
-        cols = len(dense_matrix[0]) if rows > 0 else 0
+        row = len(dense_matrix)
+        col = len(dense_matrix[0]) if row > 0 else 0
         
         data, row_indices, col_indices = [], [], []
-        for i in range(rows):
-            for j in range(cols):
+        for i in range(row):
+            for j in range(col):
                 val = dense_matrix[i][j]
                 if abs(val) > 1e-12:
                     data.append(val)
                     row_indices.append(i)
                     col_indices.append(j)
         
-        return cls(data, row_indices, col_indices, (rows, cols))
+        return cls(data, row_indices, col_indices, (row, col))
 
     def _to_csc(self) -> 'CSCMatrix':
         """
@@ -143,7 +143,7 @@ class COOMatrix(Matrix):
             _, m = self.shape
             return CSCMatrix([], [], [0] * (m + 1), self.shape)
 
-        items = list(zip(self.cols, self.rows, self.data))
+        items = list(zip(self.col, self.row, self.data))
         items.sort(key=lambda x: (x[0], x[1]))
         
         data = [d for _, _, d in items]
@@ -169,7 +169,7 @@ class COOMatrix(Matrix):
             n, _ = self.shape
             return CSRMatrix([], [], [0] * (n + 1), self.shape)
 
-        items = list(zip(self.rows, self.cols, self.data))
+        items = list(zip(self.row, self.col, self.data))
         items.sort(key=lambda x: (x[0], x[1]))
         
         data = [d for _, _, d in items]
