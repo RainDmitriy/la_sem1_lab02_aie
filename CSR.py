@@ -12,10 +12,12 @@ class CSRMatrix(Matrix):
     def to_dense(self) -> DenseMatrix:
         rows, cols = self.shape
         dense = [[0.0] * cols for _ in range(rows)]
+
         for i in range(rows):
             for idx in range(self.indptr[i], self.indptr[i + 1]):
                 j = self.indices[idx]
                 dense[i][j] = self.data[idx]
+
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
@@ -45,9 +47,8 @@ class CSRMatrix(Matrix):
                         idx2 += 1
                     else:
                         val = self.data[idx1] + other.data[idx2]
-                        if abs(val) > 1e-12:
-                            result_data.append(val)
-                            result_indices.append(col1)
+                        result_data.append(val)
+                        result_indices.append(col1)
                         idx1 += 1
                         idx2 += 1
 
@@ -121,7 +122,7 @@ class CSRMatrix(Matrix):
             result_indptr = [0]
 
             for i in range(A_rows):
-                row_dict = {}
+                row_result = {}
 
                 for a_idx in range(self.indptr[i], self.indptr[i + 1]):
                     k = self.indices[a_idx]
@@ -131,14 +132,12 @@ class CSRMatrix(Matrix):
                         for b_idx in range(B_T.indptr[k], B_T.indptr[k + 1]):
                             j = B_T.indices[b_idx]
                             b_val = B_T.data[b_idx]
-                            row_dict[j] = row_dict.get(j, 0.0) + a_val * b_val
+                            row_result[j] = row_result.get(j, 0.0) + a_val * b_val
 
-                sorted_cols = sorted(row_dict.keys())
+                sorted_cols = sorted(row_result.keys())
                 for j in sorted_cols:
-                    val = row_dict[j]
-                    if abs(val) > 1e-12:
-                        result_data.append(val)
-                        result_indices.append(j)
+                    result_data.append(row_result[j])
+                    result_indices.append(j)
 
                 result_indptr.append(len(result_data))
 

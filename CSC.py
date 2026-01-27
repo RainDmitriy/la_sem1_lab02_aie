@@ -12,10 +12,12 @@ class CSCMatrix(Matrix):
     def to_dense(self) -> DenseMatrix:
         rows, cols = self.shape
         dense = [[0.0] * cols for _ in range(rows)]
+
         for j in range(cols):
             for idx in range(self.indptr[j], self.indptr[j + 1]):
                 i = self.indices[idx]
                 dense[i][j] = self.data[idx]
+
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
