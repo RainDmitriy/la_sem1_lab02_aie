@@ -1,7 +1,5 @@
 from base import Matrix
 from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
-from COO import COOMatrix
-from CSC import CSCMatrix
 
 
 class CSRMatrix(Matrix):
@@ -43,6 +41,7 @@ class CSRMatrix(Matrix):
         Hint:
         Результат - в CSC формате (с теми же данными, но с интерпретацией столбцов как строк).
         """
+        from CSC import CSCMatrix
         n_rows, n_cols = self.shape
         if self.nnz == 0:
             return CSCMatrix([], [], [0] * (n_rows + 1), (n_cols, n_rows))
@@ -67,6 +66,7 @@ class CSRMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSR матриц."""
+        from COO import COOMatrix
         n_rows, n_cols = self.shape
         if isinstance(other, CSRMatrix):
             other_n_rows, other_n_cols = other.shape
@@ -137,6 +137,7 @@ class CSRMatrix(Matrix):
         """
         Преобразование CSRMatrix в COOMatrix.
         """
+        from COO import COOMatrix
         n_rows, n_cols = self.shape
         data = []
         row = []

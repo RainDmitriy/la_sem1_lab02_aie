@@ -1,7 +1,5 @@
 from base import Matrix
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
-from CSC import CSCMatrix
-from CSR import CSRMatrix
 
 
 class COOMatrix(Matrix):
@@ -119,6 +117,7 @@ class COOMatrix(Matrix):
         """
         Преобразование COOMatrix в CSCMatrix.
         """
+        from CSC import CSCMatrix
         n_rows, n_cols = self.shape
         sorted_indices = sorted(range(self.nnz), key=lambda idx: (self.col[idx], self.row[idx]))
         data = []
@@ -142,6 +141,7 @@ class COOMatrix(Matrix):
         """
         Преобразование COOMatrix в CSRMatrix.
         """
+        from CSR import CSRMatrix
         n_rows, n_cols = self.shape
         sorted_indices = sorted(range(self.nnz), key=lambda idx: (self.row[idx], self.col[idx]))
         data = []
