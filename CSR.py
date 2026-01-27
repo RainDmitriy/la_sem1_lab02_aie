@@ -29,8 +29,12 @@ class CSRMatrix(Matrix):
         if self.shape != other.shape:
             raise ValueError("Размерности матриц не совпадают")
         
-        # Если other тоже CSR
-        if self.__class__.__name__ == other.__class__.__name__ and other.__class__.__name__ == 'CSRMatrix':
+        # Проверяем, является ли other CSR
+        is_other_csr = (hasattr(other, 'indices') and hasattr(other, 'indptr') 
+                       and hasattr(other, 'data') and hasattr(other, 'nnz'))
+        
+        if is_other_csr:
+            # Сложение двух CSR матриц
             rows, cols = self.shape
             result_data = []
             result_indices = []
@@ -58,7 +62,7 @@ class CSRMatrix(Matrix):
                         idx2 += 1
                     else:
                         val = self.data[idx1] + other.data[idx2]
-                        if val != 0.0:
+                        if abs(val) > 1e-12:
                             result_data.append(val)
                             result_indices.append(col1)
                         idx1 += 1
@@ -78,7 +82,7 @@ class CSRMatrix(Matrix):
             
             return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
         else:
-            # Иначе преобразуем в плотные
+            # Если other не CSR, преобразуем в плотные
             dense_self = self.to_dense()
             dense_other = other.to_dense()
             rows, cols = self.shape
@@ -91,7 +95,7 @@ class CSRMatrix(Matrix):
                 row_nnz = 0
                 for j in range(cols):
                     val = dense_self[i][j] + dense_other[i][j]
-                    if val != 0.0:
+                    if abs(val) > 1e-12:
                         data.append(val)
                         indices.append(j)
                         row_nnz += 1
@@ -101,7 +105,7 @@ class CSRMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
-        if scalar == 0.0:
+        if abs(scalar) < 1e-12:
             return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
         
         new_data = [val * scalar for val in self.data]
@@ -122,33 +126,32 @@ class CSRMatrix(Matrix):
         rows_A, cols_A = self.shape
         rows_B, cols_B = other.shape
         
-        # Проверяем тип other
-        if hasattr(other, '__class__') and other.__class__.__name__ == 'CSRMatrix':
+        # Если other тоже CSR, используем оптимизированный алгоритм
+        is_other_csr = (hasattr(other, 'indices') and hasattr(other, 'indptr') 
+                       and hasattr(other, 'data') and hasattr(other, 'nnz'))
+        
+        if is_other_csr:
             other_csr = other
         else:
             # Преобразуем other в CSR
-            if hasattr(other, '_to_csr'):
-                other_csr = other._to_csr()
-            else:
-                other_csr = CSRMatrix.from_dense(other.to_dense())
+            from CSR import CSRMatrix
+            other_csr = CSRMatrix.from_dense(other.to_dense())
         
         # Алгоритм умножения CSR матриц
         result_data = []
         result_indices = []
         result_indptr = [0]
         
-        # Для каждой строки в A
         for i in range(rows_A):
             # Словарь для накопления результатов строки
             row_result = {}
             start_A, end_A = self.indptr[i], self.indptr[i + 1]
             
-            # Умножаем на строки в B
             for idx_A in range(start_A, end_A):
                 k = self.indices[idx_A]
                 val_A = self.data[idx_A]
                 
-                # Добавляем вклад от строки k в B
+                # Добавляем вклад от строки k матрицы B
                 start_B, end_B = other_csr.indptr[k], other_csr.indptr[k + 1]
                 for idx_B in range(start_B, end_B):
                     j = other_csr.indices[idx_B]
@@ -159,7 +162,7 @@ class CSRMatrix(Matrix):
             # Сохраняем ненулевые элементы
             for j in sorted(row_result.keys()):
                 val = row_result[j]
-                if val != 0.0:
+                if abs(val) > 1e-12:
                     result_data.append(val)
                     result_indices.append(j)
             
@@ -184,7 +187,7 @@ class CSRMatrix(Matrix):
             row_nnz = 0
             for j in range(cols):
                 val = dense_matrix[i][j]
-                if val != 0.0:
+                if abs(val) > 1e-12:
                     data.append(float(val))
                     indices.append(j)
                     row_nnz += 1
