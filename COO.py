@@ -1,7 +1,6 @@
 from base import Matrix
 from matrix_types import *
 
-
 class COOMatrix(Matrix):
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
         super().__init__(shape)

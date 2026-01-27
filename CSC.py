@@ -2,7 +2,6 @@ from base import Matrix
 from matrix_types import *
 from COO import COOMatrix
 
-
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
         super().__init__(shape)

@@ -3,6 +3,7 @@ from CSR import CSRMatrix
 from types import Vector, DenseMatrix
 from typing import Tuple, Optional
 
+
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     """
     LU-разложение для CSC матрицы.

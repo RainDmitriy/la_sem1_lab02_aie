@@ -2,7 +2,6 @@ from base import Matrix
 from matrix_types import *
 from COO import COOMatrix
 
-
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
         super().__init__(shape)
