@@ -1,5 +1,5 @@
 from CSC import CSCMatrix
-from types import Vector
+from type import Vector
 from typing import Tuple, Optional
 
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
@@ -39,3 +39,4 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     for i in range(len(U_dense)):
         det *= U_dense[i][i]
     return det
+
