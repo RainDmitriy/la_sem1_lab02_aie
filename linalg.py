@@ -1,7 +1,7 @@
 from CSC import CSCMatrix
 from COO import COOMatrix
 from CSR import CSRMatrix
-from types import Vector
+from type import Vector
 from typing import Tuple, Optional
 
 TOLERANCE = 1e-12
