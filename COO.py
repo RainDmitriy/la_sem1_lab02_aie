@@ -16,8 +16,7 @@ class COOMatrix(Matrix):
         dense = [[0.0] * cols for _ in range(rows)]
         
         for i in range(self.nnz):
-            r, c = self.row[i], self.col[i]
-            dense[r][c] = self.data[i]
+            dense[self.row[i]][self.col[i]] = self.data[i]
         
         return dense
 
@@ -26,39 +25,40 @@ class COOMatrix(Matrix):
         if self.shape != other.shape:
             raise ValueError("Размерности матриц не совпадают")
         
-        # Если other тоже COO, складываем
+        # Если other тоже COO
         if isinstance(other, COOMatrix):
-            # Создаем словари для сложения
-            self_dict = {}
+            # Создаем словари
+            dict1 = {}
             for i in range(self.nnz):
                 key = (self.row[i], self.col[i])
-                self_dict[key] = self.data[i]
+                dict1[key] = self.data[i]
             
-            other_dict = {}
+            dict2 = {}
             for i in range(other.nnz):
                 key = (other.row[i], other.col[i])
-                other_dict[key] = other.data[i]
+                dict2[key] = other.data[i]
             
             # Объединяем
             result_data = []
             result_row = []
             result_col = []
             
-            all_keys = set(self_dict.keys()) | set(other_dict.keys())
-            for key in sorted(all_keys):
-                val = self_dict.get(key, 0.0) + other_dict.get(key, 0.0)
-                if abs(val) > 1e-12:
+            all_keys = set(dict1.keys()) | set(dict2.keys())
+            for r, c in sorted(all_keys):
+                val = dict1.get((r, c), 0.0) + dict2.get((r, c), 0.0)
+                # Убираем порог - храним все, что не точно 0
+                if val != 0.0:
                     result_data.append(val)
-                    result_row.append(key[0])
-                    result_col.append(key[1])
+                    result_row.append(r)
+                    result_col.append(c)
             
             return COOMatrix(result_data, result_row, result_col, self.shape)
         else:
-            # Иначе преобразуем обе в плотные
+            # Иначе преобразуем в плотные
             dense_self = self.to_dense()
             dense_other = other.to_dense()
-            
             rows, cols = self.shape
+            
             result_data = []
             result_row = []
             result_col = []
@@ -66,7 +66,7 @@ class COOMatrix(Matrix):
             for i in range(rows):
                 for j in range(cols):
                     val = dense_self[i][j] + dense_other[i][j]
-                    if abs(val) > 1e-12:
+                    if val != 0.0:
                         result_data.append(val)
                         result_row.append(i)
                         result_col.append(j)
@@ -75,7 +75,7 @@ class COOMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
-        if abs(scalar) < 1e-12:
+        if scalar == 0.0:
             return COOMatrix([], [], [], self.shape)
         
         new_data = [val * scalar for val in self.data]
@@ -91,9 +91,32 @@ class COOMatrix(Matrix):
         if self.shape[1] != other.shape[0]:
             raise ValueError("Несовместимые размерности для умножения")
         
-        # Преобразуем self в CSR для эффективного умножения
-        csr_self = self._to_csr()
-        return csr_self._matmul_impl(other)
+        # Преобразуем self в плотный формат для простоты
+        dense_self = self.to_dense()
+        
+        if isinstance(other, COOMatrix):
+            dense_other = other.to_dense()
+        else:
+            dense_other = other.to_dense()
+        
+        rows_A, cols_A = self.shape
+        rows_B, cols_B = other.shape
+        
+        result_data = []
+        result_row = []
+        result_col = []
+        
+        for i in range(rows_A):
+            for j in range(cols_B):
+                val = 0.0
+                for k in range(cols_A):
+                    val += dense_self[i][k] * dense_other[k][j]
+                if val != 0.0:
+                    result_data.append(val)
+                    result_row.append(i)
+                    result_col.append(j)
+        
+        return COOMatrix(result_data, result_row, result_col, (rows_A, cols_B))
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
@@ -104,8 +127,8 @@ class COOMatrix(Matrix):
         
         for i, row in enumerate(dense_matrix):
             for j, val in enumerate(row):
-                if abs(val) > 1e-12:
-                    data.append(val)
+                if val != 0.0:
+                    data.append(float(val))
                     rows.append(i)
                     cols.append(j)
         
@@ -116,10 +139,8 @@ class COOMatrix(Matrix):
         """
         Преобразование COOMatrix в CSCMatrix.
         """
-        # Импортируем здесь, чтобы избежать циклического импорта
-        from CSC import CSCMatrix
-        
         if self.nnz == 0:
+            from CSC import CSCMatrix
             return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
         
         # Сортируем по столбцам, затем по строкам
@@ -139,16 +160,15 @@ class COOMatrix(Matrix):
         for i in range(1, cols + 1):
             indptr[i] += indptr[i - 1]
         
+        from CSC import CSCMatrix
         return CSCMatrix(data, indices, indptr, self.shape)
 
     def _to_csr(self) -> 'CSRMatrix':
         """
         Преобразование COOMatrix в CSRMatrix.
         """
-        # Импортируем здесь, чтобы избежать циклического импорта
-        from CSR import CSRMatrix
-        
         if self.nnz == 0:
+            from CSR import CSRMatrix
             return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
         
         # Сортируем по строкам, затем по столбцам
@@ -168,4 +188,5 @@ class COOMatrix(Matrix):
         for i in range(1, rows + 1):
             indptr[i] += indptr[i - 1]
         
+        from CSR import CSRMatrix
         return CSRMatrix(data, indices, indptr, self.shape)
