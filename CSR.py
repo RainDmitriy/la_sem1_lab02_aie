@@ -1,5 +1,5 @@
 from base import Matrix
-from types import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
+from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 
 
 class CSRMatrix(Matrix):
@@ -249,3 +249,4 @@ class CSRMatrix(Matrix):
         
         from COO import COOMatrix
         return COOMatrix(data, rows, cols, self.shape)
+
