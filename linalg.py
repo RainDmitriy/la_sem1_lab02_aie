@@ -1,7 +1,7 @@
 from __future__ import annotations
 from CSC import CSCMatrix
 from CSR import CSRMatrix
-from type import Vector
+from types import Vector
 from typing import Tuple, Optional, Dict, List
 _EPS = 1e-12
 
