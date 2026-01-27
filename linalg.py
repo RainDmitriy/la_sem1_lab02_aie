@@ -10,26 +10,27 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
 
     dense = A.to_dense()
 
+    for i in range(n):
+        pivot = dense[i][i]
+        if abs(pivot) < 1e-10:
+            return None
+
+        for k in range(i + 1, n):
+            factor = dense[k][i] / pivot
+            dense[k][i] = factor
+            for j in range(i + 1, n):
+                dense[k][j] -= factor * dense[i][j]
+
     L = [[0.0] * n for _ in range(n)]
     U = [[0.0] * n for _ in range(n)]
 
     for i in range(n):
-        for k in range(i, n):
-            sum_val = 0.0
-            for j in range(i):
-                sum_val += L[i][j] * U[j][k]
-            U[i][k] = dense[i][k] - sum_val
-
         L[i][i] = 1.0
-        for k in range(i + 1, n):
-            sum_val = 0.0
-            for j in range(i):
-                sum_val += L[k][j] * U[j][i]
-
-            if abs(U[i][i]) < 1e-10:
-                return None
-
-            L[k][i] = (dense[k][i] - sum_val) / U[i][i]
+        for j in range(n):
+            if j >= i:
+                U[i][j] = dense[i][j]
+            if j < i:
+                L[i][j] = dense[i][j]
 
     L_csc = CSCMatrix.from_dense(L)
     U_csc = CSCMatrix.from_dense(U)
@@ -45,26 +46,26 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     L, U = lu_result
     n = len(b)
 
-    y = [0.0] * n
     dense_L = L.to_dense()
-    for i in range(n):
-        sum_val = 0.0
-        for j in range(i):
-            sum_val += dense_L[i][j] * y[j]
-        y[i] = b[i] - sum_val
-
-    x = [0.0] * n
     dense_U = U.to_dense()
 
+    y = [0.0] * n
+    for i in range(n):
+        sum_val = b[i]
+        for j in range(i):
+            sum_val -= dense_L[i][j] * y[j]
+        y[i] = sum_val
+
+    x = [0.0] * n
     for i in range(n - 1, -1, -1):
-        sum_val = 0.0
+        sum_val = y[i]
         for j in range(i + 1, n):
-            sum_val += dense_U[i][j] * x[j]
+            sum_val -= dense_U[i][j] * x[j]
 
         if abs(dense_U[i][i]) < 1e-10:
             return None
 
-        x[i] = (y[i] - sum_val) / dense_U[i][i]
+        x[i] = sum_val / dense_U[i][i]
 
     return x
 
