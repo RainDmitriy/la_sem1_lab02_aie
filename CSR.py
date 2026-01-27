@@ -5,9 +5,9 @@ from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
         super().__init__(shape)
-        self.data = data.copy()
-        self.indices = indices.copy()
-        self.indptr = indptr.copy()
+        self.data = data
+        self.indices = indices
+        self.indptr = indptr
 
     def to_dense(self) -> DenseMatrix:
         '''Преобразует CSR в плотную матрицу.'''
@@ -21,6 +21,9 @@ class CSRMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         '''Сложение CSR матриц.'''
+        from COO import COOMatrix
+        from CSC import CSCMatrix
+
         if isinstance(other, CSRMatrix):
             rows, cols = self.shape
             result_data, result_indices = [], []
@@ -63,7 +66,6 @@ class CSRMatrix(Matrix):
 
             return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
         else:
-            from COO import COOMatrix
             coo_self = self._to_coo()
             coo_other = COOMatrix.from_dense(other.to_dense())
             result_coo = coo_self._add_impl(coo_other)
@@ -74,7 +76,7 @@ class CSRMatrix(Matrix):
         if abs(scalar) < 1e-14:
             return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
         new_data = [val * scalar for val in self.data]
-        return CSRMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
+        return CSRMatrix(new_data, self.indices[:], self.indptr[:], self.shape)
 
     def transpose(self) -> 'Matrix':
         '''
@@ -87,12 +89,12 @@ class CSRMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         '''Умножение CSR матриц.'''
+        from COO import COOMatrix
+        from CSC import CSCMatrix
+
         if isinstance(other, CSRMatrix):
             A_rows, A_cols = self.shape
             B_rows, B_cols = other.shape
-
-            if A_cols != B_rows:
-                raise ValueError("Несовместимые размерности для умножения")
 
             result_data, result_indices = [], []
             result_indptr = [0] * (A_rows + 1)
@@ -126,7 +128,6 @@ class CSRMatrix(Matrix):
 
             return CSRMatrix(result_data, result_indices, result_indptr, (A_rows, B_cols))
         else:
-            from COO import COOMatrix
             coo_self = self._to_coo()
             coo_other = COOMatrix.from_dense(other.to_dense())
             result_coo = coo_self._matmul_impl(coo_other)
@@ -140,18 +141,13 @@ class CSRMatrix(Matrix):
         data, indices = [], []
         indptr = [0]
 
-        row_counts = [0] * rows
-
         for i in range(rows):
             for j in range(cols):
                 val = dense_matrix[i][j]
-                if abs(val) > 1e-12:
+                if abs(val) > 1e-14:
                     data.append(val)
                     indices.append(j)
-                    row_counts[i] += 1
-
-        for i in range(rows):
-            indptr.append(indptr[i] + row_counts[i])
+            indptr.append(len(data))
 
         return cls(data, indices, indptr, (rows, cols))
 
@@ -174,7 +170,7 @@ class CSRMatrix(Matrix):
         data = [0] * len(self.data)
         indices = [0] * len(self.indices)
 
-        current_pos = indptr.copy()
+        current_pos = indptr[:]
 
         for i in range(m):
             row_start = self.indptr[i]
