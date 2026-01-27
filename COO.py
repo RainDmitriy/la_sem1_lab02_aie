@@ -178,24 +178,23 @@ class COOMatrix(Matrix):
         """
         from CSR import CSRMatrix
         rows, cols = self.shape
-        row_counts = [0] * rows
-        csr_data = [0] * len(self.data)
-        csr_indices = [0] * len(self.col)
+        temp_rows = [[] for _ in range(rows)]
+        for i in range(len(self.data)):
+            r = self.row[i]
+            c = self.col[i]
+            val = self.data[i]
+            temp_rows[r].append((c, val))
+
+        csr_data = []
+        csr_indices = []
         csr_indptr = [0]
-        positions = [0] * rows
-        cnt = 0
-        for r in self.row:
-            row_counts[r] += 1
 
         for r in range(rows):
-            cnt += row_counts[r]
-            csr_indptr.append(cnt)
+            temp_rows[r].sort()
+            for c, val in temp_rows[r]:
+                csr_indices.append(c)
+                csr_data.append(val)
 
-        for i in range(len(self.row)):
-            r = self.row[i]
-            pos = csr_indptr[r] + positions[r]
-            csr_data[pos] = self.data[i]
-            csr_indices[pos] = self.col[i]
-            positions[r] += 1
+            csr_indptr.append(len(csr_data))
 
         return CSRMatrix(csr_data, csr_indices, csr_indptr, self.shape)
