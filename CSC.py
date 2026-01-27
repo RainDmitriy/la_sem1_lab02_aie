@@ -9,49 +9,61 @@ class CSCMatrix(Matrix):
         self.indices = indices.copy()
         self.indptr = indptr.copy()
 
-        if len(indptr) != shape[1] + 1:
-            raise ValueError(f"Длина indptr должна быть {shape[1] + 1}, получено {len(indptr)}")
-
-        if indptr[-1] != len(data):
-            raise ValueError("Некорректный indptr")
-
     def to_dense(self) -> DenseMatrix:
         rows, cols = self.shape
         dense = [[0.0] * cols for _ in range(rows)]
-
         for j in range(cols):
-            start = self.indptr[j]
-            end = self.indptr[j + 1]
-            for idx in range(start, end):
+            for idx in range(self.indptr[j], self.indptr[j + 1]):
                 i = self.indices[idx]
                 dense[i][j] = self.data[idx]
-
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        coo_self = self._to_coo()
+        csr_self = self._to_csr()
         if isinstance(other, CSCMatrix):
-            coo_other = other._to_coo()
+            csr_other = other._to_csr()
         else:
-            from COO import COOMatrix
-            coo_other = COOMatrix.from_dense(other.to_dense())
+            from CSR import CSRMatrix
+            csr_other = CSRMatrix.from_dense(other.to_dense())
 
-        result_coo = coo_self._add_impl(coo_other)
-        return result_coo._to_csc()
+        result_csr = csr_self._add_impl(csr_other)
+        return result_csr._to_csc()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         if scalar == 0:
             return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
-
         new_data = [val * scalar for val in self.data]
         return CSCMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
         from CSR import CSRMatrix
 
-        dense = self.to_dense()
-        transposed_dense = [[dense[j][i] for j in range(self.shape[0])] for i in range(self.shape[1])]
-        return CSRMatrix.from_dense(transposed_dense)
+        if len(self.data) == 0:
+            return CSRMatrix([], [], [0] * (self.shape[0] + 1), (self.shape[1], self.shape[0]))
+
+        rows, cols = self.shape
+        nnz = len(self.data)
+
+        data_csr = [0.0] * nnz
+        indices_csr = [0] * nnz
+        indptr_csr = [0] * (rows + 1)
+
+        for i in self.indices:
+            indptr_csr[i + 1] += 1
+
+        for i in range(1, rows + 1):
+            indptr_csr[i] += indptr_csr[i - 1]
+
+        current_pos = indptr_csr.copy()
+        for j in range(cols):
+            for idx in range(self.indptr[j], self.indptr[j + 1]):
+                i = self.indices[idx]
+                pos = current_pos[i]
+                data_csr[pos] = self.data[idx]
+                indices_csr[pos] = j
+                current_pos[i] += 1
+
+        return CSRMatrix(data_csr, indices_csr, indptr_csr, (cols, rows))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         csr_self = self._to_csr()
@@ -68,7 +80,6 @@ class CSCMatrix(Matrix):
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
         rows = len(dense_matrix)
         cols = len(dense_matrix[0]) if rows > 0 else 0
-
         data = []
         indices = []
         indptr = [0]
