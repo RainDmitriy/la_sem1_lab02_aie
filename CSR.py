@@ -111,49 +111,41 @@ class CSRMatrix(Matrix):
         """Умножение CSR матриц."""
         rows_A, cols_A = self.shape
         rows_B, cols_B = other.shape
-        
-        B_csc = other._to_csc()
-        
+
         result_data = []
         result_indices = []
         result_indptr = [0] * (rows_A + 1)
-        
+
         for i in range(rows_A):
-            row_start = self.indptr[i]
-            row_end = self.indptr[i + 1]
-            
-            if row_start == row_end:
-                result_indptr[i + 1] = result_indptr[i]
-                continue
-            
-            # словарь для значений строки результата
-            row_values = {}
-            
-            for a_idx in range(row_start, row_end):
+            row_summ = {}
+
+            a_start = self.indptr[i]
+            a_end = self.indptr[i + 1]
+
+            for a_idx in range(a_start, a_end):
                 k = self.indices[a_idx]
                 a_val = self.data[a_idx]
-                
-                col_start = B_csc.indptr[k]
-                col_end = B_csc.indptr[k + 1]
-                
-                for b_idx in range(col_start, col_end):
-                    j = B_csc.indices[b_idx]
-                    b_val = B_csc.data[b_idx]
-                    
-                    if j not in row_values:
-                        row_values[j] = 0
-                    row_values[j] += a_val * b_val
-            
-            sorted_cols = sorted(row_values.keys())
+
+                b_start = other.indptr[k]
+                b_end = other.indptr[k + 1]
+
+                for b_idx in range(b_start, b_end):
+                    j = other.indices[b_idx]
+                    b_val = other.data[b_idx]
+
+                    if j not in row_summ:
+                        row_summ[j] = 0.0
+                    row_summ[j] += a_val * b_val
+
+            sorted_cols = sorted(row_summ.keys())
             for j in sorted_cols:
-                value = row_values[j]
-                if value != 0:
-                    result_data.append(value)
+                val = row_summ[j]
+                if abs(val) > 1e-14:
+                    result_data.append(val)
                     result_indices.append(j)
-            
-            # новый указатель на конец строки
+
             result_indptr[i + 1] = len(result_data)
-        
+
         return CSRMatrix(result_data, result_indices, result_indptr, (rows_A, cols_B))
 
     @classmethod

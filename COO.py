@@ -44,10 +44,10 @@ class COOMatrix(Matrix):
         sum_dict: Dict[Tuple[int, int], float] = {}
         
         for value, row, col in zip(self.data, self.row, self.col):
-            sum_dict[(row, col)] = sum_dict.get((row, col), 0) + value
+            sum_dict[(row, col)] = sum_dict.get((row, col), 0.0) + value
         
         for value, row, col in zip(other.data, other.row, other.col):
-            sum_dict[(row, col)] = sum_dict.get((row, col), 0) + value
+            sum_dict[(row, col)] = sum_dict.get((row, col), 0.0) + value
         
         new_data, new_row, new_col = [], [], []
         for (row, col), value in sum_dict.items():
@@ -70,37 +70,36 @@ class COOMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение COO матриц."""
-        
-        # преобразуем вторую матрицу в CSC для удобвства
-        other_csc = other._to_csc()
-        
-        rows_A, _ = self.shape
-        _, cols_B = other.shape
-        
-        # для созранения результата делаем временный словарь словарей
-        result_dict: Dict[int, Dict[int, float]] = {i: {} for i in range(rows_A)}
-        
-        for a_val, i, k in zip(self.data, self.row, self.col):
-            col_start = other_csc.indptr[k]
-            col_end = other_csc.indptr[k + 1]
-            
-            for idx in range(col_start, col_end):
-                j = other_csc.indices[idx]
-                b_val = other_csc.data[idx]
-                
-                if j not in result_dict[i]:
-                    result_dict[i][j] = 0
-                result_dict[i][j] += a_val * b_val
-        
-        result_data, result_row, result_col = [], [], []
-        for i in range(rows_A):
-            for j, val in result_dict[i].items():
-                if val != 0:
-                    result_data.append(val)
-                    result_row.append(i)
-                    result_col.append(j)
-        
-        return COOMatrix(result_data, result_row, result_col, (rows_A, cols_B))
+    
+        if self.shape[1] != other.shape[0]:
+            raise ValueError(f"неправильные размеры матриц")
+
+        m, n = self.shape[0], other.shape[1]
+
+        result = {}
+
+        for i in range(len(self.data)):
+            row_a = self.row[i]
+            col_a = self.col[i]
+            val_a = self.data[i]
+
+            other_csr = other._to_csr()
+            row_start = other_csr.indptr[col_a]
+            row_end = other_csr.indptr[col_a + 1]
+            for k in range(row_start, row_end):
+                col_b = other_csr.indices[k]
+                val_b = other_csr.data[k]
+                key = (row_a, col_b)
+                result[key] = result.get(key, 0.0) + val_a * val_b
+
+        data, rows, cols = [], [], []
+        for (i, j), val in result.items():
+            if abs(val) > 1e-14:
+                data.append(val)
+                rows.append(i)
+                cols.append(j)
+
+        return COOMatrix(data, rows, cols, (m, n))
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':

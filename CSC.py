@@ -108,36 +108,51 @@ class CSCMatrix(Matrix):
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
 
-        from COO import COOMatrix
-
         rows_A, cols_A = self.shape
         rows_B, cols_B = other.shape
 
-        if cols_A != rows_B:
-            raise ValueError(f"неправильные размеры матриц")
+        result_data = []
+        result_indices = []
+        result_indptr = [0] * (cols_B + 1)
 
-        A_dense = self.to_dense()
-        B_dense = other.to_dense()
+        rows_B = other.shape[0]
+        cols_B = other.shape[1]
 
-        result_dense = [[0] * cols_B for _ in range(rows_A)]
-        for i in range(rows_A):
-            for j in range(cols_B):
-                s = 0
-                for k in range(cols_A):
-                    s += A_dense[i][k] * B_dense[k][j]
-                result_dense[i][j] = s
+        row_entries_B = [[] for _ in range(rows_B)]
 
-        data, rows, cols = [], [], []
-        for i in range(rows_A):
-            for j in range(cols_B):
-                val = result_dense[i][j]
-                if abs(val) > 1e-14:
-                    data.append(val)
-                    rows.append(i)
-                    cols.append(j)
+        for col in range(cols_B):
+            start = other.indptr[col]
+            end = other.indptr[col + 1]
+            for idx in range(start, end):
+                row = other.indices[idx]
+                value = other.data[idx]
+                row_entries_B[row].append((col, value))
 
-        result_coo = COOMatrix(data, rows, cols, (rows_A, cols_B))
-        return result_coo._to_csc()
+        temp_row = [0.0] * rows_A
+
+        for j in range(cols_B):
+            for i in range(rows_A):
+                temp_row[i] = 0.0
+
+            for i in range(rows_B):
+                for col_b, val_b in row_entries_B[i]:
+                    if col_b == j:
+                        col_start = self.indptr[i]
+                        col_end = self.indptr[i + 1]
+
+                        for a_idx in range(col_start, col_end):
+                            row_a = self.indices[a_idx]
+                            val_a = self.data[a_idx]
+                            temp_row[row_a] += val_a * val_b
+
+            for i in range(rows_A):
+                if abs(temp_row[i]) > 1e-14:
+                    result_data.append(temp_row[i])
+                    result_indices.append(i)
+
+            result_indptr[j + 1] = len(result_data)
+
+        return CSCMatrix(result_data, result_indices, result_indptr, (rows_A, cols_B))
 
 
     @classmethod
