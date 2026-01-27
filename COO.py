@@ -1,9 +1,5 @@
-from base import Matrix, DenseMatrix, Shape
-from typing import List
-
-COOData = List[float]
-COORows = List[int]
-COOCols = List[int]
+from base import Matrix
+from type import COOData, COORows, COOCols, Shape, DenseMatrix
 
 
 class COOMatrix(Matrix):
@@ -15,6 +11,7 @@ class COOMatrix(Matrix):
         self.nnz = len(data)
 
     def to_dense(self) -> DenseMatrix:
+        """Преобразует COO в плотную матрицу."""
         rows, cols = self.shape
         dense = [[0.0] * cols for _ in range(rows)]
         for val, r, c in zip(self.data, self.row, self.col):
@@ -22,6 +19,7 @@ class COOMatrix(Matrix):
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
+        """Сложение COO матриц."""
         from CSR import CSRMatrix
         from CSC import CSCMatrix
         
@@ -65,23 +63,25 @@ class COOMatrix(Matrix):
         return COOMatrix(result_data, result_row, result_col, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
+        """Умножение COO на скаляр."""
         if scalar == 0:
             return COOMatrix([], [], [], self.shape)
         new_data = [val * scalar for val in self.data]
         return COOMatrix(new_data, self.row[:], self.col[:], self.shape)
 
     def transpose(self) -> 'Matrix':
+        """Транспонирование COO матрицы."""
         return COOMatrix(self.data[:], self.col[:], self.row[:], (self.cols, self.rows))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        from CSR import CSRMatrix
-        
+        """Умножение COO матриц."""
         # Преобразуем в CSR для эффективного умножения
         csr_self = self._to_csr()
         return csr_self._matmul_impl(other)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
+        """Создание COO из плотной матрицы."""
         data = []
         row = []
         col = []
@@ -98,7 +98,10 @@ class COOMatrix(Matrix):
         
         return cls(data, row, col, (rows, cols))
 
-    def _to_csc(self):
+    def _to_csc(self) -> 'CSCMatrix':
+        """
+        Преобразование COOMatrix в CSCMatrix.
+        """
         from CSC import CSCMatrix
         
         if self.nnz == 0:
@@ -121,7 +124,10 @@ class COOMatrix(Matrix):
         
         return CSCMatrix(data, indices, indptr, self.shape)
 
-    def _to_csr(self):
+    def _to_csr(self) -> 'CSRMatrix':
+        """
+        Преобразование COOMatrix в CSRMatrix.
+        """
         from CSR import CSRMatrix
         
         if self.nnz == 0:
