@@ -1,6 +1,6 @@
 from base import Matrix
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
-from typing import Dict
+from typing import Dict, List, Tuple
 
 
 class COOMatrix(Matrix):
@@ -22,7 +22,7 @@ class COOMatrix(Matrix):
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         '''Реализация сложения с другой матрицей.'''
         if isinstance(other, COOMatrix):
-            sum_dict: Dict[tuple, float] = {}
+            sum_dict: Dict[Tuple[int, int], float] = {}
 
             for i in range(len(self.data)):
                 key = (self.row[i], self.col[i])
@@ -39,7 +39,13 @@ class COOMatrix(Matrix):
                     new_row.append(r)
                     new_col.append(c)
 
-            return COOMatrix(new_data, new_row, new_col, self.shape)
+            sorted_elements = sorted(zip(new_row, new_col, new_data))
+            if sorted_elements:
+                new_row, new_col, new_data = zip(*sorted_elements)
+            else:
+                new_row, new_col, new_data = [], [], []
+
+            return COOMatrix(list(new_data), list(new_row), list(new_col), self.shape)
         else:
             from CSR import CSRMatrix
             csr_self = self._to_csr()
@@ -55,7 +61,17 @@ class COOMatrix(Matrix):
 
     def transpose(self) -> 'Matrix':
         '''Транспонирование матрицы.'''
-        return COOMatrix(self.data.copy(), self.col.copy(), self.row.copy(),
+        new_row = self.col.copy()
+        new_col = self.row.copy()
+        new_data = self.data.copy()
+
+        sorted_elements = sorted(zip(new_row, new_col, new_data))
+        if sorted_elements:
+            new_row, new_col, new_data = zip(*sorted_elements)
+        else:
+            new_row, new_col, new_data = [], [], []
+
+        return COOMatrix(list(new_data), list(new_row), list(new_col),
                          (self.shape[1], self.shape[0]))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':

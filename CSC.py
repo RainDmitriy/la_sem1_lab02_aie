@@ -26,23 +26,17 @@ class CSCMatrix(Matrix):
         from COO import COOMatrix
         from CSR import CSRMatrix
 
-        if isinstance(other, CSCMatrix):
-            csr_self = self._to_csr()
-            csr_other = other._to_csr()
-            result_csr = csr_self._add_impl(csr_other)
-            return result_csr._to_csc()
+        coo_self = self._to_coo()
+
+        if isinstance(other, COOMatrix):
+            coo_other = other
+        elif isinstance(other, (CSRMatrix, CSCMatrix)):
+            coo_other = other._to_coo()
         else:
-            coo_self = self._to_coo()
+            coo_other = COOMatrix.from_dense(other.to_dense())
 
-            if isinstance(other, COOMatrix):
-                coo_other = other
-            elif isinstance(other, CSRMatrix):
-                coo_other = other._to_coo()
-            else:
-                coo_other = COOMatrix.from_dense(other.to_dense())
-
-            result_coo = coo_self._add_impl(coo_other)
-            return result_coo._to_csc()
+        result_coo = coo_self._add_impl(coo_other)
+        return result_coo._to_csc()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         '''Реализация умножения на скаляр.'''
@@ -54,35 +48,7 @@ class CSCMatrix(Matrix):
     def transpose(self) -> 'Matrix':
         '''Транспонирование матрицы.'''
         from CSR import CSRMatrix
-
-        if len(self.data) == 0:
-            return CSRMatrix([], [], [0] * (self.shape[0] + 1), (self.shape[1], self.shape[0]))
-
-        rows, cols = self.shape
-        row_counts = [0] * rows
-
-        for j in range(cols):
-            for idx in range(self.indptr[j], self.indptr[j + 1]):
-                i = self.indices[idx]
-                row_counts[i] += 1
-
-        indptr_T = [0] * (rows + 1)
-        for i in range(rows):
-            indptr_T[i + 1] = indptr_T[i] + row_counts[i]
-
-        data_T = [0.0] * len(self.data)
-        indices_T = [0] * len(self.indices)
-        current_pos = indptr_T.copy()
-
-        for j in range(cols):
-            for idx in range(self.indptr[j], self.indptr[j + 1]):
-                i = self.indices[idx]
-                pos = current_pos[i]
-                data_T[pos] = self.data[idx]
-                indices_T[pos] = j
-                current_pos[i] += 1
-
-        return CSRMatrix(data_T, indices_T, indptr_T, (cols, rows))
+        return self._to_coo().transpose()._to_csr()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         '''Реализация умножения матриц.'''
@@ -130,6 +96,7 @@ class CSCMatrix(Matrix):
 
     def _to_csr(self) -> 'CSRMatrix':
         '''Преобразование CSC в CSR.'''
+        from CSR import CSRMatrix
         return self.transpose()
 
     def _to_coo(self) -> 'COOMatrix':
