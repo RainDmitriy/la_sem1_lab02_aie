@@ -26,7 +26,7 @@ class COOMatrix(Matrix):
 
         res_data, res_row, res_col = [], [], []
         for (r, c), v in merged.items():
-            if v != 0.0:
+            if abs(v) > TOLERANCE:
                 res_data.append(v)
                 res_row.append(r)
                 res_col.append(c)
@@ -53,7 +53,7 @@ class COOMatrix(Matrix):
                     idx = (r1, c2)
                     temp_results[idx] = temp_results.get(idx, 0.0) + v1 * v2
         for (r, c), val in temp_results.items():
-            if val != 0.0:
+            if abs(val) > TOLERANCE:
                 res_rows.append(r)
                 res_cols.append(c)
                 res_data.append(val)
@@ -68,7 +68,7 @@ class COOMatrix(Matrix):
         for i in range(rows):
             for j in range(cols):
                 val = dense_matrix[i][j]
-                if val != 0.0:
+                if abs(val) > TOLERANCE:
                     data.append(float(val))
                     row_indices.append(i)
                     col_indices.append(j)
@@ -79,24 +79,14 @@ class COOMatrix(Matrix):
         Преобразование COOMatrix в CSCMatrix.
         """
         from CSC import CSCMatrix
-
-        valid_indices = [i for i, v in enumerate(self.data) if abs(v) > TOLERANCE]
-
-        f_data = [self.data[i] for i in valid_indices]
-        f_row = [self.row[i] for i in valid_indices]
-        f_col = [self.col[i] for i in valid_indices]
-
-        sorted_indices = sorted(range(len(f_data)), key=lambda i: (f_col[i], f_row[i]))
-
-        data = [f_data[i] for i in sorted_indices]
-        indices = [f_row[i] for i in sorted_indices]
+        sorted_indices = sorted(range(len(self.data)), key=lambda i: (self.col[i], self.row[i]))
+        data = [self.data[i] for i in sorted_indices]
+        indices = [self.row[i] for i in sorted_indices]
         indptr = [0] * (self.shape[1] + 1)
         for i in sorted_indices:
-            indptr[f_col[i] + 1] += 1
-
+            indptr[self.col[i] + 1] += 1
         for i in range(len(indptr) - 1):
             indptr[i + 1] += indptr[i]
-
         return CSCMatrix(data, indices, indptr, self.shape)
 
     def _to_csr(self) -> 'CSRMatrix':
@@ -104,22 +94,12 @@ class COOMatrix(Matrix):
         Преобразование COOMatrix в CSRMatrix.
         """
         from CSR import CSRMatrix
-
-        valid_indices = [i for i, v in enumerate(self.data) if abs(v) > TOLERANCE]
-
-        f_data = [self.data[i] for i in valid_indices]
-        f_row = [self.row[i] for i in valid_indices]
-        f_col = [self.col[i] for i in valid_indices]
-
-        sorted_indices = sorted(range(len(f_data)), key=lambda i: (f_row[i], f_col[i]))
-
-        data = [f_data[i] for i in sorted_indices]
-        indices = [f_col[i] for i in sorted_indices]
+        sorted_indices = sorted(range(len(self.data)), key=lambda i: (self.row[i], self.col[i]))
+        data = [self.data[i] for i in sorted_indices]
+        indices = [self.col[i] for i in sorted_indices]
         indptr = [0] * (self.shape[0] + 1)
         for i in sorted_indices:
-            indptr[f_row[i] + 1] += 1
-
+            indptr[self.row[i] + 1] += 1
         for i in range(len(indptr) - 1):
             indptr[i + 1] += indptr[i]
-
         return CSRMatrix(data, indices, indptr, self.shape)
