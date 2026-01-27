@@ -32,12 +32,11 @@ class CSCMatrix(Matrix):
         # Преобразуем в CSR для сложения
         csr_self = self._to_csr()
         
-        # Преобразуем other в CSR
+        # Если other тоже CSC, преобразуем его в CSR
         if isinstance(other, CSCMatrix):
             csr_other = other._to_csr()
-        elif isinstance(other, CSRMatrix):
-            csr_other = other
         else:
+            # Иначе преобразуем other в CSR
             from CSR import CSRMatrix
             csr_other = CSRMatrix.from_dense(other.to_dense())
         
@@ -46,7 +45,7 @@ class CSCMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
-        if abs(scalar) < 1e-12:
+        if scalar == 0.0:
             return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
         
         new_data = [val * scalar for val in self.data]
@@ -64,7 +63,7 @@ class CSCMatrix(Matrix):
         if self.shape[1] != other.shape[0]:
             raise ValueError("Несовместимые размерности для умножения")
         
-        # Преобразуем в CSR для умножения
+        # Преобразуем self в CSR для умножения
         csr_self = self._to_csr()
         result_csr = csr_self._matmul_impl(other)
         return result_csr._to_csc()
@@ -83,13 +82,13 @@ class CSCMatrix(Matrix):
         for j in range(cols):
             for i in range(rows):
                 val = dense_matrix[i][j]
-                if abs(val) > 1e-12:
+                if val != 0.0:
                     elements.append((j, i, val))  # (col, row, val)
         
         # Сортируем по столбцам, затем по строкам
         elements.sort()
         
-        data = [elem[2] for elem in elements]
+        data = [float(elem[2]) for elem in elements]
         indices = [elem[1] for elem in elements]
         
         # Строим indptr
@@ -106,12 +105,10 @@ class CSCMatrix(Matrix):
         """
         Преобразование CSCMatrix в CSRMatrix.
         """
-        # Импортируем здесь, чтобы избежать циклического импорта
-        from CSR import CSRMatrix
-        
         rows, cols = self.shape
         
         if self.nnz == 0:
+            from CSR import CSRMatrix
             return CSRMatrix([], [], [0] * (rows + 1), self.shape)
         
         # Подсчитываем количество ненулевых элементов в каждой строке
@@ -124,7 +121,7 @@ class CSCMatrix(Matrix):
         for i in range(rows):
             indptr[i + 1] = indptr[i] + row_counts[i]
         
-        # Рабочие массивы
+        # Рабочие массивы для заполнения
         current_pos = indptr.copy()
         data_csr = [0.0] * self.nnz
         indices_csr = [0] * self.nnz
@@ -139,16 +136,15 @@ class CSCMatrix(Matrix):
                 indices_csr[pos] = j
                 current_pos[i] += 1
         
+        from CSR import CSRMatrix
         return CSRMatrix(data_csr, indices_csr, indptr, self.shape)
 
     def _to_coo(self) -> 'COOMatrix':
         """
         Преобразование CSCMatrix в COOMatrix.
         """
-        # Импортируем здесь, чтобы избежать циклического импорта
-        from COO import COOMatrix
-        
         if self.nnz == 0:
+            from COO import COOMatrix
             return COOMatrix([], [], [], self.shape)
         
         data = []
@@ -162,4 +158,5 @@ class CSCMatrix(Matrix):
                 rows.append(self.indices[idx])
                 cols.append(j)
         
+        from COO import COOMatrix
         return COOMatrix(data, rows, cols, self.shape)
