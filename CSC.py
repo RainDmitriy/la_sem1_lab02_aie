@@ -57,27 +57,31 @@ class CSCMatrix(Matrix):
                     row2 = other.indices[idx2]
                     
                     if row1 < row2:
+                        # Элемент только из первой матрицы
                         result_data.append(self.data[idx1])
                         result_indices.append(row1)
                         idx1 += 1
                     elif row1 > row2:
+                        # Элемент только из второй матрицы
                         result_data.append(other.data[idx2])
                         result_indices.append(row2)
                         idx2 += 1
                     else:
+                        # Элементы в одинаковой позиции - складываем
                         val = self.data[idx1] + other.data[idx2]
-                        result_data.append(val)
-                        result_indices.append(row1)
+                        if abs(val) > TOL:
+                            result_data.append(val)
+                            result_indices.append(row1)
                         idx1 += 1
                         idx2 += 1
                 
-                # Добавляем оставшиеся элементы из self
+                # Добавляем оставшиеся элементы из первой матрицы
                 while idx1 < self_end:
                     result_data.append(self.data[idx1])
                     result_indices.append(self.indices[idx1])
                     idx1 += 1
                 
-                # Добавляем оставшиеся элементы из other
+                # Добавляем оставшиеся элементы из второй матрицы
                 while idx2 < other_end:
                     result_data.append(other.data[idx2])
                     result_indices.append(other.indices[idx2])
@@ -113,16 +117,44 @@ class CSCMatrix(Matrix):
         if scalar == 0.0:
             return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
         
-        # Умножаем все значения, НЕ удаляя элементы
         new_data = [val * scalar for val in self.data]
         return CSCMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
-        """Транспонирование CSC матрицы через COO."""
-        # Преобразуем в COO, транспонируем, затем в CSR
-        coo = self._to_coo()
-        coo_t = coo.transpose()
-        return coo_t._to_csr()
+        """Транспонирование CSC матрицы."""
+        from CSR import CSRMatrix
+        
+        rows, cols = self.shape
+        
+        if self.nnz == 0:
+            return CSRMatrix([], [], [0] * (rows + 1), (cols, rows))
+        
+        # Подсчитываем количество ненулевых элементов в каждой строке
+        row_counts = [0] * rows
+        for i in self.indices:
+            row_counts[i] += 1
+        
+        # Строим indptr для CSR
+        indptr = [0] * (rows + 1)
+        for i in range(rows):
+            indptr[i + 1] = indptr[i] + row_counts[i]
+        
+        # Рабочие массивы для заполнения
+        current_pos = indptr.copy()
+        data_csr = [0.0] * self.nnz
+        indices_csr = [0] * self.nnz
+        
+        # Заполняем CSR
+        for j in range(cols):
+            start, end = self.indptr[j], self.indptr[j + 1]
+            for idx in range(start, end):
+                i = self.indices[idx]
+                pos = current_pos[i]
+                data_csr[pos] = self.data[idx]
+                indices_csr[pos] = j
+                current_pos[i] += 1
+        
+        return CSRMatrix(data_csr, indices_csr, indptr, (cols, rows))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
