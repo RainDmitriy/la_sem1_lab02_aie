@@ -43,7 +43,7 @@ class CSCMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
-        if abs(scalar) < 1e-12:
+        if abs(scalar) < 1e-10:
             return CSCMatrix([], [], [0] * (self.cols + 1), self.shape)
         new_data = [val * scalar for val in self.data]
         return CSCMatrix(new_data, self.indices[:], self.indptr[:], self.shape)
@@ -60,7 +60,7 @@ class CSCMatrix(Matrix):
         if self.nnz == 0:
             return CSRMatrix([], [], [0] * (rows + 1), (cols, rows))
         
-        # Подсчитываем количество элементов в каждой строке
+        # Создаем временные структуры для транспонирования
         row_counts = [0] * rows
         for i in self.indices:
             row_counts[i] += 1
@@ -92,9 +92,34 @@ class CSCMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
-        # Преобразуем в CSR для умножения
-        csr_self = self._to_csr()
-        return csr_self._matmul_impl(other)
+        from CSR import CSRMatrix
+        
+        result_rows = self.rows
+        result_cols = other.cols
+        
+        if isinstance(other, CSCMatrix):
+            # CSC * CSC - преобразуем в CSR для умножения
+            csr_self = self._to_csr()
+            return csr_self._matmul_impl(other)
+        elif isinstance(other, CSRMatrix):
+            # CSC * CSR
+            # Преобразуем текущую матрицу в CSR
+            csr_self = self._to_csr()
+            return csr_self._matmul_impl(other)
+        else:
+            # Общий случай - через плотные матрицы
+            dense_self = self.to_dense()
+            dense_other = other.to_dense()
+            result = [[0.0] * result_cols for _ in range(result_rows)]
+            
+            for i in range(result_rows):
+                for k in range(self.cols):
+                    val = dense_self[i][k]
+                    if abs(val) > 1e-10:
+                        for j in range(result_cols):
+                            result[i][j] += val * dense_other[k][j]
+            
+            return CSCMatrix.from_dense(result)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
@@ -109,7 +134,7 @@ class CSCMatrix(Matrix):
             nnz_in_col = 0
             for i in range(rows):
                 val = dense_matrix[i][j]
-                if abs(val) > 1e-12:
+                if abs(val) > 1e-10:
                     data.append(val)
                     indices.append(i)
                     nnz_in_col += 1
