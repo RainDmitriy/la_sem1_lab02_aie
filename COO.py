@@ -1,5 +1,5 @@
 from base import Matrix
-from types import COOData, COORows, COOCols, Shape, DenseMatrix
+from type import COOData, COORows, COOCols, Shape, DenseMatrix
 
 
 class COOMatrix(Matrix):
@@ -43,3 +43,4 @@ class COOMatrix(Matrix):
         Преобразование COOMatrix в CSRMatrix.
         """
         pass
+
