@@ -1,5 +1,6 @@
 from base import Matrix
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
+from typing import Dict, Tuple
 
 
 class COOMatrix(Matrix):
@@ -11,7 +12,6 @@ class COOMatrix(Matrix):
         self.nnz = len(data)
 
     def to_dense(self) -> DenseMatrix:
-        """Преобразует COO в плотную матрицу."""
         rows, cols = self.shape
         dense = [[0.0] * cols for _ in range(rows)]
         for val, r, c in zip(self.data, self.row, self.col):
@@ -20,51 +20,43 @@ class COOMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение COO матриц."""
-        from CSR import CSRMatrix
-        from CSC import CSCMatrix
-        
-        if isinstance(other, (CSRMatrix, CSCMatrix)):
-            other = other._to_coo()
-        
-        result_data = []
-        result_row = []
-        result_col = []
-        
-        # Создаём словарь для быстрого доступа к значениям текущей матрицы
-        current = {}
-        for i in range(self.nnz):
-            key = (self.row[i], self.col[i])
-            current[key] = self.data[i]
-        
-        # Обрабатываем матрицу other
         if isinstance(other, COOMatrix):
-            other_dict = {}
+            # Сложение двух COO матриц
+            result_data = []
+            result_row = []
+            result_col = []
+            
+            # Используем словари для объединения
+            dict1 = {}
+            for i in range(self.nnz):
+                key = (self.row[i], self.col[i])
+                dict1[key] = self.data[i]
+            
+            dict2 = {}
             for i in range(other.nnz):
                 key = (other.row[i], other.col[i])
-                other_dict[key] = other.data[i]
+                dict2[key] = other.data[i]
+            
+            # Объединяем ключи
+            all_keys = set(dict1.keys()) | set(dict2.keys())
+            
+            for key in sorted(all_keys):
+                r, c = key
+                val = dict1.get(key, 0.0) + dict2.get(key, 0.0)
+                if abs(val) > 1e-12:  # Порог для избежания числового шума
+                    result_data.append(val)
+                    result_row.append(r)
+                    result_col.append(c)
+            
+            return COOMatrix(result_data, result_row, result_col, self.shape)
         else:
-            other_dense = other.to_dense()
-            other_dict = {}
-            rows, cols = other.shape
-            for r in range(rows):
-                for c in range(cols):
-                    if other_dense[r][c] != 0:
-                        other_dict[(r, c)] = other_dense[r][c]
-        
-        # Объединяем значения
-        all_keys = set(current.keys()) | set(other_dict.keys())
-        for r, c in sorted(all_keys):
-            val = current.get((r, c), 0) + other_dict.get((r, c), 0)
-            if val != 0:
-                result_data.append(val)
-                result_row.append(r)
-                result_col.append(c)
-        
-        return COOMatrix(result_data, result_row, result_col, self.shape)
+            # Для других типов преобразуем в COO и складываем
+            other_coo = other._to_coo()
+            return self._add_impl(other_coo)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
-        if scalar == 0:
+        if abs(scalar) < 1e-12:
             return COOMatrix([], [], [], self.shape)
         new_data = [val * scalar for val in self.data]
         return COOMatrix(new_data, self.row[:], self.col[:], self.shape)
@@ -75,9 +67,43 @@ class COOMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение COO матриц."""
-        # Преобразуем в CSR для эффективного умножения
-        csr_self = self._to_csr()
-        return csr_self._matmul_impl(other)
+        # Используем алгоритм умножения разреженных матриц
+        from CSR import CSRMatrix
+        from CSC import CSCMatrix
+        
+        if isinstance(other, CSRMatrix):
+            # COO * CSR
+            # Преобразуем COO в CSR для эффективного умножения
+            csr_self = self._to_csr()
+            return csr_self._matmul_impl(other)
+        elif isinstance(other, CSCMatrix):
+            # COO * CSC
+            # Преобразуем COO в CSR
+            csr_self = self._to_csr()
+            return csr_self._matmul_impl(other)
+        elif isinstance(other, COOMatrix):
+            # COO * COO - преобразуем обе в CSR
+            csr_self = self._to_csr()
+            csr_other = other._to_csr()
+            return csr_self._matmul_impl(csr_other)
+        else:
+            # Общий случай
+            return COOMatrix.from_dense(self._dense_matmul(other))
+
+    def _dense_matmul(self, other: 'Matrix') -> DenseMatrix:
+        """Умножение через плотные матрицы."""
+        dense_self = self.to_dense()
+        dense_other = other.to_dense()
+        result = [[0.0] * other.cols for _ in range(self.rows)]
+        
+        for i in range(self.rows):
+            for k in range(self.cols):
+                val = dense_self[i][k]
+                if abs(val) > 1e-12:
+                    for j in range(other.cols):
+                        result[i][j] += val * dense_other[k][j]
+        
+        return result
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
@@ -91,7 +117,7 @@ class COOMatrix(Matrix):
         for r in range(rows):
             for c in range(cols):
                 val = dense_matrix[r][c]
-                if val != 0:
+                if abs(val) > 1e-12:
                     data.append(val)
                     row.append(r)
                     col.append(c)
