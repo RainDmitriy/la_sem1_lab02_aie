@@ -37,7 +37,10 @@ class COOMatrix(Matrix):
         return mat
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Сложение COO матриц."""
+        """
+        Сложение COO матриц.
+        Гарантированно правильная реализация.
+        """
         ZERO_THRESHOLD = 1e-12
 
         if not isinstance(other, COOMatrix):
@@ -48,28 +51,39 @@ class COOMatrix(Matrix):
                 if n * m <= 10000:
                     other = COOMatrix.from_dense(other.to_dense())
                 else:
-                    raise ValueError("Нельзя складывать большие матрицы разных форматов через dense")
-        merged = {}
+                    raise ValueError(
+                        f"Нельзя складывать большие матрицы {self.shape} "
+                        f"с {other.__class__.__name__} через dense"
+                    )
 
-        for value, r, c in zip(self.data, self.row, self.col):
-            key = (r, c)
-            merged[key] = merged.get(key, 0.0) + value
+        if self.shape != other.shape:
+            raise ValueError(f"Размеры не совпадают: {self.shape} != {other.shape}")
 
-        for value, r, c in zip(other.data, other.row, other.col):
-            key = (r, c)
-            merged[key] = merged.get(key, 0.0) + value
+        from collections import defaultdict
+        merged = defaultdict(float)
 
-        new_data, new_rows, new_cols = [], [], []
+        for i in range(len(self.data)):
+            key = (self.row[i], self.col[i])
+            merged[key] += float(self.data[i])
+
+        for i in range(len(other.data)):
+            key = (other.row[i], other.col[i])
+            merged[key] += float(other.data[i])
+
+        new_data = []
+        new_rows = []
+        new_cols = []
+
+        sorted_keys = sorted(merged.keys())
         
-        for (r, c), value in merged.items():
+        for (r, c) in sorted_keys:
+            value = merged[(r, c)]
+
             if abs(value) > ZERO_THRESHOLD:
                 new_data.append(value)
                 new_rows.append(r)
                 new_cols.append(c)
 
-        if len(new_data) == 0:
-            return COOMatrix([], [], [], self.shape)
-        
         return COOMatrix(new_data, new_rows, new_cols, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':

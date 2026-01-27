@@ -46,83 +46,23 @@ class CSRMatrix(Matrix):
         return mat
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Сложение CSR матриц."""
-        ZERO_THRESHOLD = 1e-12
+        """Сложение через преобразование в COO."""
+        self_coo = self._to_coo()
 
-        if not isinstance(other, CSRMatrix):
-            if hasattr(other, '_to_csr'):
-                other = other._to_csr()
+        if isinstance(other, CSRMatrix):
+            other_coo = other._to_coo()
+        elif hasattr(other, '_to_coo'):
+            other_coo = other._to_coo()
+        else:
+            if self.shape[0] * self.shape[1] <= 10000:
+                from COO import COOMatrix
+                other_coo = COOMatrix.from_dense(other.to_dense())
             else:
-                n, m = self.shape
-                if n * m <= 10000:
-                    from COO import COOMatrix
-                    other_coo = COOMatrix.from_dense(other.to_dense())
-                    other = other_coo._to_csr()
-                else:
-                    raise ValueError("Нельзя складывать большие матрицы через dense")
+                raise ValueError("Нельзя складывать большие матрицы через dense")
 
-        if self.shape != other.shape:
-            raise ValueError(f"Размеры не совпадают: {self.shape} != {other.shape}")
-        
-        n, m = self.shape
+        result_coo = self_coo._add_impl(other_coo)
 
-        result_data = []
-        result_indices = []
-        result_indptr = [0]
-        
-        for i in range(n):
-            p1 = self.indptr[i]
-            p2 = other.indptr[i]
-            
-            end1 = self.indptr[i + 1]
-            end2 = other.indptr[i + 1]
-
-            while p1 < end1 and p2 < end2:
-                j1 = self.indices[p1]
-                j2 = other.indices[p2]
-                
-                if j1 < j2:
-                    result_data.append(self.data[p1])
-                    result_indices.append(j1)
-                    p1 += 1
-                    
-                elif j1 > j2:
-                    result_data.append(other.data[p2])
-                    result_indices.append(j2)
-                    p2 += 1
-                    
-                else:
-                    sum_val = self.data[p1] + other.data[p2]
-                    
-                    if abs(sum_val) > ZERO_THRESHOLD:
-                        result_data.append(sum_val)
-                        result_indices.append(j1)
-                    
-                    p1 += 1
-                    p2 += 1
-
-            while p1 < end1:
-                result_data.append(self.data[p1])
-                result_indices.append(self.indices[p1])
-                p1 += 1
-
-            while p2 < end2:
-                result_data.append(other.data[p2])
-                result_indices.append(other.indices[p2])
-                p2 += 1
-
-            result_indptr.append(len(result_data))
-
-        if len(result_indptr) != n + 1:
-            raise ValueError(f"Неправильная длина indptr: {len(result_indptr)} != {n + 1}")
-        
-        if result_indptr[-1] != len(result_data):
-            raise ValueError(
-                f"Несоответствие: indptr[-1]={result_indptr[-1]}, "
-                f"len(data)={len(result_data)}"
-            )
-        
-        return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
+        return result_coo._to_csr()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
@@ -130,118 +70,37 @@ class CSRMatrix(Matrix):
         return CSRMatrix(new_data, self.indices, self.indptr, self.shape)
 
     def transpose(self) -> 'Matrix':
-        """
-        Транспонирование CSR матрицы.
-        Возвращает CSC матрицу той же формы (m, n).
-        """
+        """Транспонирование через COO."""
         from CSC import CSCMatrix
-        
-        n, m = self.shape
-        nnz = self.nnz
 
-        if nnz == 0:
-            return CSCMatrix([], [], [0] * (m + 1), (m, n))
+        coo = self._to_coo()
 
-        col_counts = [0] * m
-        
-        for i in range(n):
-            for pos in range(self.indptr[i], self.indptr[i + 1]):
-                j = self.indices[pos]
-                col_counts[j] += 1
-
-        csc_indptr = [0] * (m + 1)
-        for j in range(m):
-            csc_indptr[j + 1] = csc_indptr[j] + col_counts[j]
-
-        csc_data = [0.0] * nnz
-        csc_indices = [0] * nnz
-
-        current_pos = csc_indptr.copy()
-
-        for i in range(n):
-            for pos in range(self.indptr[i], self.indptr[i + 1]):
-                j = self.indices[pos]
-                value = self.data[pos]
-
-                csc_pos = current_pos[j]
-
-                csc_data[csc_pos] = value
-                csc_indices[csc_pos] = i
-
-                current_pos[j] += 1
-
-        if current_pos != csc_indptr[1:]:
-            for j in range(m):
-                if current_pos[j] != csc_indptr[j + 1]:
-                    print(f"Warning: Столбец {j}: размещено {current_pos[j] - csc_indptr[j]}, "
-                        f"ожидалось {col_counts[j]}")
-
-        return CSCMatrix(csc_data, csc_indices, csc_indptr, (m, n))
+        transposed_coo = COOMatrix(
+            coo.data[:],
+            coo.col[:],
+            coo.row[:],
+            (self.shape[1], self.shape[0])
+        )
+        return transposed_coo._to_csc()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """Умножение CSR матриц."""
-        ZERO_THRESHOLD = 1e-12
+        """Умножение через преобразование в COO."""
 
-        if not isinstance(other, CSRMatrix):
-            if hasattr(other, '_to_csr'):
-                other_csr = other._to_csr()
-            else:
-                if self.shape[0] * self.shape[1] <= 10000 and \
-                other.shape[0] * other.shape[1] <= 10000:
-                    from COO import COOMatrix
-                    other_coo = COOMatrix.from_dense(other.to_dense())
-                    other_csr = other_coo._to_csr()
-                else:
-                    raise ValueError("Нельзя умножать большие матрицы через dense")
+        if isinstance(other, CSRMatrix):
+            other_coo = other._to_coo()
+        elif hasattr(other, '_to_coo'):
+            other_coo = other._to_coo()
         else:
-            other_csr = other
+            if self.shape[0] * self.shape[1] <= 10000 and \
+            other.shape[0] * other.shape[1] <= 10000:
+                from COO import COOMatrix
+                other_coo = COOMatrix.from_dense(other.to_dense())
+            else:
+                raise ValueError("Нельзя умножать большие матрицы через dense")
         
-        n, k1 = self.shape
-        k2, m = other_csr.shape
-        
-        if k1 != k2:
-            raise ValueError(f"Несовместимые размерности: {self.shape} @ {other_csr.shape}")
+        result_coo = self_coo._matmul_impl(other_coo)
 
-        other_csc = other_csr.transpose()
-
-        result_data = []
-        result_indices = []
-        result_indptr = [0]
-        
-        for i in range(n):
-            row_accumulator = {}
-
-            for a_pos in range(self.indptr[i], self.indptr[i + 1]):
-                k = self.indices[a_pos]
-                a_val = self.data[a_pos]
-
-                for b_pos in range(other_csc.indptr[k], other_csc.indptr[k + 1]):
-                    j = other_csc.indices[b_pos]
-                    b_val = other_csc.data[b_pos]
-
-                    product = a_val * b_val
-                    if j in row_accumulator:
-                        row_accumulator[j] += product
-                    else:
-                        row_accumulator[j] = product
-
-            filtered_items = []
-            for j, value in row_accumulator.items():
-                if abs(value) > ZERO_THRESHOLD:
-                    filtered_items.append((j, value))
-
-            filtered_items.sort(key=lambda x: x[0])
-
-            for j, value in filtered_items:
-                result_indices.append(j)
-                result_data.append(value)
-
-            result_indptr.append(len(result_data))
-
-        if len(result_indptr) != n + 1:
-            raise ValueError(f"Неправильная длина indptr: {len(result_indptr)} != {n + 1}")
-        
-        return CSRMatrix(result_data, result_indices, result_indptr, (n, m))
+        return result_coo._to_csr()
 
     """Методы для LU"""
     def get_row(self, i: int) -> List[Tuple[int, float]]:
