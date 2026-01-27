@@ -78,12 +78,16 @@ class COOMatrix(Matrix):
         Преобразование COOMatrix в CSCMatrix.
         """
         from CSC import CSCMatrix
-        sorted_indices = sorted(range(len(self.data)), key=lambda i: (self.col[i], self.row[i]))
-        data = [self.data[i] for i in sorted_indices]
-        indices = [self.row[i] for i in sorted_indices]
+        filtered_indices = [i for i, v in enumerate(self.data) if abs(v) > TOLERANCE]
+        f_data = [self.data[i] for i in filtered_indices]
+        f_row = [self.row[i] for i in filtered_indices]
+        f_col = [self.col[i] for i in filtered_indices]
+        sorted_indices = sorted(range(len(f_data)), key=lambda i: (f_col[i], f_row[i]))
+        data = [f_data[i] for i in sorted_indices]
+        indices = [f_row[i] for i in sorted_indices]
         indptr = [0] * (self.shape[1] + 1)
         for i in sorted_indices:
-            indptr[self.col[i] + 1] += 1
+            indptr[f_col[i] + 1] += 1
         for i in range(len(indptr) - 1):
             indptr[i + 1] += indptr[i]
         return CSCMatrix(data, indices, indptr, self.shape)
@@ -93,12 +97,16 @@ class COOMatrix(Matrix):
         Преобразование COOMatrix в CSRMatrix.
         """
         from CSR import CSRMatrix
-        sorted_indices = sorted(range(len(self.data)), key=lambda i: (self.row[i], self.col[i]))
-        data = [self.data[i] for i in sorted_indices]
-        indices = [self.col[i] for i in sorted_indices]
+        filtered_indices = [i for i, v in enumerate(self.data) if abs(v) > TOLERANCE]
+        f_data = [self.data[i] for i in filtered_indices]
+        f_row = [self.row[i] for i in filtered_indices]
+        f_col = [self.col[i] for i in filtered_indices]
+        sorted_indices = sorted(range(len(f_data)), key=lambda i: (f_row[i], f_col[i]))
+        data = [f_data[i] for i in sorted_indices]
+        indices = [f_col[i] for i in sorted_indices]
         indptr = [0] * (self.shape[0] + 1)
         for i in sorted_indices:
-            indptr[self.row[i] + 1] += 1
+            indptr[f_row[i] + 1] += 1
         for i in range(len(indptr) - 1):
             indptr[i + 1] += indptr[i]
         return CSRMatrix(data, indices, indptr, self.shape)
