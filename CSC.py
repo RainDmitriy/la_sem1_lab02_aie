@@ -1,6 +1,6 @@
 from base import Matrix
 from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
-
+from COO import COOMatrix
 
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
@@ -94,10 +94,7 @@ class CSCMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
-        if not isinstance(other, CSRMatrix):
-            other_csr = other._to_csr()
-        else:
-            other_csr = other
+        other_csr = other._to_csr()
 
         result_rows, result_cols, result_data = [], [], []
         rows_a, cols_a = other_csr.shape

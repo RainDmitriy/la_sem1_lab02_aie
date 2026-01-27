@@ -1,6 +1,7 @@
 from base import Matrix
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
-
+from CSR import CSRMatrix
+from CSC import CSCMatrix
 class COOMatrix(Matrix):
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
         super().__init__(shape)
