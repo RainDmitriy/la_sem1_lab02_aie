@@ -1,16 +1,24 @@
 from base import Matrix
-from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
+from typing import List, Tuple
+
+TOL = 1e-12
 
 
 class CSCMatrix(Matrix):
-    def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
+    def __init__(self, data: List[float], indices: List[int], indptr: List[int], shape: Tuple[int, int]):
         super().__init__(shape)
         self.data = data
         self.indices = indices
         self.indptr = indptr
         self.nnz = len(data)
+        
+        # Проверка целостности
+        if len(indptr) != shape[1] + 1:
+            raise ValueError(f"Длина indptr должна быть {shape[1] + 1}, получено {len(indptr)}")
+        if indices and max(indices) >= shape[0]:
+            raise ValueError(f"Индекс строки {max(indices)} превышает размер {shape[0]}")
 
-    def to_dense(self) -> DenseMatrix:
+    def to_dense(self) -> List[List[float]]:
         """Преобразует CSC в плотную матрицу."""
         rows, cols = self.shape
         dense = [[0.0] * cols for _ in range(rows)]
@@ -30,52 +38,146 @@ class CSCMatrix(Matrix):
             raise ValueError("Размерности матриц не совпадают")
         
         # Если other тоже CSC
-        if type(other).__name__ == 'CSCMatrix':
-            # Преобразуем в CSR для сложения
-            csr_self = self._to_csr()
-            csr_other = other._to_csr()
-            result_csr = csr_self._add_impl(csr_other)
-            return result_csr._to_csc()
+        if isinstance(other, CSCMatrix):
+            rows, cols = self.shape
+            result_data = []
+            result_indices = []
+            result_indptr = [0]
+            
+            for j in range(cols):
+                self_start = self.indptr[j]
+                self_end = self.indptr[j + 1]
+                other_start = other.indptr[j]
+                other_end = other.indptr[j + 1]
+                
+                idx1, idx2 = self_start, other_start
+                
+                while idx1 < self_end and idx2 < other_end:
+                    row1 = self.indices[idx1]
+                    row2 = other.indices[idx2]
+                    
+                    if row1 < row2:
+                        val = self.data[idx1]
+                        if abs(val) > TOL:
+                            result_data.append(val)
+                            result_indices.append(row1)
+                        idx1 += 1
+                    elif row1 > row2:
+                        val = other.data[idx2]
+                        if abs(val) > TOL:
+                            result_data.append(val)
+                            result_indices.append(row2)
+                        idx2 += 1
+                    else:
+                        val = self.data[idx1] + other.data[idx2]
+                        if abs(val) > TOL:
+                            result_data.append(val)
+                            result_indices.append(row1)
+                        idx1 += 1
+                        idx2 += 1
+                
+                # Добавляем оставшиеся элементы из self
+                while idx1 < self_end:
+                    val = self.data[idx1]
+                    if abs(val) > TOL:
+                        result_data.append(val)
+                        result_indices.append(self.indices[idx1])
+                    idx1 += 1
+                
+                # Добавляем оставшиеся элементы из other
+                while idx2 < other_end:
+                    val = other.data[idx2]
+                    if abs(val) > TOL:
+                        result_data.append(val)
+                        result_indices.append(other.indices[idx2])
+                    idx2 += 1
+                
+                result_indptr.append(len(result_data))
+            
+            return CSCMatrix(result_data, result_indices, result_indptr, self.shape)
         else:
             # Иначе преобразуем в плотные
             dense_self = self.to_dense()
             dense_other = other.to_dense()
+            rows, cols = self.shape
             
-            return CSCMatrix.from_dense(
-                [[dense_self[i][j] + dense_other[i][j] 
-                  for j in range(self.shape[1])] 
-                 for i in range(self.shape[0])]
-            )
+            data = []
+            indices = []
+            indptr = [0]
+            
+            for j in range(cols):
+                col_nnz = 0
+                for i in range(rows):
+                    val = dense_self[i][j] + dense_other[i][j]
+                    if abs(val) > TOL:
+                        data.append(val)
+                        indices.append(i)
+                        col_nnz += 1
+                indptr.append(indptr[-1] + col_nnz)
+            
+            return CSCMatrix(data, indices, indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
-        if abs(scalar) < 1e-10:
+        if abs(scalar) < TOL:
             return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
         
-        new_data = [val * scalar for val in self.data]
-        # Проверяем, не стали ли элементы нулевыми
-        result_data = []
-        result_indices = []
-        result_indptr = [0] * (self.shape[1] + 1)
+        new_data = []
+        new_indices = []
+        new_indptr = [0]
         
         for j in range(self.shape[1]):
+            start = self.indptr[j]
+            end = self.indptr[j + 1]
             col_nnz = 0
-            for k in range(self.indptr[j], self.indptr[j + 1]):
-                val = new_data[k]
-                if abs(val) > 1e-10:
-                    result_data.append(val)
-                    result_indices.append(self.indices[k])
+            
+            for idx in range(start, end):
+                val = self.data[idx] * scalar
+                if abs(val) > TOL:
+                    new_data.append(val)
+                    new_indices.append(self.indices[idx])
                     col_nnz += 1
-            result_indptr[j + 1] = result_indptr[j] + col_nnz
+            
+            new_indptr.append(new_indptr[-1] + col_nnz)
         
-        return CSCMatrix(result_data, result_indices, result_indptr, self.shape)
+        return CSCMatrix(new_data, new_indices, new_indptr, self.shape)
 
     def transpose(self) -> 'Matrix':
-        """
-        Транспонирование CSC матрицы.
-        Результат - в CSR формате.
-        """
-        return self._to_csr()
+        """Транспонирование CSC матрицы."""
+        from CSR import CSRMatrix
+        
+        rows, cols = self.shape
+        new_shape = (cols, rows)
+        
+        if self.nnz == 0:
+            return CSRMatrix([], [], [0] * (cols + 1), new_shape)
+        
+        # Подсчитываем количество ненулевых элементов в каждой строке
+        row_counts = [0] * rows
+        for i in self.indices:
+            row_counts[i] += 1
+        
+        # Строим indptr для CSR
+        indptr = [0] * (rows + 1)
+        for i in range(rows):
+            indptr[i + 1] = indptr[i] + row_counts[i]
+        
+        # Рабочие массивы для заполнения
+        current_pos = indptr.copy()
+        data_csr = [0.0] * self.nnz
+        indices_csr = [0] * self.nnz
+        
+        # Заполняем CSR
+        for j in range(cols):
+            start, end = self.indptr[j], self.indptr[j + 1]
+            for idx in range(start, end):
+                i = self.indices[idx]
+                pos = current_pos[i]
+                data_csr[pos] = self.data[idx]
+                indices_csr[pos] = j
+                current_pos[i] += 1
+        
+        return CSRMatrix(data_csr, indices_csr, indptr, new_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
@@ -88,7 +190,7 @@ class CSCMatrix(Matrix):
         return result_csr._to_csc()
 
     @classmethod
-    def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
+    def from_dense(cls, dense_matrix: List[List[float]]) -> 'CSCMatrix':
         """Создание CSC из плотной матрицы."""
         if not dense_matrix:
             return cls([], [], [0], (0, 0))
@@ -104,7 +206,7 @@ class CSCMatrix(Matrix):
             col_nnz = 0
             for i in range(rows):
                 val = dense_matrix[i][j]
-                if abs(val) > 1e-10:
+                if abs(val) > TOL:
                     data.append(float(val))
                     indices.append(i)
                     col_nnz += 1
@@ -113,13 +215,12 @@ class CSCMatrix(Matrix):
         return cls(data, indices, indptr, (rows, cols))
 
     def _to_csr(self) -> 'CSRMatrix':
-        """
-        Преобразование CSCMatrix в CSRMatrix.
-        """
+        """Преобразование CSCMatrix в CSRMatrix."""
+        from CSR import CSRMatrix
+        
         rows, cols = self.shape
         
         if self.nnz == 0:
-            from CSR import CSRMatrix
             return CSRMatrix([], [], [0] * (rows + 1), self.shape)
         
         # Подсчитываем количество ненулевых элементов в каждой строке
@@ -147,15 +248,13 @@ class CSCMatrix(Matrix):
                 indices_csr[pos] = j
                 current_pos[i] += 1
         
-        from CSR import CSRMatrix
         return CSRMatrix(data_csr, indices_csr, indptr, self.shape)
 
     def _to_coo(self) -> 'COOMatrix':
-        """
-        Преобразование CSCMatrix в COOMatrix.
-        """
+        """Преобразование CSCMatrix в COOMatrix."""
+        from COO import COOMatrix
+        
         if self.nnz == 0:
-            from COO import COOMatrix
             return COOMatrix([], [], [], self.shape)
         
         data = []
@@ -169,5 +268,4 @@ class CSCMatrix(Matrix):
                 rows.append(self.indices[idx])
                 cols.append(j)
         
-        from COO import COOMatrix
         return COOMatrix(data, rows, cols, self.shape)
