@@ -1,7 +1,5 @@
 from base import Matrix
 from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
-from CSR import CSRMatrix
-from COO import COOMatrix
 
 
 class CSCMatrix(Matrix):
@@ -18,10 +16,11 @@ class CSCMatrix(Matrix):
         dense = [[0.0] * cols for _ in range(rows)]
         
         for j in range(cols):
-            start, end = self.indptr[j], self.indptr[j + 1]
+            start = self.indptr[j]
+            end = self.indptr[j + 1]
             for idx in range(start, end):
-                i = self.indices[idx]
-                dense[i][j] = self.data[idx]
+                row = self.indices[idx]
+                dense[row][j] = self.data[idx]
         
         return dense
 
@@ -34,13 +33,12 @@ class CSCMatrix(Matrix):
         csr_self = self._to_csr()
         
         # Преобразуем other в CSR
-        if isinstance(other, CSRMatrix):
+        if isinstance(other, CSCMatrix):
+            csr_other = other._to_csr()
+        elif isinstance(other, CSRMatrix):
             csr_other = other
-        elif isinstance(other, CSCMatrix):
-            csr_other = other._to_csr()
-        elif isinstance(other, COOMatrix):
-            csr_other = other._to_csr()
         else:
+            from CSR import CSRMatrix
             csr_other = CSRMatrix.from_dense(other.to_dense())
         
         result_csr = csr_self._add_impl(csr_other)
@@ -88,7 +86,7 @@ class CSCMatrix(Matrix):
                 if abs(val) > 1e-12:
                     elements.append((j, i, val))  # (col, row, val)
         
-        # Сортируем по столбцам
+        # Сортируем по столбцам, затем по строкам
         elements.sort()
         
         data = [elem[2] for elem in elements]
@@ -108,6 +106,7 @@ class CSCMatrix(Matrix):
         """
         Преобразование CSCMatrix в CSRMatrix.
         """
+        # Импортируем здесь, чтобы избежать циклического импорта
         from CSR import CSRMatrix
         
         rows, cols = self.shape
@@ -125,7 +124,7 @@ class CSCMatrix(Matrix):
         for i in range(rows):
             indptr[i + 1] = indptr[i] + row_counts[i]
         
-        # Рабочие массивы для заполнения
+        # Рабочие массивы
         current_pos = indptr.copy()
         data_csr = [0.0] * self.nnz
         indices_csr = [0] * self.nnz
@@ -146,6 +145,7 @@ class CSCMatrix(Matrix):
         """
         Преобразование CSCMatrix в COOMatrix.
         """
+        # Импортируем здесь, чтобы избежать циклического импорта
         from COO import COOMatrix
         
         if self.nnz == 0:
