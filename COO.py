@@ -8,18 +8,12 @@ class COOMatrix(Matrix):
         super().__init__(shape)
         if not(len(data) == len(row) == len(col)):
             raise ValueError("data, row, col doesnt have same length")
-
-        result = {}
-        for d, r, c in zip(data, row, col):
-            key = (r, c)
-            result[key] = result.get(key, 0.0) + d
-
         self.data = []
         self.row = []
         self.col = []
-        for (r, c), val in result.items():
-            if abs(val) > TOLERANCE:
-                self.data.append(val)
+        for d, r, c in zip(data, row, col):
+            if abs(d) > TOLERANCE:
+                self.data.append(d)
                 self.row.append(r)
                 self.col.append(c)
 
@@ -156,18 +150,36 @@ class COOMatrix(Matrix):
         if not self.data:
             rows, cols = self.shape
             return CSCMatrix([], [], [0] * (cols + 1), (rows, cols))
-        triples = sorted(zip(self.col, self.row, self.data))
+        merged = {}
+        for i in range(len(self.data)):
+            col = self.col[i]
+            row = self.row[i]
+            val = self.data[i]
+            key = (col, row)
+            if key in merged:
+                merged[key] += val
+            else:
+                merged[key] = val
+
+        triples = []
+        for (col, row), val in merged.items():
+            if abs(val) > TOLERANCE:
+                triples.append((col, row, val))
+
+        triples.sort(key=lambda x: (x[0], x[1]))
+
         data = []
         indices = []
         indptr = [0]
-
         current_col = 0
+
         for col, row, val in triples:
             while current_col < col:
                 indptr.append(len(data))
                 current_col += 1
             data.append(val)
             indices.append(row)
+
         rows, cols = self.shape
         while current_col < cols:
             indptr.append(len(data))
@@ -183,18 +195,35 @@ class COOMatrix(Matrix):
         if not self.data:
             rows, cols = self.shape
             return CSRMatrix([], [], [0] * (rows + 1), (rows, cols))
-        triples = sorted(zip(self.row, self.col, self.data))
+        merged = {}
+        for i in range(len(self.data)):
+            row = self.row[i]
+            col = self.col[i]
+            val = self.data[i]
+            key = (row, col)
+            if key in merged:
+                merged[key] += val
+            else:
+                merged[key] = val
+
+        triples = []
+        for (row, col), val in merged.items():
+            if abs(val) > TOLERANCE:
+                triples.append((row, col, val))
+
+        triples.sort(key=lambda x: (x[0], x[1]))
         data = []
         indices = []
         indptr = [0]
-
         current_row = 0
+
         for row, col, val in triples:
             while current_row < row:
                 indptr.append(len(data))
                 current_row += 1
             data.append(val)
             indices.append(col)
+
         rows, cols = self.shape
         while current_row < rows:
             indptr.append(len(data))
