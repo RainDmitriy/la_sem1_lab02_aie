@@ -125,7 +125,6 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         empty = CSCMatrix([], [], [0], (0, 0))
         return empty, empty
     rows, cols = _new_structure(A)
-
     L_trip: List[Tuple[int, int, float]] = []
     U_trip: List[Tuple[int, int, float]] = []
 
@@ -134,7 +133,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
 
     for k in range(n):
         row_k = rows.get(k, {})
-
+        pivot = None
         for j in range(k, n):
             total = row_k.get(j, 0.0)
             for t in range(k):
@@ -151,17 +150,17 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                         break
                 total -= l_kt * u_tj
 
-            if abs(total) > TOLERANCE:
+            if j == k:
+                pivot = total
+                if abs(pivot) < TOLERANCE:
+                    return None
+                U_trip.append((k, k, float(pivot)))
+            elif abs(total) > TOLERANCE:
                 U_trip.append((k, j, float(total)))
-        pivot = 0.0
-        for (r, c, v) in U_trip:
-            if r == k and c == k:
-                pivot = v
-                break
-        if abs(pivot) < TOLERANCE:
+
+        if pivot is None or abs(pivot) < TOLERANCE:
             return None
         col_k = cols.get(k, {})
-
         for i in range(k + 1, n):
             if i in col_k:
                 total = col_k[i]
@@ -181,25 +180,21 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                 l_ik = total / pivot
                 if abs(l_ik) > TOLERANCE:
                     L_trip.append((i, k, float(l_ik)))
-        for i in range(k + 1, n):
-            l_ik = 0.0
-            for (r, c, v) in L_trip:
-                if r == i and c == k:
-                    l_ik = v
-                    break
 
-            if abs(l_ik) < TOLERANCE:
-                continue
+        current_U_row = {}
+        for (r, c, v) in U_trip:
+            if r == k and c > k:
+                current_U_row[c] = v
 
-            for (r, c, u_kj) in U_trip:
-                if r == k and c > k:
-                    current = rows.get(i, {}).get(c, 0.0)
+        for (r, c, l_ik) in L_trip:
+            if c == k and r > k:
+                for j, u_kj in current_U_row.items():
+                    current = rows.get(r, {}).get(j, 0.0)
                     new_val = current - l_ik * u_kj
-                    _set_val(rows, cols, i, c, new_val)
+                    _set_val(rows, cols, r, j, new_val)
 
     L_csc = _triplets_to_csc(n, n, L_trip)
     U_csc = _triplets_to_csc(n, n, U_trip)
-
     return L_csc, U_csc
 
 def _solve_l(L: CSCMatrix, b: Vector) -> Vector:
