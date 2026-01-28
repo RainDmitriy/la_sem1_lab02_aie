@@ -49,9 +49,11 @@ class CSCMatrix(Matrix):
         return result_coo._to_csc()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        """умножение CSC на скаляр"""
+        """умножение на скаляр"""
+        if scalar == 0:
+            return self.__class__.from_dense([[0] * self.shape[1] for _ in range(self.shape[0])])
         new_data = [value * scalar for value in self.data]
-        return CSCMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
+        # ...
 
     def transpose(self) -> 'Matrix':
         """транспонирование матрицы"""
@@ -118,3 +120,9 @@ class CSCMatrix(Matrix):
                 cols.append(j)
 
         return COOMatrix(data, rows, cols, self.shape)
+
+    def __str__(self) -> str:
+        return f"CSCMatrix(shape={self.shape}, nnz={self.nnz})"
+
+    def __repr__(self) -> str:
+        return self.__str__()

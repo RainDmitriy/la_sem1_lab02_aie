@@ -24,17 +24,45 @@ class COOMatrix(Matrix):
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """сложение матриц."""
-        dense_self = self.to_dense()
-        dense_other = other.to_dense()
-        result_dense = []
-        for i in range(self.shape[0]):
-            row = []
-            for j in range(self.shape[1]):
-                row.append(dense_self[i][j] + dense_other[i][j])
-            result_dense.append(row)
+        """сложение матриц"""
+        if isinstance(other, COOMatrix):
+            # Сливаем два COO
+            data = []
+            rows = []
+            cols = []
+            values = {}
+            for idx in range(self.nnz):
+                key = (self.row[idx], self.col[idx])
+                values[key] = self.data[idx]
 
-        return COOMatrix.from_dense(result_dense)
+            for idx in range(other.nnz):
+                key = (other.row[idx], other.col[idx])
+                if key in values:
+                    values[key] += other.data[idx]
+                else:
+                    values[key] = other.data[idx]
+
+            for (r, c), val in values.items():
+                if abs(val) > 1e-10:
+                    data.append(val)
+                    rows.append(r)
+                    cols.append(c)
+
+            return COOMatrix(data, rows, cols, self.shape)
+        else:
+            dense_self = self.to_dense()
+            dense_other = other.to_dense()
+
+            rows, cols = self.shape
+            result_dense = []
+            for i in range(rows):
+                row = []
+                for j in range(cols):
+                    row.append(dense_self[i][j] + dense_other[i][j])
+                result_dense.append(row)
+
+            return COOMatrix.from_dense(result_dense)
+
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """умножение на скаляр"""
@@ -122,3 +150,9 @@ class COOMatrix(Matrix):
             indptr[row + 1] = len(data)
 
         return CSRMatrix(data, indices, indptr, self.shape)
+
+    def __str__(self) -> str:
+        return f"COOMatrix(shape={self.shape}, nnz={self.nnz})"
+
+    def __repr__(self) -> str:
+        return self.__str__()

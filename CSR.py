@@ -119,3 +119,9 @@ class CSRMatrix(Matrix):
                 cols.append(self.indices[idx])
 
         return COOMatrix(data, rows, cols, self.shape)
+
+    def __str__(self) -> str:
+        return f"CSRMatrix(shape={self.shape}, nnz={self.nnz})"
+
+    def __repr__(self) -> str:
+        return self.__str__()
