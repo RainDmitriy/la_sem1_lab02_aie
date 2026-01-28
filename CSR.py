@@ -8,37 +8,37 @@ if TYPE_CHECKING:
 
 
 class CSRMatrix(Matrix):
-    def __init__(self, d: CSRData, idxs: CSRIndices, ptrs: CSRIndptr, s: Shape):
-        super().__init__(s)
+    def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
+        super().__init__(shape)
 
-        if len(ptrs) != s[0] + 1:
-            raise ValueError(f"Неверная длина ptrs")
-        if ptrs[0] != 0:
-            raise ValueError("ptrs[0] должен быть 0")
-        if ptrs[-1] != len(d):
-            raise ValueError(f"Несоответствие ptrs[-1]")
-        if len(d) != len(idxs):
+        if len(indptr) != shape[0] + 1:
+            raise ValueError(f"Неверная длина indptr")
+        if indptr[0] != 0:
+            raise ValueError("indptr[0] должен быть 0")
+        if indptr[-1] != len(data):
+            raise ValueError(f"Несоответствие indptr[-1]")
+        if len(data) != len(indices):
             raise ValueError("Разные длины массивов")
         
-        self.d = d
-        self.idxs = idxs
-        self.ptrs = ptrs
+        self.data = data
+        self.indices = indices
+        self.indptr = indptr
 
     def to_dense(self) -> DenseMatrix:
-        rows_cnt, cols_cnt = self.s
+        r_cnt, c_cnt = self.shape
 
-        result_mat = [[0] * cols_cnt for _ in range(rows_cnt)]
+        res_mat = [[0] * c_cnt for _ in range(r_cnt)]
         
-        for i in range(rows_cnt):
-            st = self.ptrs[i]
-            en = self.ptrs[i + 1]
+        for i in range(r_cnt):
+            st = self.indptr[i]
+            en = self.indptr[i + 1]
             for pos in range(st, en):
 
-                j = self.idxs[pos]
-                v = self.d[pos]
-                result_mat[i][j] = v
+                j = self.indices[pos]
+                v = self.data[pos]
+                res_mat[i][j] = v
         
-        return result_mat
+        return res_mat
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         coo_a = self._to_coo()
@@ -50,73 +50,73 @@ class CSRMatrix(Matrix):
 
     def _mul_impl(self, k: float) -> 'Matrix':
         if k == 0:
-            return CSRMatrix([], [], [0] * (self.s[0] + 1), self.s)
+            return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
         
-        new_vals = [x * k for x in self.d]
+        new_vals = [x * k for x in self.data]
 
-        return CSRMatrix(new_vals, self.idxs.copy(), self.ptrs.copy(), self.s)
+        return CSRMatrix(new_vals, self.indices.copy(), self.indptr.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
         from CSC import CSCMatrix
         
-        rows_cnt, cols_cnt = self.s
-        new_r_cnt, new_c_cnt = cols_cnt, rows_cnt
+        r_cnt, c_cnt = self.shape
+        nr_cnt, nc_cnt = c_cnt, r_cnt
         
-        cnts_per_col = [0] * new_c_cnt
+        col_cnts = [0] * nc_cnt
         
-        for i in range(rows_cnt):
-            st = self.ptrs[i]
-            en = self.ptrs[i + 1]
-            cnts_per_col[i] = en - st
+        for i in range(r_cnt):
+            st = self.indptr[i]
+            en = self.indptr[i + 1]
+            col_cnts[i] = en - st
         
-        new_ptrs = [0] * (new_c_cnt + 1)
-        for j in range(new_c_cnt):
-            new_ptrs[j + 1] = new_ptrs[j] + cnts_per_col[j]
+        new_ptr = [0] * (nc_cnt + 1)
+        for j in range(nc_cnt):
+            new_ptr[j + 1] = new_ptr[j] + col_cnts[j]
         
-        new_vals = [0] * len(self.d)
-        new_idxs = [0] * len(self.idxs)
+        new_vals = [0] * len(self.data)
+        new_idxs = [0] * len(self.indices)
         
-        pos_per_col = new_ptrs.copy()
+        col_pos = new_ptr.copy()
         
-        for i in range(rows_cnt):
-            st = self.ptrs[i]
-            en = self.ptrs[i + 1]
+        for i in range(r_cnt):
+            st = self.indptr[i]
+            en = self.indptr[i + 1]
             
             for pos in range(st, en):
-                j = self.idxs[pos]
-                v = self.d[pos]
+                j = self.indices[pos]
+                v = self.data[pos]
                 
-                p = pos_per_col[i]
+                p = col_pos[i]
                 new_vals[p] = v
                 new_idxs[p] = j
-                pos_per_col[i] += 1
+                col_pos[i] += 1
         
-        return CSCMatrix(new_vals, new_idxs, new_ptrs, (new_r_cnt, new_c_cnt))
+        return CSCMatrix(new_vals, new_idxs, new_ptr, (nr_cnt, nc_cnt))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        rows_a, cols_a = self.s
-        rows_b, cols_b = other.s
+        ra, ca = self.shape
+        rb, cb = other.shape
 
         res_vals = []
         res_idxs = []
-        res_ptrs = [0] * (rows_a + 1)
+        res_ptr = [0] * (ra + 1)
 
-        for i_idx in range(rows_a):
+        for i_idx in range(ra):
             row_sum = {}
 
-            a_st = self.ptrs[i_idx]
-            a_en = self.ptrs[i_idx + 1]
+            a_st = self.indptr[i_idx]
+            a_en = self.indptr[i_idx + 1]
 
             for a_pos in range(a_st, a_en):
-                k_idx = self.idxs[a_pos]
-                a_v = self.d[a_pos]
+                k_idx = self.indices[a_pos]
+                a_v = self.data[a_pos]
 
-                b_st = other.ptrs[k_idx]
-                b_en = other.ptrs[k_idx + 1]
+                b_st = other.indptr[k_idx]
+                b_en = other.indptr[k_idx + 1]
 
                 for b_pos in range(b_st, b_en):
-                    j_idx = other.idxs[b_pos]
-                    b_v = other.d[b_pos]
+                    j_idx = other.indices[b_pos]
+                    b_v = other.data[b_pos]
 
                     if j_idx not in row_sum:
                         row_sum[j_idx] = 0.0
@@ -129,61 +129,61 @@ class CSRMatrix(Matrix):
                     res_vals.append(v_val)
                     res_idxs.append(j_idx)
 
-            res_ptrs[i_idx + 1] = len(res_vals)
+            res_ptr[i_idx + 1] = len(res_vals)
 
-        return CSRMatrix(res_vals, res_idxs, res_ptrs, (rows_a, cols_b))
+        return CSRMatrix(res_vals, res_idxs, res_ptr, (ra, cb))
 
     @classmethod
     def from_dense(cls, dense_mat: DenseMatrix) -> 'CSRMatrix':
-        rows_cnt = len(dense_mat)
-        cols_cnt = len(dense_mat[0])
+        r_cnt = len(dense_mat)
+        c_cnt = len(dense_mat[0])
         
         vals = []
         idxs = []
         
-        cnts_per_row = [0] * rows_cnt
+        row_cnts = [0] * r_cnt
         
-        for i in range(rows_cnt):
-            for j in range(cols_cnt):
+        for i in range(r_cnt):
+            for j in range(c_cnt):
                 v = dense_mat[i][j]
                 if v != 0:
                     vals.append(v)
                     idxs.append(j)
-                    cnts_per_row[i] += 1
+                    row_cnts[i] += 1
         
-        ptrs = [0] * (rows_cnt + 1)
-        for i in range(rows_cnt):
-            ptrs[i + 1] = ptrs[i] + cnts_per_row[i]
+        ptrs = [0] * (r_cnt + 1)
+        for i in range(r_cnt):
+            ptrs[i + 1] = ptrs[i] + row_cnts[i]
         
-        return cls(vals, idxs, ptrs, (rows_cnt, cols_cnt))
+        return cls(vals, idxs, ptrs, (r_cnt, c_cnt))
 
     def _to_csc(self) -> 'CSCMatrix':
         from CSC import CSCMatrix
 
-        m_val, n_val = self.s
+        m, n = self.shape
 
-        cnts_per_col = [0] * n_val
+        col_cnts = [0] * n
 
-        for col_idx in self.idxs:
-            cnts_per_col[col_idx] += 1
+        for col_idx in self.indices:
+            col_cnts[col_idx] += 1
 
-        new_ptrs = [0] * (n_val + 1)
+        new_ptr = [0] * (n + 1)
 
-        for j in range(n_val):
-            new_ptrs[j + 1] = new_ptrs[j] + cnts_per_col[j]
+        for j in range(n):
+            new_ptr[j + 1] = new_ptr[j] + col_cnts[j]
 
-        new_vals = [0] * len(self.d)
-        new_idxs = [0] * len(self.idxs)
+        new_vals = [0] * len(self.data)
+        new_idxs = [0] * len(self.indices)
 
-        cur_pos = new_ptrs.copy()
+        cur_pos = new_ptr.copy()
 
-        for i in range(m_val):
-            row_st = self.ptrs[i]
-            row_en = self.ptrs[i + 1]
+        for i in range(m):
+            row_st = self.indptr[i]
+            row_en = self.indptr[i + 1]
 
             for k in range(row_st, row_en):
-                j_val = self.idxs[k]
-                v_val = self.d[k]
+                j_val = self.indices[k]
+                v_val = self.data[k]
 
                 p_val = cur_pos[j_val]
 
@@ -192,27 +192,27 @@ class CSRMatrix(Matrix):
 
                 cur_pos[j_val] += 1
     
-        return CSCMatrix(new_vals, new_idxs, new_ptrs, (m_val, n_val))
+        return CSCMatrix(new_vals, new_idxs, new_ptr, (m, n))
     
     def _to_coo(self) -> 'COOMatrix':
         from COO import COOMatrix
 
-        rows_cnt, cols_cnt = self.s
+        r_cnt, c_cnt = self.shape
 
         vals = []
-        row_idxs = []
-        col_idxs = []
+        rows = []
+        cols = []
         
-        for i in range(rows_cnt):
-            st = self.ptrs[i]
-            en = self.ptrs[i + 1]
+        for i in range(r_cnt):
+            st = self.indptr[i]
+            en = self.indptr[i + 1]
             
             for pos in range(st, en):
-                j = self.idxs[pos]
-                v = self.d[pos]
+                j = self.indices[pos]
+                v = self.data[pos]
                 
                 vals.append(v)
-                row_idxs.append(i)
-                col_idxs.append(j)
+                rows.append(i)
+                cols.append(j)
         
-        return COOMatrix(vals, row_idxs, col_idxs, self.s)
+        return COOMatrix(vals, rows, cols, self.shape)

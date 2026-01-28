@@ -8,74 +8,74 @@ if TYPE_CHECKING:
     from CSR import CSRMatrix
 
 class COOMatrix(Matrix):
-    def __init__(self, d: COOData, r: COORows, c: COOCols, s: Shape):
-        super().__init__(s)
+    def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
+        super().__init__(shape)
 
-        if not (len(d) == len(r) == len(c)):
-            raise ValueError("Размеры массивов не совпадают")
+        if not (len(data) == len(row) == len(col)):
+            raise ValueError("Разные длины массивов")
         
-        self.d = d
-        self.r = r
-        self.c = c
-        self.s = s
+        self.data = data
+        self.row = row
+        self.col = col
+        self.shape = shape
 
     def to_dense(self) -> DenseMatrix:
-        rows_cnt, cols_cnt = self.s
-        result = []
+        r_cnt, c_cnt = self.shape
+        res = []
 
-        for i in range(rows_cnt):
-            row_list = [0] * cols_cnt
-            result.append(row_list)
+        for i in range(r_cnt):
+            r_list = [0] * c_cnt
+            res.append(r_list)
 
-        for idx in range(len(self.d)):
-            result[ self.r[idx] ][ self.c[idx] ] = self.d[idx]
+        for idx in range(len(self.data)):
+            res[ self.row[idx] ][ self.col[idx] ] = self.data[idx]
     
-        return result
+        return res
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         values_map: Dict[Tuple[int, int], float] = {}
         
-        for v, row_idx, col_idx in zip(self.d, self.r, self.c):
-            values_map[(row_idx, col_idx)] = values_map.get((row_idx, col_idx), 0.0) + v
+        for v, r_idx, c_idx in zip(self.data, self.row, self.col):
+            values_map[(r_idx, c_idx)] = values_map.get((r_idx, c_idx), 0.0) + v
         
-        for v, row_idx, col_idx in zip(other.d, other.r, other.c):
-            values_map[(row_idx, col_idx)] = values_map.get((row_idx, col_idx), 0.0) + v
+        for v, r_idx, c_idx in zip(other.data, other.row, other.col):
+            values_map[(r_idx, c_idx)] = values_map.get((r_idx, c_idx), 0.0) + v
         
-        new_d, new_r, new_c = [], [], []
-        for (row_idx, col_idx), val in values_map.items():
+        nd, nr, nc = [], [], []
+        for (r_idx, c_idx), val in values_map.items():
             if val != 0:
-                new_d.append(val)
-                new_r.append(row_idx)
-                new_c.append(col_idx)
+                nd.append(val)
+                nr.append(r_idx)
+                nc.append(c_idx)
         
-        return COOMatrix(new_d, new_r, new_c, self.s)
+        return COOMatrix(nd, nr, nc, self.shape)
 
     def _mul_impl(self, k: float) -> 'Matrix':
-        new_values = [x * k for x in self.d]
-        return COOMatrix(new_values, self.r[:], self.c[:], self.s)
+        new_vals = [x * k for x in self.data]
+        return COOMatrix(new_vals, self.row[:], self.col[:], self.shape)
 
     def transpose(self) -> 'Matrix':
-        new_s = (self.s[1], self.s[0])
-        return COOMatrix(self.d.copy(), self.c.copy(), self.r.copy(), new_s)
+        ns = (self.shape[1], self.shape[0])
+        return COOMatrix(self.data.copy(), self.col.copy(), self.row.copy(), ns)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        if self.s[1] != other.s[0]:
-            raise ValueError("Недопустимые размеры матриц")
+        if self.shape[1] != other.shape[0]:
+            raise ValueError("Некорректные размеры")
 
-        m, n = self.s[0], other.s[1]
+        m, n = self.shape[0], other.shape[1]
         res_map = {}
 
-        for idx in range(len(self.d)):
-            ra = self.r[idx]
-            ca = self.c[idx]
-            va = self.d[idx]
+        for idx in range(len(self.data)):
+            ra = self.row[idx]
+            ca = self.col[idx]
+            va = self.data[idx]
 
-            other_csr = other._to_csr()
-            start_idx = other_csr.indptr[ca]
-            end_idx = other_csr.indptr[ca + 1]
-            for k_idx in range(start_idx, end_idx):
-                cb = other_csr.indices[k_idx]
-                vb = other_csr.data[k_idx]
+            csr_other = other._to_csr()
+            st = csr_other.indptr[ca]
+            en = csr_other.indptr[ca + 1]
+            for k_idx in range(st, en):
+                cb = csr_other.indices[k_idx]
+                vb = csr_other.data[k_idx]
                 key = (ra, cb)
                 res_map[key] = res_map.get(key, 0.0) + va * vb
 
@@ -104,43 +104,43 @@ class COOMatrix(Matrix):
 
     def _to_csc(self) -> 'CSCMatrix':
         from CSC import CSCMatrix
-        rows_cnt, cols_cnt = self.s
+        r_cnt, c_cnt = self.shape
         
-        items = list(zip(self.c, self.r, self.d))
+        items = list(zip(self.col, self.row, self.data))
         items.sort()
         
         d_vals: List[float] = []
         idxs: List[int] = []
-        ptrs: List[int] = [0] * (cols_cnt + 1)
+        ptrs: List[int] = [0] * (c_cnt + 1)
         
-        for col_idx, row_idx, v in items:
+        for c_idx, r_idx, v in items:
             d_vals.append(v)
-            idxs.append(row_idx)
-            ptrs[col_idx + 1] += 1
+            idxs.append(r_idx)
+            ptrs[c_idx + 1] += 1
         
-        for j in range(cols_cnt):
+        for j in range(c_cnt):
             ptrs[j + 1] += ptrs[j]
         
-        return CSCMatrix(d_vals, idxs, ptrs, self.s)
+        return CSCMatrix(d_vals, idxs, ptrs, self.shape)
 
     def _to_csr(self) -> 'CSRMatrix':
         from CSR import CSRMatrix
 
-        rows_cnt, cols_cnt = self.s
+        r_cnt, c_cnt = self.shape
         
-        items = list(zip(self.r, self.c, self.d))
+        items = list(zip(self.row, self.col, self.data))
         items.sort()
         
         d_vals: List[float] = []
         idxs: List[int] = []
-        ptrs: List[int] = [0] * (rows_cnt + 1)
+        ptrs: List[int] = [0] * (r_cnt + 1)
         
-        for row_idx, col_idx, v in items:
+        for r_idx, c_idx, v in items:
             d_vals.append(v)
-            idxs.append(col_idx)
-            ptrs[row_idx + 1] += 1
+            idxs.append(c_idx)
+            ptrs[r_idx + 1] += 1
         
-        for i in range(rows_cnt):
+        for i in range(r_cnt):
             ptrs[i + 1] += ptrs[i]
         
-        return CSRMatrix(d_vals, idxs, ptrs, self.s)
+        return CSRMatrix(d_vals, idxs, ptrs, self.shape)
