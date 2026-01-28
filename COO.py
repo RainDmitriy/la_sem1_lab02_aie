@@ -8,12 +8,18 @@ class COOMatrix(Matrix):
         super().__init__(shape)
         if not(len(data) == len(row) == len(col)):
             raise ValueError("data, row, col doesnt have same length")
+
+        result = {}
+        for d, r, c in zip(data, row, col):
+            key = (r, c)
+            result[key] = result.get(key, 0.0) + d
+
         self.data = []
         self.row = []
         self.col = []
-        for d, r, c in zip(data, row, col):
-            if d != 0.0:
-                self.data.append(d)
+        for (r, c), val in result.items():
+            if abs(val) > TOLERANCE:
+                self.data.append(val)
                 self.row.append(r)
                 self.col.append(c)
 

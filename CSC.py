@@ -88,13 +88,21 @@ class CSCMatrix(Matrix):
             return CSCMatrix([], [], [0] * (cols + 1), self.shape)
         new_data = []
         new_indices = []
-        for i in range(len(self.data)):
-            val = self.data[i] * scalar
-            if abs(val) > TOLERANCE:
-                new_data.append(val)
-                new_indices.append(self.indices[i])
+        new_indptr = [0]
 
-        return CSCMatrix(new_data, new_indices, self.indptr[:], self.shape)
+        for col in range(self.shape[1]):
+            start = self.indptr[col]
+            end = self.indptr[col + 1]
+            count = 0
+            for idx in range(start, end):
+                val = self.data[idx] * scalar
+                if abs(val) > TOLERANCE:
+                    new_data.append(val)
+                    new_indices.append(self.indices[idx])
+                    count += 1
+            new_indptr.append(new_indptr[-1] + count)
+
+        return CSCMatrix(new_data, new_indices, new_indptr, self.shape)
 
     def transpose(self) -> 'Matrix':
         """
