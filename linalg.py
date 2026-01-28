@@ -56,7 +56,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                 if idx1 == idx2:
                     if idx1 > k:
                         l_ki = U_data[p1] / u_kk  # коэффициент
-                        new_data.append(U_data[p2] - l_ki * U_data[diag_pos])
+                        new_data.append(U_data[p2] - l_ki * U_data[p1])
                     p1 += 1
                     p2 += 1
                 elif idx1 < idx2:

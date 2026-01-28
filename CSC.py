@@ -64,36 +64,37 @@ class CSCMatrix(Matrix):
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
         other_csr = other._to_csr()
-        rows_a = self.shape[0]
+        rows_a, cols_a = self.shape
         cols_b = other_csr.shape[1]
-        res_r, res_c, res_v = [], [], []
+        res_row, res_col, res_val = [], [], []
         for i in range(rows_a):
-            row_start_a = self.indptr[i]
-            row_end_a = self.indptr[i + 1]
+            # cтрока i матрицы A
+            a_row_idx = []
+            a_row_val = []
+            for k in range(self.indptr[i], self.indptr[i + 1]):
+                a_row_idx.append(self.indices[k])
+                a_row_val.append(self.data[k])
             for j in range(cols_b):
-                col_start_b = other_csr.indptr[j]
-                col_end_b = other_csr.indptr[j + 1]
+                # cтолбец j матрицы B
+                b_col_start = other_csr.indptr[j]
+                b_col_end = other_csr.indptr[j + 1]
                 s = 0.0
-                k1 = row_start_a
-                k2 = col_start_b
-                while k1 < row_end_a and k2 < col_end_b:
-                    idx_a = self.indices[k1]
-                    idx_b = other_csr.indices[k2]
-                    if idx_a == idx_b:
-                        s += self.data[k1] * other_csr.data[k2]
-                        k1 += 1
-                        k2 += 1
-                    elif idx_a < idx_b:
-                        k1 += 1
+                ka, kb = 0, b_col_start
+                while ka < len(a_row_idx) and kb < b_col_end:
+                    if a_row_idx[ka] == other_csr.indices[kb]:
+                        s += a_row_val[ka] * other_csr.data[kb]
+                        ka += 1
+                        kb += 1
+                    elif a_row_idx[ka] < other_csr.indices[kb]:
+                        ka += 1
                     else:
-                        k2 += 1
-                if abs(s) > 1e-10:
-                    res_r.append(i)
-                    res_c.append(j)
-                    res_v.append(s)
+                        kb += 1
+                if abs(s) > 1e-12:
+                    res_row.append(i)
+                    res_col.append(j)
+                    res_val.append(s)
         from COO import COOMatrix
-        coo_result = COOMatrix(res_v, res_r, res_c, (rows_a, cols_b))
-        return coo_result._to_csc()
+        return COOMatrix(res_val, res_row, res_col, (rows_a, cols_b))._to_csc()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
