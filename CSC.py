@@ -1,11 +1,23 @@
 from base import Matrix
-from types import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 from math import fabs
+from typing import List, Tuple
+
+# Основные типы данных
+DenseMatrix = List[List[float]]  # Плотная матрица: [[row1], [row2], ...] как в NumPy
+Shape = Tuple[int, int]  # Размерность: (rows, cols)
+
+# Для CSR и CSC
+CSRData = CSCData = List[float]      # Ненулевые значения
+CSRIndices = CSCIndices = List[int]  # Колонки (CSR) или строки (CSC)
+CSRIndptr = CSCIndptr = List[int]    # Указатели начала строк (CSR) или колонок (CSC)
+
+
+
 
 
 class CSCMatrix(Matrix):
     # Константа для сравнения с нулем
-    ZERO_TOLERANCE = 1e-10
+    ZERO_TOLERANCE = 1e-15
 
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
         super().__init__(shape)

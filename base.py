@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
-from types import DenseMatrix, Shape
+from typing import List, Tuple
+DenseMatrix = List[List[float]]  # Плотная матрица: [[row1], [row2], ...] как в NumPy
+Shape = Tuple[int, int]  # Размерность: (rows, cols)
 
 
 class Matrix(ABC):

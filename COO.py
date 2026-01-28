@@ -1,9 +1,17 @@
 from base import Matrix
-from types import COOData, COORows, COOCols, Shape, DenseMatrix
+from typing import List, Tuple
+
+DenseMatrix = List[List[float]]  # Плотная матрица: [[row1], [row2], ...] как в NumPy
+Shape = Tuple[int, int]  # Размерность: (rows, cols)
+
+# Для COO
+COOData = List[float]      # Ненулевые значения
+COORows = List[int]        # Индексы строк
+COOCols = List[int]        # Индексы столбцов
 
 
 class COOMatrix(Matrix):
-    ZERO_TOLERANCE = 1e-10
+    ZERO_TOLERANCE = 1e-15
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
         super().__init__(shape)
         self.data = data

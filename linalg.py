@@ -1,7 +1,7 @@
 from CSC import CSCMatrix
 from CSR import CSRMatrix
-from types import Vector
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
+Vector = List[float]
 
 
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
@@ -29,7 +29,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                 max_val = abs(dense_A[k][i])
                 max_row = k
 
-        if max_val < 1e-10:
+        if max_val < 1e-15:
             return None
 
         if max_row != i:
@@ -43,7 +43,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                 sum_u += L[i][k] * U[k][j]
             U[i][j] = dense_A[i][j] - sum_u
 
-        if abs(U[i][i]) < 1e-10:
+        if abs(U[i][i]) < 1e-15:
             return None
 
         for j in range(i + 1, n):
@@ -59,12 +59,12 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
 
     for i in range(n):
         for j in range(n):
-            if j <= i and abs(L[i][j]) >= 1e-10:
+            if j <= i and abs(L[i][j]) >= 1e-15:
                 L_data.append(L[i][j])
                 L_rows.append(i)
                 L_cols.append(j)
 
-            if j >= i and abs(U[i][j]) >= 1e-10:
+            if j >= i and abs(U[i][j]) >= 1e-15:
                 U_data.append(U[i][j])
                 U_rows.append(i)
                 U_cols.append(j)
@@ -118,7 +118,7 @@ def solve_upper_triangular(U: CSCMatrix, y: Vector) -> Vector:
                 diag_val = U.data[idx]
                 break
 
-        if abs(diag_val) < 1e-10:
+        if abs(diag_val) < 1e-15:
             raise ValueError("Matrix U is singular")
 
         x[i] = (y[i] - sum_val) / diag_val
