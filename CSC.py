@@ -1,5 +1,5 @@
-from .base import Matrix
-from .types import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
+from base import Matrix
+from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 
 
 class CSCMatrix(Matrix):
@@ -49,7 +49,7 @@ class CSCMatrix(Matrix):
         """
         Транспонирование CSC матрицы
         """
-        from .CSR import CSRMatrix
+        from CSR import CSRMatrix
 
         sr, sc = self.shape
         return CSRMatrix(list(self.data), list(self.indices), list(self.indptr), (sc, sr))
@@ -60,7 +60,7 @@ class CSCMatrix(Matrix):
         c = a._matmul_impl(other)
         if hasattr(c, "_to_csc"):
             return c._to_csc()
-        from .COO import COOMatrix
+        from COO import COOMatrix
         return COOMatrix.from_dense(c.to_dense())._to_csc()
 
     @classmethod
@@ -96,7 +96,7 @@ class CSCMatrix(Matrix):
         """
         Преобразование CSCMatrix в COOMatrix
         """
-        from .COO import COOMatrix
+        from COO import COOMatrix
 
         sr, sc = self.shape
         data: list[float] = []

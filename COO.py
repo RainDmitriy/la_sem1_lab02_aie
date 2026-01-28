@@ -1,5 +1,5 @@
-from .base import Matrix
-from .types import COOData, COORows, COOCols, Shape, DenseMatrix
+from base import Matrix
+from type import COOData, COORows, COOCols, Shape, DenseMatrix
 
 
 class COOMatrix(Matrix):
@@ -92,7 +92,7 @@ class COOMatrix(Matrix):
         """
         Преобразование COOMatrix в CSCMatrix.
         """
-        from .CSC import CSCMatrix
+        from CSC import CSCMatrix
 
         sr, sc = self.shape
 
@@ -119,7 +119,7 @@ class COOMatrix(Matrix):
         """
         Преобразование COOMatrix в CSRMatrix.
         """
-        from .CSR import CSRMatrix
+        from CSR import CSRMatrix
 
         sr, sc = self.shape
         coo = COOMatrix(list(self.data), list(self.row), list(self.col), self.shape)

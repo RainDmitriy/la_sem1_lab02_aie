@@ -1,5 +1,5 @@
-from .base import Matrix
-from .types import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
+from base import Matrix
+from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 
 
 class CSRMatrix(Matrix):
@@ -49,7 +49,7 @@ class CSRMatrix(Matrix):
         """
         Транспонирование CSR матрицы
         """
-        from .CSC import CSCMatrix
+        from CSC import CSCMatrix
 
         sr, sc = self.shape
         return CSCMatrix(list(self.data), list(self.indices), list(self.indptr), (sc, sr))
@@ -59,7 +59,7 @@ class CSRMatrix(Matrix):
         if hasattr(other, "_to_csr"):
             b = other._to_csr()
         else:
-            from .COO import COOMatrix
+            from COO import COOMatrix
             b = COOMatrix.from_dense(other.to_dense())._to_csr()
 
         sr, sc = self.shape
@@ -126,7 +126,7 @@ class CSRMatrix(Matrix):
         """
         Преобразование CSRMatrix в COOMatrix
         """
-        from .COO import COOMatrix
+        from COO import COOMatrix
 
         sr, _ = self.shape
         data: list[float] = []

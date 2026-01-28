@@ -1,5 +1,5 @@
-from .CSC import CSCMatrix
-from .types import Vector
+from CSC import CSCMatrix
+from type import Vector
 from typing import Tuple, Optional
 
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
