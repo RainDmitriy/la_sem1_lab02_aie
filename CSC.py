@@ -46,12 +46,55 @@ class CSCMatrix(Matrix):
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSC матриц."""
 
-        coo_self = self._to_coo()
-        coo_other = other._to_coo()
+        assert isinstance(other, CSCMatrix), "Addition is only supported between two CSC matrices"
+        assert self.shape == other.shape, "Matrix shapes must match for addition"
 
-        res = coo_self._add_impl(coo_other)
+        n_rows, n_cols = self.shape
+        result_data, result_indices, result_indptr = [], [], [0]
 
-        return res._to_csc()
+        for col in range(n_cols):
+            self_start, self_end = self.indptr[col], self.indptr[col + 1]
+            other_start, other_end = other.indptr[col], other.indptr[col + 1]
+
+            i, j = self_start, other_start
+
+            while i < self_end and j < other_end:
+                row1, row2 = self.indices[i], other.indices[j]
+
+                if row1 < row2:
+                    # Элемент только в первой матрице
+                    result_indices.append(row1)
+                    result_data.append(self.data[i])
+                    i += 1
+                elif row1 > row2:
+                    # Элемент только во второй матрице
+                    result_indices.append(row2)
+                    result_data.append(other.data[j])
+                    j += 1
+                else:
+                    # Элемент в обеих матрицах
+                    sum_val = self.data[i] + other.data[j]
+                    if fabs(sum_val) >= self.ZERO_TOLERANCE:
+                        result_indices.append(row1)
+                        result_data.append(sum_val)
+                    i += 1
+                    j += 1
+
+            # Остатки из первой матрицы
+            while i < self_end:
+                result_indices.append(self.indices[i])
+                result_data.append(self.data[i])
+                i += 1
+
+            # Остатки из второй матрицы
+            while j < other_end:
+                result_indices.append(other.indices[j])
+                result_data.append(other.data[j])
+                j += 1
+
+            result_indptr.append(len(result_data))
+
+        return CSCMatrix(result_data, result_indices, result_indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""

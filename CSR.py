@@ -42,11 +42,56 @@ class CSRMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSR матриц."""
-        coo_self = self._to_coo()
-        coo_other = other._to_coo()
 
-        res = coo_self._add_impl(coo_other)
-        return res._to_csr()
+        assert isinstance(other, CSRMatrix), "Addition is only supported between two CSR matrices"
+        assert self.shape == other.shape, "Matrix shapes must match for addition"
+
+        n_rows, n_cols = self.shape
+        result_data, result_indices, result_indptr = [], [], [0]
+
+        for row in range(n_rows):
+            self_start, self_end = self.indptr[row], self.indptr[row + 1]
+            other_start, other_end = other.indptr[row], other.indptr[row + 1]
+
+            i, j = self_start, other_start
+
+            while i < self_end and j < other_end:
+                col1, col2 = self.indices[i], other.indices[j]
+
+                if col1 < col2:
+                    # Элемент только в первой матрице
+                    result_indices.append(col1)
+                    result_data.append(self.data[i])
+                    i += 1
+                elif col1 > col2:
+                    # Элемент только во второй матрице
+                    result_indices.append(col2)
+                    result_data.append(other.data[j])
+                    j += 1
+                else:
+                    # Элемент в обеих матрицах
+                    sum_val = self.data[i] + other.data[j]
+                    if fabs(sum_val) >= self.ZERO_TOLERANCE:
+                        result_indices.append(col1)
+                        result_data.append(sum_val)
+                    i += 1
+                    j += 1
+
+            # Остатки из первой матрицы
+            while i < self_end:
+                result_indices.append(self.indices[i])
+                result_data.append(self.data[i])
+                i += 1
+
+            # Остатки из второй матрицы
+            while j < other_end:
+                result_indices.append(other.indices[j])
+                result_data.append(other.data[j])
+                j += 1
+
+            result_indptr.append(len(result_data))
+
+        return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
