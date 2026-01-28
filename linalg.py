@@ -13,21 +13,17 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     if n != m:
         return None
 
-    L_data, L_indices, L_indptr = [], [], [0]
-    U_data, U_indices, U_indptr = [], [], [0]
-
-    A_cols = []
+    A_cols = [{} for _ in range(n)]
     for j in range(n):
-        col = {}
         for idx in range(A.indptr[j], A.indptr[j + 1]):
-            col[A.indices[idx]] = A.data[idx]
-        A_cols.append(col)
+            row = A.indices[idx]
+            val = A.data[idx]
+            A_cols[j][row] = val
 
-    U_cols = [{} for _ in range(n)]
     L_cols = [{} for _ in range(n)]
+    U_cols = [{} for _ in range(n)]
 
     for k in range(n):
-        # U[k, k:]
         uk = dict(A_cols[k])
 
         for j in range(k):
@@ -37,20 +33,21 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                     uk[i] = uk.get(i, 0.0) - ljk * val
 
         if k not in uk or uk[k] == 0:
-            return None  # ведущий элем
+            return None
 
         pivot = uk[k]
 
         for i, val in uk.items():
-            if i >= k:
+            if i >= k and val != 0:
                 U_cols[k][i] = val
 
-        # L[k+1:, k]
         for i in range(k + 1, n):
-            if i in uk:
+            if i in uk and uk[i] != 0:
                 L_cols[k][i] = uk[i] / pivot
-
         L_cols[k][k] = 1.0
+
+    L_data, L_indices, L_indptr = [], [], [0]
+    U_data, U_indices, U_indptr = [], [], [0]
 
     for j in range(n):
         col = L_cols[j]
@@ -92,7 +89,7 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
                 if L.indices[idx] == i:
                     s -= L.data[idx] * y[j]
                     break
-        y[i] = s  # L[i,i] = 1
+        y[i] = s
 
     x = [0.0] * n
 
