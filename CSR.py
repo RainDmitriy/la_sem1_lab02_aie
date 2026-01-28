@@ -12,9 +12,10 @@ if TYPE_CHECKING:
 
 class CSRMatrix(Matrix):
 
-    def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
+    def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape) -> None:
         super().__init__(shape)
-        if len(indptr) != shape[1] + 1:
+        rows, _ = shape
+        if len(indptr) != rows + 1:
             raise ValueError()
         if indptr[0] != 0:
             raise ValueError()
@@ -22,9 +23,9 @@ class CSRMatrix(Matrix):
             raise ValueError()
         if len(data) != len(indices):
             raise ValueError()
-        self.data = data
-        self.indices = indices
-        self.indptr = indptr
+        self.data = list(data)
+        self.indices = list(indices)
+        self.indptr = list(indptr)
 
     def to_dense(self) -> DenseMatrix:
         """Преобразует CSR в плотную матрицу."""
