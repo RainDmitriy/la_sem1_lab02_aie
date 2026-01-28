@@ -1,5 +1,5 @@
 from base import Matrix
-from types import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
+from .types import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
