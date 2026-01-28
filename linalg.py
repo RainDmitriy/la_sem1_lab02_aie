@@ -13,111 +13,73 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix, List[
     if n != A.shape[1]:
         raise ValueError("LU-разложение требует квадратную матрицу")
     
-    A_csr = A._to_csr()
+    # Получаем элементы матрицы
+    matrix = [[0.0] * n for _ in range(n)]
+    for j in range(n):
+        for idx in range(A.indptr[j], A.indptr[j + 1]):
+            i = A.indices[idx]
+            matrix[i][j] = A.data[idx]
     
-    rows_A = [{} for _ in range(n)]
-    for i in range(n):
-        rows_A[i] = A_csr.get_row_as_dict(i)
-    
-    L_cols = [{} for _ in range(n)]
-    U_rows = [{} for _ in range(n)]
-    
+    # Рабочие копии для L и U
+    L = [[0.0] * n for _ in range(n)]
+    U = [[0.0] * n for _ in range(n)]
     P = list(range(n))
-    active_rows = [{} for _ in range(n)]
     
+    # Для каждой строки
+    for i in range(n):
+        L[i][i] = 1.0
+    
+    # Копируем A в U
+    for i in range(n):
+        for j in range(n):
+            U[i][j] = matrix[i][j]
+    
+    # Прямой ход метода Гаусса
     for k in range(n):
-        row_k = {}
-        
-        for j, val in rows_A[k].items():
-            if j >= k:
-                row_k[j] = float(val)
-        
-        for j, val in active_rows[k].items():
-            if j >= k:
-                current = row_k.get(j, 0.0)
-                row_k[j] = current + float(val)
-        
-        u_kk = row_k.get(k, 0.0)
-        
-        if abs(u_kk) < EPSILON:
-            for i in range(k + 1, n):
-                row_i = {}
-                for j, val in rows_A[i].items():
-                    if j >= k:
-                        row_i[j] = float(val)
-                for j, val in active_rows[i].items():
-                    if j >= k:
-                        current = row_i.get(j, 0.0)
-                        row_i[j] = current + float(val)
-                
-                if k in row_i and abs(row_i[k]) > EPSILON:
-                    P[k], P[i] = P[i], P[k]
-                    rows_A[k], rows_A[i] = rows_A[i], rows_A[k]
-                    active_rows[k], active_rows[i] = active_rows[i], active_rows[k]
-                    
-                    row_k = {}
-                    for j, val in rows_A[k].items():
-                        if j >= k:
-                            row_k[j] = float(val)
-                    for j, val in active_rows[k].items():
-                        if j >= k:
-                            current = row_k.get(j, 0.0)
-                            row_k[j] = current + float(val)
-                    
-                    u_kk = row_k.get(k, 0.0)
-                    break
-            
-            if abs(u_kk) < EPSILON:
-                return None
-        
-        U_rows[k] = {}
-        for j, val in row_k.items():
-            if j >= k and abs(val) > EPSILON:
-                U_rows[k][j] = val
-        
-        U_rows[k][k] = u_kk
-        L_cols[k][k] = 1.0
+        # Выбор ведущего элемента
+        max_row = k
+        max_val = abs(U[k][k])
         
         for i in range(k + 1, n):
-            elem = 0.0
-            if k in rows_A[i]:
-                elem += float(rows_A[i][k])
-            if k in active_rows[i]:
-                elem += float(active_rows[i][k])
+            if abs(U[i][k]) > max_val:
+                max_val = abs(U[i][k])
+                max_row = i
+        
+        if max_val < EPSILON:
+            return None
+        
+        # Перестановка строк
+        if max_row != k:
+            # Меняем строки в U
+            U[k], U[max_row] = U[max_row], U[k]
+            # Меняем строки в L (только уже вычисленные столбцы)
+            for j in range(k):
+                L[k][j], L[max_row][j] = L[max_row][j], L[k][j]
+            # Меняем перестановку
+            P[k], P[max_row] = P[max_row], P[k]
+        
+        # Обновление L и U
+        for i in range(k + 1, n):
+            if abs(U[k][k]) < EPSILON:
+                return None
             
-            if abs(elem) > EPSILON:
-                L_ik = elem / u_kk
-                L_cols[k][i] = L_ik
-                
-                for j, U_kj in U_rows[k].items():
-                    if j > k:
-                        delta = -L_ik * U_kj
-                        if abs(delta) > EPSILON:
-                            current = active_rows[i].get(j, 0.0)
-                            active_rows[i][j] = current + delta
+            L[i][k] = U[i][k] / U[k][k]
+            for j in range(k, n):
+                U[i][j] -= L[i][k] * U[k][j]
     
-    L_data, L_indices, L_indptr = [], [], [0]
-    for j in range(n):
-        rows = sorted(L_cols[j].keys())
-        for i in rows:
-            L_data.append(L_cols[j][i])
-            L_indices.append(i)
-        L_indptr.append(len(L_data))
-    
-    U_cols = [{} for _ in range(n)]
+    # Очистка нулей
     for i in range(n):
-        for j, val in U_rows[i].items():
-            U_cols[j][i] = val
+        for j in range(n):
+            if abs(L[i][j]) < EPSILON:
+                L[i][j] = 0.0
+            if abs(U[i][j]) < EPSILON:
+                U[i][j] = 0.0
     
-    U_data, U_indices, U_indptr = [], [], [0]
-    for j in range(n):
-        rows = sorted(U_cols[j].keys())
-        for i in rows:
-            U_data.append(U_cols[j][i])
-            U_indices.append(i)
-        U_indptr.append(len(U_data))
+    # Конвертация в CSC
+    L_csc = CSCMatrix.from_dense(L)
+    U_csc = CSCMatrix.from_dense(U)
     
-    return CSCMatrix(L_data, L_indices, L_indptr, (n, n)), CSCMatrix(U_data, U_indices, U_indptr, (n, n)), P
+    return L_csc, U_csc, P
 
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
@@ -129,37 +91,29 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     L, U, P = lu_result
     n = A.shape[0]
     
+    # Применяем перестановку
     b_perm = [b[P[i]] for i in range(n)]
     
-    L_csr = L._to_csr()
-    
+    # Решение Ly = b_perm
     y = [0.0] * n
     for i in range(n):
         s = 0.0
-        row_dict = L_csr.get_row_as_dict(i)
-        for j, val in row_dict.items():
-            if j < i:
-                s += val * y[j]
+        for j in range(i):
+            s += L.get(i, j) * y[j]
         y[i] = b_perm[i] - s
     
-    U_csr = U._to_csr()
-    
+    # Решение Ux = y
     x = [0.0] * n
     for i in range(n - 1, -1, -1):
         s = 0.0
-        row_dict = U_csr.get_row_as_dict(i)
-        diag_val = 0.0
+        for j in range(i + 1, n):
+            s += U.get(i, j) * x[j]
         
-        for j, val in row_dict.items():
-            if j > i:
-                s += val * x[j]
-            elif j == i:
-                diag_val = val
-        
-        if abs(diag_val) < EPSILON:
+        diag = U.get(i, i)
+        if abs(diag) < EPSILON:
             return None
         
-        x[i] = (y[i] - s) / diag_val
+        x[i] = (y[i] - s) / diag
     
     return x
 
@@ -173,22 +127,19 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     _, U, P = lu_result
     n = A.shape[0]
     
-    visited = [False] * n
+    # Знак перестановки
     swaps = 0
-    
     for i in range(n):
-        if not visited[i]:
-            cycle_len = 0
-            j = i
-            while not visited[j]:
-                visited[j] = True
-                j = P[j]
-                cycle_len += 1
-            if cycle_len > 1:
-                swaps += cycle_len - 1
+        if P[i] != i:
+            for j in range(i + 1, n):
+                if P[j] == i:
+                    P[i], P[j] = P[j], P[i]
+                    swaps += 1
+                    break
     
     sign = 1 if swaps % 2 == 0 else -1
     
+    # Определитель
     det = sign
     for i in range(n):
         diag = U.get(i, i)
