@@ -52,8 +52,8 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         l_indptr.append(len(l_data))
 
     return (
-        CSCMatrix(l_data, l_indices, l_indptr, (A.shape[0], A.shape[0])),
-        CSCMatrix(u_data, u_indices, u_indptr, (A.shape[0], A.shape[0]))
+        CSCMatrix(l_data, l_indices, l_indptr, A.shape),
+        CSCMatrix(u_data, u_indices, u_indptr, A.shape)
     )
 
 
