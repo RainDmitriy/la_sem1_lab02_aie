@@ -57,8 +57,6 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     y = [0.0] * n
     for i in range(n):
         s = sum(L[i][j] * y[j] for j in range(i))
-        if L[i][i] == 0.0:
-            return None
         y[i] = (b[i] - s) / L[i][i]
 
     x = [0.0] * n
