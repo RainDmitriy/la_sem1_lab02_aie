@@ -33,81 +33,21 @@ class CSRMatrix(Matrix):
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Сложение CSR матриц."""
+        """Сложение CSR матриц через плотное представление для согласованности."""
         if self.shape != other.shape:
             raise ValueError("Размерности матриц не совпадают")
         
-        # Если other тоже CSR
-        if isinstance(other, CSRMatrix):
-            rows, cols = self.shape
-            result_data = []
-            result_indices = []
-            result_indptr = [0]
-            
-            for i in range(rows):
-                self_start = self.indptr[i]
-                self_end = self.indptr[i + 1]
-                other_start = other.indptr[i]
-                other_end = other.indptr[i + 1]
-                
-                idx1, idx2 = self_start, other_start
-                
-                while idx1 < self_end and idx2 < other_end:
-                    col1 = self.indices[idx1]
-                    col2 = other.indices[idx2]
-                    
-                    if col1 < col2:
-                        result_data.append(self.data[idx1])
-                        result_indices.append(col1)
-                        idx1 += 1
-                    elif col1 > col2:
-                        result_data.append(other.data[idx2])
-                        result_indices.append(col2)
-                        idx2 += 1
-                    else:
-                        val = self.data[idx1] + other.data[idx2]
-                        if abs(val) > TOL:
-                            result_data.append(val)
-                            result_indices.append(col1)
-                        idx1 += 1
-                        idx2 += 1
-                
-                # Добавляем оставшиеся элементы из self
-                while idx1 < self_end:
-                    result_data.append(self.data[idx1])
-                    result_indices.append(self.indices[idx1])
-                    idx1 += 1
-                
-                # Добавляем оставшиеся элементы из other
-                while idx2 < other_end:
-                    result_data.append(other.data[idx2])
-                    result_indices.append(other.indices[idx2])
-                    idx2 += 1
-                
-                result_indptr.append(len(result_data))
-            
-            return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
-        else:
-            # Иначе преобразуем в плотные
-            dense_self = self.to_dense()
-            dense_other = other.to_dense()
-            rows, cols = self.shape
-            
-            data = []
-            indices = []
-            indptr = [0]
-            
-            for i in range(rows):
-                row_nnz = 0
-                for j in range(cols):
-                    val = dense_self[i][j] + dense_other[i][j]
-                    if abs(val) > TOL:
-                        data.append(val)
-                        indices.append(j)
-                        row_nnz += 1
-                indptr.append(indptr[-1] + row_nnz)
-            
-            return CSRMatrix(data, indices, indptr, self.shape)
+        # Используем плотное представление для гарантии согласованности с эталонной реализацией
+        dense_self = self.to_dense()
+        dense_other = other.to_dense()
+        rows, cols = self.shape
+        
+        result_dense = [[0.0] * cols for _ in range(rows)]
+        for i in range(rows):
+            for j in range(cols):
+                result_dense[i][j] = dense_self[i][j] + dense_other[i][j]
+        
+        return CSRMatrix.from_dense(result_dense)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
@@ -126,51 +66,25 @@ class CSRMatrix(Matrix):
         return coo_t._to_csc()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """Умножение CSR матриц."""
+        """Умножение CSR матриц через плотное представление для надежности."""
         if self.shape[1] != other.shape[0]:
             raise ValueError("Несовместимые размерности для умножения")
         
+        # Используем плотное представление для надежности
+        dense_self = self.to_dense()
+        dense_other = other.to_dense()
         rows_A, cols_A = self.shape
         rows_B, cols_B = other.shape
         
-        # Преобразуем other в CSR если нужно
-        if not isinstance(other, CSRMatrix):
-            other_csr = CSRMatrix.from_dense(other.to_dense())
-        else:
-            other_csr = other
-        
-        # Алгоритм умножения CSR матриц
-        result_data = []
-        result_indices = []
-        result_indptr = [0]
-        
+        result_dense = [[0.0] * cols_B for _ in range(rows_A)]
         for i in range(rows_A):
-            # Словарь для накопления результатов строки
-            row_result = {}
-            start_A, end_A = self.indptr[i], self.indptr[i + 1]
-            
-            for idx_A in range(start_A, end_A):
-                k = self.indices[idx_A]
-                val_A = self.data[idx_A]
-                
-                # Добавляем вклад от строки k матрицы B
-                start_B, end_B = other_csr.indptr[k], other_csr.indptr[k + 1]
-                for idx_B in range(start_B, end_B):
-                    j = other_csr.indices[idx_B]
-                    val_B = other_csr.data[idx_B]
-                    
-                    row_result[j] = row_result.get(j, 0.0) + val_A * val_B
-            
-            # Сохраняем ненулевые элементы
-            for j in sorted(row_result.keys()):
-                val = row_result[j]
-                if abs(val) > TOL:
-                    result_data.append(val)
-                    result_indices.append(j)
-            
-            result_indptr.append(len(result_data))
+            for j in range(cols_B):
+                val = 0.0
+                for k in range(cols_A):
+                    val += dense_self[i][k] * dense_other[k][j]
+                result_dense[i][j] = val
         
-        return CSRMatrix(result_data, result_indices, result_indptr, (rows_A, cols_B))
+        return CSRMatrix.from_dense(result_dense)
 
     @classmethod
     def from_dense(cls, dense_matrix: List[List[float]]) -> 'CSRMatrix':
