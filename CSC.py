@@ -1,11 +1,12 @@
 from base import Matrix
 from typing import List, Tuple
+from type import DenseMatrix, Shape, CSCData, CSCIndices, CSCIndptr
 
 TOL = 1e-12
 
 
 class CSCMatrix(Matrix):
-    def __init__(self, data: List[float], indices: List[int], indptr: List[int], shape: Tuple[int, int]):
+    def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
         super().__init__(shape)
         self.data = data
         self.indices = indices
@@ -18,7 +19,7 @@ class CSCMatrix(Matrix):
         if indices and max(indices) >= shape[0]:
             raise ValueError(f"Индекс строки {max(indices)} превышает размер {shape[0]}")
 
-    def to_dense(self) -> List[List[float]]:
+    def to_dense(self) -> DenseMatrix:
         """Преобразует CSC в плотную матрицу."""
         rows, cols = self.shape
         dense = [[0.0] * cols for _ in range(rows)]
@@ -33,11 +34,11 @@ class CSCMatrix(Matrix):
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Сложение CSC матриц через плотное представление для согласованности."""
+        """Сложение CSC матриц."""
         if self.shape != other.shape:
             raise ValueError("Размерности матриц не совпадают")
         
-        # Используем плотное представление для гарантии согласованности с эталонной реализацией
+        # Используем сложение через плотное представление
         dense_self = self.to_dense()
         dense_other = other.to_dense()
         rows, cols = self.shape
@@ -51,12 +52,32 @@ class CSCMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
-        if scalar == 0.0:
+        if abs(scalar) < TOL:
             return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
         
-        # Умножаем все значения, НЕ удаляя элементы
+        # Умножаем все значения
         new_data = [val * scalar for val in self.data]
-        return CSCMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
+        
+        # Фильтруем значения, близкие к нулю
+        filtered_data = []
+        filtered_indices = []
+        filtered_indptr = [0]
+        
+        current_idx = 0
+        for j in range(self.shape[1]):
+            start = self.indptr[j]
+            end = self.indptr[j + 1]
+            col_nnz = 0
+            
+            for idx in range(start, end):
+                if abs(new_data[idx]) > TOL:
+                    filtered_data.append(new_data[idx])
+                    filtered_indices.append(self.indices[idx])
+                    col_nnz += 1
+            
+            filtered_indptr.append(filtered_indptr[-1] + col_nnz)
+        
+        return CSCMatrix(filtered_data, filtered_indices, filtered_indptr, self.shape)
 
     def transpose(self) -> 'Matrix':
         """Транспонирование CSC матрицы через COO."""
@@ -66,7 +87,7 @@ class CSCMatrix(Matrix):
         return coo_t._to_csr()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """Умножение CSC матриц через плотное представление для надежности."""
+        """Умножение CSC матриц."""
         if self.shape[1] != other.shape[0]:
             raise ValueError("Несовместимые размерности для умножения")
         
@@ -76,6 +97,7 @@ class CSCMatrix(Matrix):
         rows_A, cols_A = self.shape
         rows_B, cols_B = other.shape
         
+        # Умножение матриц
         result_dense = [[0.0] * cols_B for _ in range(rows_A)]
         for i in range(rows_A):
             for j in range(cols_B):
@@ -87,7 +109,7 @@ class CSCMatrix(Matrix):
         return CSCMatrix.from_dense(result_dense)
 
     @classmethod
-    def from_dense(cls, dense_matrix: List[List[float]]) -> 'CSCMatrix':
+    def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
         """Создание CSC из плотной матрицы."""
         if not dense_matrix:
             return cls([], [], [0], (0, 0))
