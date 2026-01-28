@@ -24,25 +24,25 @@ class COOMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение COO матриц."""
-        sum_dict = {}
-
-        # добавляю элементы self
-        for i in range(len(self.data)):
-            key = (self.row[i], self.col[i])
-            sum_dict[key] = sum_dict.get(key, 0.0) + self.data[i]
         other_coo = other._to_coo()
-        for i in range(len(other_coo.data)):
-            key = (other_coo.row[i], other_coo.col[i])
-            sum_dict[key] = sum_dict.get(key, 0.0) + other_coo.data[i]
-        # сортирую по (row, col) и фильтрую нули
-        sorted_items = sorted(sum_dict.items(), key=lambda x: (x[0][0], x[0][1]))
+        n1, n2 = len(self.data), len(other_coo.data)
+        all_row = self.row + other_coo.row
+        all_col = self.col + other_coo.col
+        all_data = self.data[:] + other_coo.data[:]
+        order = sorted(range(n1 + n2), key=lambda i: (all_row[i], all_col[i]))
         result_row, result_col, result_data = [], [], []
-        for (r, c), val in sorted_items:
-            if abs(val) > 1e-10:
-                result_row.append(r)
-                result_col.append(c)
-                result_data.append(val)
-
+        i = 0
+        while i < n1 + n2:
+            curr_r, curr_c = all_row[order[i]], all_col[order[i]]
+            s = all_data[order[i]]
+            i += 1
+            while i < n1 + n2 and all_row[order[i]] == curr_r and all_col[order[i]] == curr_c:
+                s += all_data[order[i]]
+                i += 1
+            if abs(s) > 1e-10:
+                result_row.append(curr_r)
+                result_col.append(curr_c)
+                result_data.append(s)
         return COOMatrix(result_data, result_row, result_col, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
