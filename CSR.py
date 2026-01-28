@@ -132,18 +132,19 @@ class CSRMatrix(Matrix):
         return CSCMatrix(csc_data, csc_indices, csc_indptr, self.shape)
 
     def _to_coo(self) -> 'COOMatrix':
-        """преобразование CSRMatrix в COOMatrix"""
+        """Конвертирует CSR‑матрицу в формат COO."""
         from COO import COOMatrix
+        sr, sc = self.shape
         data = []
-        rows = []
-        cols = []
-        for i in range(self.shape[0]):
+        row = []
+        col = []
+        for i in range(sr):
             for idx in range(self.indptr[i], self.indptr[i + 1]):
-                data.append(self.data[idx])
-                rows.append(i)
-                cols.append(self.indices[idx])
+                data.append(float(self.data[idx]))
+                row.append(i)
+                col.append(int(self.indices[idx]))
 
-        return COOMatrix(data, rows, cols, self.shape)
+        return COOMatrix(data, row, col, (sr, sc))
 
     def __str__(self) -> str:
         return f"CSRMatrix(shape={self.shape}, nnz={self.nnz})"
