@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
-from type import DenseMatrix, Shape  # изменил импорт
+from type import DenseMatrix, Shape
+
 
 class Matrix(ABC):
     def __init__(self, shape: Shape):
         self.shape = shape
+
     @abstractmethod
     def to_dense(self) -> DenseMatrix:
         """Преобразует разреженную матрицу в плотную."""
@@ -26,7 +28,7 @@ class Matrix(ABC):
 
     @abstractmethod
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        """Реализация умножения на скаляр"""
+        """Реализация умножения на скаляр."""
         pass
 
     def __rmul__(self, scalar: float) -> 'Matrix':
