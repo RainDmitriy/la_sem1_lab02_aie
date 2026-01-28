@@ -143,13 +143,20 @@ class CSCMatrix(Matrix):
         data = []
         row_indices = []
         col_indices = []
+        coo_dict = {}
 
         for j in range(cols):
             start = self.indptr[j]
             end = self.indptr[j + 1]
             for idx in range(start, end):
-                data.append(self.data[idx])
-                row_indices.append(self.indices[idx])
+                i = self.indices[idx]
+                val = self.data[idx]
+                key = (i, j)
+                coo_dict[key] = coo_dict.get(key, 0.0) + val
+        for (i, j), val in coo_dict.items():
+            if abs(val) > TOLERANCE:
+                data.append(val)
+                row_indices.append(i)
                 col_indices.append(j)
 
         return COOMatrix(data, row_indices, col_indices, (rows, cols))

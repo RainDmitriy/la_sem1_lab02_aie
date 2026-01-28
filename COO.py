@@ -69,8 +69,8 @@ class COOMatrix(Matrix):
 
     def transpose(self) -> 'Matrix':
         """Транспонирование COO матрицы."""
-        new_shape = (self.shape[1], self.shape[0])
-        return COOMatrix(list(self.data), list(self.col), list(self.row), new_shape)
+        new_rows, new_cols = self.shape
+        return COOMatrix(list(self.data), list(self.col), list(self.row), (new_cols, new_rows))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение COO матриц."""
