@@ -9,28 +9,77 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     Возвращает (L, U) - нижнюю и верхнюю треугольные матрицы.
     Ожидается, что матрица L хранит единицы на главной диагонали.
     """
-    dense_A = A.to_dense()
-    n = len(dense_A)
-    if n == 0 or len(dense_A[0]) != n:
+    n = A.shape[0]
+    if n == 0 or len(A.to_dense()[0]) != n:
         return None
-    L_dense = [[0.0] * n for _ in range(n)]
-    U_dense = [[0.0] * n for _ in range(n)]
+    rows = []
     for i in range(n):
-        for j in range(i, n):
-            sum_val = 0.0
-            for k in range(i):
-                sum_val += L_dense[i][k] * U_dense[k][j]
-            U_dense[i][j] = dense_A[i][j] - sum_val
-        if abs(U_dense[i][i]) < 1e-12:
+        row_dict = {}
+        for col in range(n):
+            start_idx = A.indptr[col]
+            end_idx = A.indptr[col + 1]
+            for idx in range(start_idx, end_idx):
+                if A.indices[idx] == i:
+                    row_dict[col] = A.data[idx]
+                    break
+        rows.append(row_dict)
+    L_rows = [{} for _ in range(n)]
+    U_rows = [{} for _ in range(n)]
+    for i in range(n):
+        for j, val in rows[i].items():
+            if i <= j:
+                U_rows[i][j] = float(val)
+    for k in range(n):
+        if k not in U_rows[k]:
+            found = False
+            for i in range(k + 1, n):
+                if k in U_rows[i]:
+                    U_rows[k], U_rows[i] = U_rows[i], U_rows[k]
+                    L_rows[k], L_rows[i] = L_rows[i], L_rows[k]
+                    rows[k], rows[i] = rows[i], rows[k]
+                    found = True
+                    break
+            if not found:
+                return None
+        u_kk = U_rows[k].get(k, 0.0)
+        if abs(u_kk) < 1e-12:
             return None
-        L_dense[i][i] = 1.0
-        for j in range(i + 1, n):
-            sum_val = 0.0
-            for k in range(i):
-                sum_val += L_dense[j][k] * U_dense[k][i]
-            L_dense[j][i] = (dense_A[j][i] - sum_val) / U_dense[i][i]
-    L = CSCMatrix.from_dense(L_dense)
-    U = CSCMatrix.from_dense(U_dense)
+        for i in range(k + 1, n):
+            if k in U_rows[i]:
+                L_rows[i][k] = U_rows[i][k] / u_kk
+                if k in U_rows[i]:
+                    del U_rows[i][k]
+            for j in range(k + 1, n):
+                if k in U_rows[k] and j in U_rows[k]:
+                    if j in U_rows[i]:
+                        U_rows[i][j] = U_rows[i].get(j, 0.0) - L_rows[i].get(k, 0.0) * U_rows[k][j]
+                    elif L_rows[i].get(k, 0.0) != 0:
+                        U_rows[i][j] = -L_rows[i].get(k, 0.0) * U_rows[k][j]
+        L_rows[k][k] = 1.0
+    L_data, L_indices, L_indptr = [], [], [0]
+    U_data, U_indices, U_indptr = [], [], [0]
+    for col in range(n):
+        current_count = 0
+        for row in range(n):
+            if col in L_rows[row]:
+                val = L_rows[row][col]
+                if abs(val) > 1e-12 or row == col:
+                    L_data.append(val)
+                    L_indices.append(row)
+                    current_count += 1
+        L_indptr.append(L_indptr[-1] + current_count)
+    for col in range(n):
+        current_count = 0
+        for row in range(n):
+            if col in U_rows[row]:
+                val = U_rows[row][col]
+                if abs(val) > 1e-12:
+                    U_data.append(val)
+                    U_indices.append(row)
+                    current_count += 1
+        U_indptr.append(U_indptr[-1] + current_count)
+    L = CSCMatrix(L_data, L_indices, L_indptr, (n, n))
+    U = CSCMatrix(U_data, U_indices, U_indptr, (n, n))
     return L, U
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
