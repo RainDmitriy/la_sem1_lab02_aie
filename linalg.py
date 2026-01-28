@@ -1,6 +1,6 @@
 from CSC import CSCMatrix
 from CSR import CSRMatrix
-from type import Vector
+from types import Vector
 from typing import Tuple, Optional
 
 
@@ -23,7 +23,8 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         for k in range(i, n):
             s_sum = sum(l_dict.get((i, s), 0) * u_dict.get((s, k), 0) for s in range(i))
             val = a_dict.get((i, k), 0) - s_sum
-            u_dict[(i, k)] = val
+            if val != 0:
+                u_dict[(i, k)] = val
 
         diag_u = u_dict.get((i, i), 0)
         if diag_u == 0:
@@ -33,7 +34,8 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         for k in range(i + 1, n):
             s_sum = sum(l_dict.get((k, s), 0) * u_dict.get((s, i), 0) for s in range(i))
             val = (a_dict.get((k, i), 0) - s_sum) / diag_u
-            l_dict[(k, i)] = val
+            if val != 0:
+                l_dict[(k, i)] = val
 
     def to_csc(data_dict):
         sorted_items = sorted(data_dict.items(), key=lambda x: (x[0][1], x[0][0]))
@@ -118,3 +120,4 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
             return 0.0
 
     return det
+
