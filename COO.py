@@ -1,7 +1,5 @@
 from base import Matrix
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
-from CSR import CSRMatrix
-from CSC import CSCMatrix
 
 class COOMatrix(Matrix):
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
@@ -123,7 +121,8 @@ class COOMatrix(Matrix):
         """
         Преобразование COOMatrix в CSCMatrix.
         """
-        num_cols = self.shape[1]
+        from CSC import CSCMatrix
+        _, num_cols = self.shape
 
         cols_elements = [[] for _ in range(num_cols)]
         for v, r, c in zip(self.data, self.row, self.col):
@@ -143,6 +142,7 @@ class COOMatrix(Matrix):
         """
         Преобразование COOMatrix в CSRMatrix.
         """
+        from CSR import CSRMatrix
         num_rows, _ = self.shape
 
         rows_elements = [[] for _ in range(num_rows)]

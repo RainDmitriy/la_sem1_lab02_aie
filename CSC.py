@@ -1,7 +1,6 @@
 from base import Matrix
 from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
-from COO import COOMatrix
-from CSR import CSRMatrix
+
 
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
@@ -111,6 +110,7 @@ class CSCMatrix(Matrix):
         """
         Преобразование CSCMatrix в CSRMatrix.
         """
+        from CSR import CSRMatrix
         rows, cols = self.shape
         nnz = len(self.data)
 
@@ -140,6 +140,7 @@ class CSCMatrix(Matrix):
         """
         Преобразование CSCMatrix в COOMatrix.
         """
+        from COO import COOMatrix
         rows, cols = self.shape
         data, row, col = [], [], []
 
