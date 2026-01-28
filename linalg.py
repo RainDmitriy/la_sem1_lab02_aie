@@ -17,30 +17,21 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     a = A.to_dense()
     l = [[0.0] * rows for _ in range(rows)]
     u = [[0.0] * rows for _ in range(rows)]
-    perm = list(range(rows))
+    n = rows
 
-    for i in range(rows):
-        p = max(range(i, rows), key=lambda r: abs(a[r][i]))
-        if abs(a[p][i]) < 1e-12:
+    for i in range():
+        for j in range(i, n):
+            u[i][j] = a[i][j] - sum(l[i][k] * u[k][j] for k in range(i))
+
+        if abs(u[i][i]) < 1e-12:
             return None
 
-        a[i], a[p] = a[p], a[i]
-        perm[i], perm[p] = perm[p], perm[i]
-
-        for k in range(i):
-            l[i][k], l[p][k] = l[p][k], l[i][k]
+        for j in range(i + 1, n):
+            l[j][i] = (a[j][i] - sum(l[j][k] * u[k][i] for k in range(i))) / u[i][i]
 
         l[i][i] = 1.0
 
-        for j in range(i, rows):
-            u[i][j] = a[i][j] - sum(l[i][k] * u[k][j] for k in range(i))
-        for j in range(i + 1, rows):
-            l[j][i] = (a[j][i] - sum(l[j][k] * u[k][i] for k in range(i))) / u[i][i]
-
-    res_l = [l[perm.index(i)] for i in range(rows)]
-    res_u = u
-
-    return CSCMatrix.from_dense(res_l), CSCMatrix.from_dense(res_u)
+    return CSCMatrix.from_dense(l), CSCMatrix.from_dense(u)
 
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
@@ -51,9 +42,6 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     Решаем Ly = b
     Решаем Ux = y
     """
-    if A.shape[0] != len(b):
-        raise ValueError("Размерность A должна совпадать с размером b")
-
     lu = lu_decomposition(A)
     if lu is None:
         return None
@@ -65,14 +53,21 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
 
     y = [0.0] * n
     for i in range(n):
-        y[i] = b[i] - sum(dense_l[i][j] * y[j] for j in range(i))
+        s = 0.0
+        for j in range(i):
+            s += dense_l[i][j] * y[j]
+        y[i] = b[i] - s
+
     x = [0.0] * n
     for i in range(n - 1, -1, -1):
         if abs(dense_u[i][i]) < 1e-12:
             return None
-        x[i] = (y[i] - sum(dense_u[i][j] * x[j] for j in range(i + 1, n))) / dense_u[i][i]
+        s = 0.0
+        for j in range(i + 1, n):
+            s += dense_u[i][j] * x[j]
+        x[i] = (y[i] - s) / dense_u[i][i]
 
-    return x
+    return Vector(x)
 
 
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
@@ -89,5 +84,4 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     det = 1.0
     for i in range(len(dense_u)):
         det *= dense_u[i][i]
-
     return det
