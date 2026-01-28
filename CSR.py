@@ -112,48 +112,64 @@ class CSRMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSR матриц"""
+        from CSC import CSCMatrix
+
         assert self.shape[1] == other.shape[0], "Matrix dimensions incompatible for multiplication"
-        assert isinstance(other, CSRMatrix), "Multiplication is only supported between two CSR matrices"
 
-        n_rows, n_cols = self.shape
-        k = other.shape[1]
+        if hasattr(other, "_to_csc"):
+            other_csc = other._to_csc()
+        else:
+            other_csc = CSCMatrix.from_dense(other.to_dense())
 
-        result_data = [[0.0 for _ in range(k)] for _ in range(n_rows)]
+        n_rows, inner_dim = self.shape
+        n_cols = other_csc.shape[1]
+
+        result_dict = {}
 
         for i in range(n_rows):
-            row_start_self = self.indptr[i]
-            row_end_self = self.indptr[i + 1]
+            row_start = self.indptr[i]
+            row_end = self.indptr[i + 1]
 
-            if row_start_self == row_end_self:
-                continue
+            for p1 in range(row_start, row_end):
+                k = self.indices[p1]
+                val_a = self.data[p1]
 
-            for j in range(k):
-                row_start_other = other.indptr[j]
-                row_end_other = other.indptr[j + 1]
+                col_start = other_csc.indptr[k]
+                col_end = other_csc.indptr[k + 1]
 
-                if row_start_other == row_end_other:
-                    continue
+                for p2 in range(col_start, col_end):
+                    j = other_csc.indices[p2]
+                    val_b = other_csc.data[p2]
 
-                dot = 0.0
+                    key = (i, j)
+                    result_dict[key] = result_dict.get(key, 0.0) + val_a * val_b
 
-                p1, p2 = row_start_self, row_start_other
-                while p1 < row_end_self and p2 < row_end_other:
-                    col_self = self.indices[p1]
-                    col_other = other.indices[p2]
+        if not result_dict:
+            return CSRMatrix([], [], [0] * (n_rows + 1), (n_rows, n_cols))
 
-                    if col_self < col_other:
-                        p1 += 1
-                    elif col_self > col_other:
-                        p2 += 1
-                    else:
-                        dot += self.data[p1] * other.data[p2]
-                        p1 += 1
-                        p2 += 1
+        rows_dict = {}
+        for (i, j), val in result_dict.items():
+            if abs(val) >= self.ZERO_TOLERANCE:
+                if i not in rows_dict:
+                    rows_dict[i] = []
+                rows_dict[i].append((j, val))
 
-                if fabs(dot) >= self.ZERO_TOLERANCE:
-                    result_data[i][j] = dot
+        data = []
+        indices = []
+        indptr = [0]
 
-        return CSRMatrix.from_dense(result_data)
+        for row_idx in range(n_rows):
+            if row_idx in rows_dict:
+                elements = rows_dict[row_idx]
+                elements.sort(key=lambda x: x[0])
+
+                for col, val in elements:
+                    data.append(val)
+                    indices.append(col)
+
+            indptr.append(len(data))
+
+        return CSRMatrix(data, indices, indptr, (n_rows, n_cols))
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':

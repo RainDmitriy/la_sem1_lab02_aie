@@ -117,50 +117,69 @@ class CSCMatrix(Matrix):
         """Умножение CSC матриц."""
 
         assert self.shape[1] == other.shape[0], "Matrix dimensions incompatible for multiplication"
-        assert isinstance(other, CSCMatrix), "Multiplication is only supported between two CSC matrices"
 
-        n_rows, n_cols = self.shape
-        k = other.shape[1]
+        if not isinstance(other, CSCMatrix):
+            if hasattr(other, "_to_csc"):
+                other_csc = other._to_csc()
+            else:
+                other_csc = CSCMatrix.from_dense(other.to_dense())
+        else:
+            other_csc = other
+
+        n_rows, inner_dim = self.shape
+        n_cols = other_csc.shape[1]
 
         self_csr = self._to_csr()
 
-        result_data = [[0.0 for _ in range(k)] for _ in range(n_rows)]
+        result_dict = {}
 
         for i in range(n_rows):
             row_start = self_csr.indptr[i]
             row_end = self_csr.indptr[i + 1]
 
-            if row_start == row_end:
-                continue
+            for p1 in range(row_start, row_end):
+                k = self_csr.indices[p1]
+                val_a = self_csr.data[p1]
 
-            for j in range(k):
-                col_start = other.indptr[j]
-                col_end = other.indptr[j + 1]
+                col_start = other_csc.indptr[k]
+                col_end = other_csc.indptr[k + 1]
 
-                if col_start == col_end:
-                    continue
+                for p2 in range(col_start, col_end):
+                    j = other_csc.indices[p2]
+                    val_b = other_csc.data[p2]
 
-                dot = 0.0
+                    key = (i, j)
+                    result_dict[key] = result_dict.get(key, 0.0) + val_a * val_b
 
-                p1, p2 = row_start, col_start
-                while p1 < row_end and p2 < col_end:
-                    col_in_self = self_csr.indices[p1]
-                    row_in_other = other.indices[p2]
+        if not result_dict:
+            return CSCMatrix([], [], [0] * (n_cols + 1), (n_rows, n_cols))
 
-                    if col_in_self < row_in_other:
-                        p1 += 1
-                    elif col_in_self > row_in_other:
-                        p2 += 1
-                    else:
-                        # Нашли совпадающий индекс k
-                        dot += self_csr.data[p1] * other.data[p2]
-                        p1 += 1
-                        p2 += 1
+        cols_dict = {}
+        for (i, j), val in result_dict.items():
+            if abs(val) >= self.ZERO_TOLERANCE:
+                if j not in cols_dict:
+                    cols_dict[j] = []
+                cols_dict[j].append((i, val))
 
-                if fabs(dot) >= self.ZERO_TOLERANCE:
-                    result_data[i][j] = dot
+        data = []
+        indices = []
+        indptr = [0]
 
-        return CSCMatrix.from_dense(result_data)
+        current_pos = 0
+        for col_idx in range(n_cols):
+            if col_idx in cols_dict:
+                elements = cols_dict[col_idx]
+                elements.sort(key=lambda x: x[0])
+
+                for row, val in elements:
+                    data.append(val)
+                    indices.append(row)
+
+                current_pos += len(elements)
+
+            indptr.append(current_pos)
+
+        return CSCMatrix(data, indices, indptr, (n_rows, n_cols))
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
