@@ -1,9 +1,7 @@
-from CSC import CSCMatrix
-from CSR import CSRMatrix
 from type import Vector
 from typing import Tuple, Optional, List, Dict
-
-
+from CSC import CSCMatrix
+from CSR import CSRMatrix
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     """
     LU-разложение для CSC матрицы
@@ -270,3 +268,4 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
         determinant *= diagonal_element
     
     return determinant
+
