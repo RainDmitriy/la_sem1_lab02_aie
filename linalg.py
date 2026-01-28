@@ -15,7 +15,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     if n == 0 or any(len(row) != n for row in dense):
         return None
 
-    a = dense
+    a = [row[:] for row in dense]
 
     L = [[0.0] * n for _ in range(n)]
     U = [[0.0] * n for _ in range(n)]
@@ -24,6 +24,21 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         L[i][i] = 1.0
 
     for k in range(n):
+        max_idx = k
+        max_val = abs(a[k][k])
+        for i in range(k + 1, n):
+            if abs(a[i][k]) > max_val:
+                max_val = abs(a[i][k])
+                max_idx = i
+        
+        if max_val < 1e-10:
+            return None
+        
+        if max_idx != k:
+            a[k], a[max_idx] = a[max_idx], a[k]
+            for j in range(k):
+                L[k][j], L[max_idx][j] = L[max_idx][j], L[k][j]
+        
         U_k = U[k]
         L_k = L[k]
         a_k = a[k]
@@ -63,8 +78,13 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
 
     y = [0.0] * n
     for i in range(n):
-        s = sum(L[i][j] * y[j] for j in range(i))
-        y[i] = (b[i] - s) / L[i][i]
+        s = 0.0
+        L_i = L[i]
+        for j in range(i):
+            s += L_i[j] * y[j]
+        if abs(L_i[i]) < 1e-10:
+            return None
+        y[i] = (b[i] - s) / L_i[i]
 
     x = [0.0] * n
     for i in range(n - 1, -1, -1):
