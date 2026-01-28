@@ -15,7 +15,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     if n == 0 or any(len(row) != n for row in dense):
         return None
 
-    a = [row[:] for row in dense]
+    a = dense
 
     L = [[0.0] * n for _ in range(n)]
     U = [[0.0] * n for _ in range(n)]
