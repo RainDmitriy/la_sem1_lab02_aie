@@ -23,14 +23,41 @@ class CSCMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSC матриц."""
-        from COO import COOMatrix
-        coo_self = self._to_coo()
-        if isinstance(other, COOMatrix):
-            coo_other = other
-        else:
-            coo_other = other._to_coo()
-        result_coo = coo_self._add_impl(coo_other)
-        return result_coo._to_csc()
+        data_self = list(self.data)
+        indices_self = list(self.indices)
+        indptr_self = list(self.indptr)
+        data_other = list(other.data)
+        indices_other = list(other.indices)
+        indptr_other = list(other.indptr)
+        result_data = []
+        result_indices = []
+        result_indptr = [0]
+        rows, cols = self.shape
+        for c in range(cols):
+            self_start = indptr_self[c]
+            other_start = indptr_other[c]
+            self_end = indptr_self[c + 1]
+            other_end = indptr_other[c + 1]
+            while self_start < self_end or other_start < other_end:
+                if self_start == self_end:
+                    r, val = indices_other[other_start], data_other[other_start]
+                    other_start += 1
+                elif other_start == other_end:
+                    r, val = indices_self[self_start], data_self[self_start]
+                    self_start += 1
+                elif indices_self[self_start] < indices_other[other_start]:
+                    r, val = indices_self[self_start], data_self[self_start]
+                    self_start += 1
+                elif indices_other[other_start] < indices_self[self_start]:
+                    r, val = indices_other[other_start], data_other[other_start]
+                    other_start += 1
+                else:
+                    r, val = indices_self[self_start], data_self[self_start] + data_other[other_start]
+                    self_start += 1
+                    other_start += 1
+                result_indices.append(r)
+                result_data.append(val)
+            result_indptr.append(len(result_data))
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""

@@ -20,21 +20,41 @@ class COOMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение COO матриц."""
-        other_coo = other if isinstance(other, COOMatrix) else other._to_coo()
-        if self.shape != other_coo.shape:
-            raise ValueError()
-        sum_dict: dict[tuple[int, int], float] = {}
-        for v, i, j in zip(self.data, self.row, self.col):
-            sum_dict[(i, j)] = sum_dict.get((i, j), 0.0) + v
-        for v, i, j in zip(other_coo.data, other_coo.row, other_coo.col):
-            sum_dict[(i, j)] = sum_dict.get((i, j), 0.0) + v
-        new_data, new_row, new_col = [], [], []
-        for (i, j), v in sorted(sum_dict.items()):
-            if abs(v) > 1e-12:
-                new_data.append(v)
-                new_row.append(i)
-                new_col.append(j)
-        return COOMatrix(new_data, new_row, new_col, self.shape)
+        rows, cols = self.shape
+        result_rows = []
+        result_cols = []
+        result_data = []
+        row_copy = list(self.row)
+        col_copy = list(self.col)
+        data_copy = list(self.data)
+        row_copy_other = list(other.row)
+        col_copy_other = list(other.col)
+        data_copy_other = list(other.data)
+        for r in range(rows):
+            for c in range(cols):
+                self_index = None
+                other_index = None
+                for i in range(len(row_copy)):
+                    if row_copy[i] == r and col_copy[i] == c:
+                        self_index = i
+                        break
+                for i in range(len(row_copy_other)):
+                    if row_copy_other[i] == r and col_copy_other[i] == c:
+                        other_index = i
+                        break
+                if self_index is not None and other_index is not None:
+                    result_rows.append(r)
+                    result_cols.append(c)
+                    result_data.append(data_copy[self_index] + data_copy_other[other_index])
+                elif self_index is not None:
+                    result_rows.append(r)
+                    result_cols.append(c)
+                    result_data.append(data_copy[self_index])
+                elif other_index is not None:
+                    result_rows.append(r)
+                    result_cols.append(c)
+                    result_data.append(data_copy_other[other_index])
+        return COOMatrix(result_data, result_rows, result_cols, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
