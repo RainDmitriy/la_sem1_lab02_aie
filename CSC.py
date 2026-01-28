@@ -47,19 +47,7 @@ class CSCMatrix(Matrix):
         Hint:
         Результат - в CSR формате (с теми же данными, но с интерпретацией строк как столбцов).
         """
-        new_row = []
-        new_col = []
-        new_data = []
-        for j in range(self.shape[1]):
-            col_start = self.indptr[j]
-            col_end = self.indptr[j + 1]
-            for k in range(col_start, col_end):
-                new_row.append(j)
-                new_col.append(self.indices[k])
-                new_data.append(self.data[k])
-        from COO import COOMatrix
-        coo_result = COOMatrix(new_data, new_row, new_col, (self.shape[1], self.shape[0]))
-        return coo_result._to_csr()
+        return CSRMatrix(self.data[:], self.indices[:], self.indptr[:], (self.shape[1], self.shape[0]))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
@@ -92,17 +80,22 @@ class CSCMatrix(Matrix):
         Преобразование CSCMatrix в CSRMatrix.
         """
         from CSR import CSRMatrix
-        coo = self._to_coo()
-        temp_rows = [[] for _ in range(self.shape[0])]
-        for i in range(len(coo.data)):
-            temp_rows[coo.row[i]].append((coo.col[i], coo.data[i]))
-        csr_data, csr_indices, csr_indptr = [], [], [0]
-        for r in range(self.shape[0]):
-            temp_rows[r].sort()
-            for c, val in temp_rows[r]:
-                csr_indices.append(c)
-                csr_data.append(val)
-            csr_indptr.append(len(csr_data))
+        rows, cols = self.shape
+        row_counts = [0] * rows
+        for r in self.indices:
+            row_counts[r] += 1
+        csr_indptr = [0] * (rows + 1)
+        for r in range(rows):
+            csr_indptr[r + 1] = csr_indptr[r] + row_counts[r]
+        csr_data = [0.0] * len(self.data)
+        csr_indices = [0] * len(self.indices)
+        pos = csr_indptr[:]
+        for c in range(cols):
+            for p in range(self.indptr[c], self.indptr[c + 1]):
+                r = self.indices[p]
+                csr_data[pos[r]] = self.data[p]
+                csr_indices[pos[r]] = c
+                pos[r] += 1
         return CSRMatrix(csr_data, csr_indices, csr_indptr, self.shape)
 
     def _to_coo(self) -> 'COOMatrix':

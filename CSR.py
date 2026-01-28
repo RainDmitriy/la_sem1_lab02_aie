@@ -47,19 +47,7 @@ class CSRMatrix(Matrix):
         Hint:
         Результат - в CSC формате (с теми же данными, но с интерпретацией столбцов как строк).
         """
-        new_row = []
-        new_col = []
-        new_data = []
-        for i in range(self.shape[0]):
-            row_start = self.indptr[i]
-            row_end = self.indptr[i + 1]
-            for k in range(row_start, row_end):
-                new_row.append(self.indices[k])
-                new_col.append(i)
-                new_data.append(self.data[k])
-        from COO import COOMatrix
-        coo_result = COOMatrix(new_data, new_row, new_col, (self.shape[1], self.shape[0]))
-        return coo_result._to_csc()
+        return CSCMatrix(self.data[:], self.indices[:], self.indptr[:], (self.shape[1], self.shape[0]))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSR матриц."""
