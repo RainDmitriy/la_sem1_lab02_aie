@@ -132,7 +132,8 @@ class CSCMatrix(Matrix):
                     result_data.append(sum_val)
 
         COOClass = getattr(sys.modules['COO'], 'COOMatrix')
-        return COOClass(result_data, result_rows, result_cols, (rows_a, cols_b))
+        coo_result = COOClass(result_data, result_rows, result_cols, (rows_a, cols_b))
+        return coo_result._to_csc()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':

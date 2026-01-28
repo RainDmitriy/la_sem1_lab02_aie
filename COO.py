@@ -151,7 +151,3 @@ class COOMatrix(Matrix):
             csr_indptr.append(len(csr_data))
 
         return CSRMatrix(csr_data, csr_indices, csr_indptr, self.shape)
-
-    def _to_coo(self) -> 'COOMatrix':
-        """COO возвращает сам себя."""
-        return self
