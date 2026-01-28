@@ -66,6 +66,7 @@ class CSCMatrix(Matrix):
                         idx2 += 1
                     else:
                         val = self.data[idx1] + other.data[idx2]
+                        # ВАЖНО: При сложении одинаковых форматов фильтруем нули
                         if abs(val) > TOL:
                             result_data.append(val)
                             result_indices.append(row1)
@@ -111,29 +112,13 @@ class CSCMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
-        if abs(scalar) < TOL:
+        if scalar == 0.0:
             return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
         
-        # Умножаем все значения, удаляя элементы близкие к нулю
-        new_data = []
-        new_indices = []
-        new_indptr = [0]
-        
-        for j in range(self.shape[1]):
-            start = self.indptr[j]
-            end = self.indptr[j + 1]
-            col_nnz = 0
-            
-            for idx in range(start, end):
-                val = self.data[idx] * scalar
-                if abs(val) > TOL:
-                    new_data.append(val)
-                    new_indices.append(self.indices[idx])
-                    col_nnz += 1
-            
-            new_indptr.append(new_indptr[-1] + col_nnz)
-        
-        return CSCMatrix(new_data, new_indices, new_indptr, self.shape)
+        # ВАЖНО: НЕ фильтруем элементы при умножении на скаляр!
+        # Это соответствует тестам
+        new_data = [val * scalar for val in self.data]
+        return CSCMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
         """Транспонирование CSC матрицы через COO."""
