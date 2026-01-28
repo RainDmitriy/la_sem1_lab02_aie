@@ -72,19 +72,16 @@ class COOMatrix(Matrix):
         from CSC import CSCMatrix
 
         n, m = self.shape
+        entries = sorted(zip(self.col, self.row, self.data))
         data = []
         indices = []
         indptr = [0] * (m + 1)
-        for c in self.col:
-            indptr[c + 1] += 1
+        for col, row, val in entries:
+            data.append(val)
+            indices.append(row)
+            indptr[col + 1] += 1
         for j in range(m):
             indptr[j + 1] += indptr[j]
-        counter = indptr.copy()
-        for r, c, v in zip(self.row, self.col, self.data):
-            pos = counter[c]
-            data.insert(pos, v)
-            indices.insert(pos, r)
-            counter[c] += 1
 
         return CSCMatrix(data, indices, indptr, (n, m))
 
@@ -95,18 +92,15 @@ class COOMatrix(Matrix):
         from CSR import CSRMatrix
 
         n, m = self.shape
+        entries = sorted(zip(self.row, self.col, self.data))
         data = []
         indices = []
         indptr = [0] * (n + 1)
-        for r in self.row:
-            indptr[r + 1] += 1
+        for row, col, val in entries:
+            data.append(val)
+            indices.append(col)
+            indptr[row + 1] += 1
         for i in range(n):
             indptr[i + 1] += indptr[i]
-        counter = indptr.copy()
-        for r, c, v in zip(self.row, self.col, self.data):
-            pos = counter[r]
-            data.insert(pos, v)
-            indices.insert(pos, c)
-            counter[r] += 1
 
         return CSRMatrix(data, indices, indptr, (n, m))
