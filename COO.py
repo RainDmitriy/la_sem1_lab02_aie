@@ -66,16 +66,12 @@ class COOMatrix(Matrix):
 
     def _matmul_impl(self, other: Matrix) -> Matrix:
         """Умножение COO матриц."""
-        # Ensure the inner dimensions match for matrix multiplication
         if self.shape[1] != other.shape[0]:
             raise ValueError()
         m, n = self.shape[0], other.shape[1]
-        # Convert the second matrix to CSR format once for efficient row access
         other_csr = other._to_csr()
         result: Dict[Tuple[int, int], float] = {}
-        # Iterate over each non-zero element of the first matrix
         for val_a, row_a, col_a in zip(self.data, self.row, self.col):
-            # Access the row in the second matrix corresponding to the column index of the current element
             row_start = other_csr.indptr[col_a]
             row_end = other_csr.indptr[col_a + 1]
             for k in range(row_start, row_end):
@@ -83,7 +79,6 @@ class COOMatrix(Matrix):
                 val_b = other_csr.data[k]
                 key = (row_a, col_b)
                 result[key] = result.get(key, 0.0) + val_a * val_b
-        # Build result COO matrix from the accumulated values
         res_data: COOData = []
         res_row: COORows = []
         res_col: COOCols = []
