@@ -73,35 +73,63 @@ class CSRMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSR матриц."""
-        from COO import COOMatrix
+        from CSR import CSRMatrix
         from CSC import CSCMatrix
 
-        a_coo = self._to_coo()
-        if isinstance(other, CSCMatrix):
-            b_coo = other._to_coo()
+        rows_a, cols_a = self.shape
+        rows_b, cols_b = other.shape
+
+        if isinstance(other, CSRMatrix):
+            other_csc = other._to_csc()
+            result_csc = self._to_csc()._matmul_impl(other_csc)
+            return result_csc._to_csr()
+
+        elif isinstance(other, CSCMatrix):
+            result_data = []
+            result_indices = []
+            result_indptr = [0]
+
+            for i in range(rows_a):
+                row_vals = {}
+                row_start = self.indptr[i]
+                row_end = self.indptr[i + 1]
+
+                for idx_a in range(row_start, row_end):
+                    col_a = self.indices[idx_a]
+                    val_a = self.data[idx_a]
+
+                    start_b = other.indptr[col_a]
+                    end_b = other.indptr[col_a + 1]
+                    for idx_b in range(start_b, end_b):
+                        row_b = other.indices[idx_b]
+                        val_b = other.data[idx_b]
+                        row_vals[row_b] = row_vals.get(row_b, 0) + val_a * val_b
+
+                sorted_cols = sorted(row_vals.keys())
+                for c in sorted_cols:
+                    v = row_vals[c]
+                    if v != 0:
+                        result_data.append(v)
+                        result_indices.append(c)
+                result_indptr.append(len(result_data))
+
+            return CSRMatrix(result_data, result_indices, result_indptr, (rows_a, cols_b))
+
+        #другая COO
+        elif 'COOMatrix' in str(type(other)):
+            return self._matmul_impl(other._to_csr())
+
         else:
-            b_coo = other._to_coo()
-
-        result_dict = {}
-        for v1, r1, c1 in zip(a_coo.data, a_coo.row, a_coo.col):
-            for v2, r2, c2 in zip(b_coo.data, b_coo.row, b_coo.col):
-                if c1 == r2:
-                    result_dict[(r1, c2)] = result_dict.get((r1, c2), 0) + v1 * v2
-
-        #собираем COO
-        data, row, col = [], [], []
-        for r, c in sorted(result_dict.keys(), key=lambda x: (x[0], x[1])):  # сорт
-            v = result_dict[(r, c)]
-            if v != 0:
-                data.append(v)
-                row.append(r)
-                col.append(c)
-
-        shape = (self.shape[0], other.shape[1])
-        coo_result = COOMatrix(data, row, col, shape)
-
-        # в томже формате ретерн
-        return coo_result._to_csr()
+            dense_self = self.to_dense()
+            dense_other = other.to_dense()
+            result = [[0.0] * cols_b for _ in range(rows_a)]
+            for i in range(rows_a):
+                for j in range(cols_a):
+                    if dense_self[i][j] != 0:
+                        for k in range(cols_b):
+                            if dense_other[j][k] != 0:
+                                result[i][k] += dense_self[i][j] * dense_other[j][k]
+            return self.__class__.from_dense(result)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
