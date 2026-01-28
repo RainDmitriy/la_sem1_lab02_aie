@@ -50,9 +50,13 @@ class COOMatrix(Matrix):
         # Добавляем элементы из второй матрицы
         for i in range(other_coo.nnz):
             key = (other_coo.row[i], other_coo.col[i])
-            result_dict[key] = result_dict.get(key, 0.0) + other_coo.data[i]
+            new_val = result_dict.get(key, 0.0) + other_coo.data[i]
+            if abs(new_val) > TOL:
+                result_dict[key] = new_val
+            elif key in result_dict:
+                del result_dict[key]
         
-        # Собираем результат, НЕ удаляя нулевые элементы
+        # Собираем результат
         result_data = []
         result_row = []
         result_col = []
