@@ -9,8 +9,7 @@ import math
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix, List[int]]]:
     """
     LU-разложение для CSC матрицы с частичным выбором ведущего элемента.
-    Работает полностью с разреженными структурами, без конвертации в dense.
-    Возвращает (L, U, P) где P - вектор перестановок.
+    Работает полностью с разреженными структурами.
     """
     n = A.shape[0]
     
@@ -20,29 +19,27 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix, List[
     # Конвертируем в CSR для удобства доступа по строкам
     A_csr = A._to_csr()
     
-    # Инициализируем структуры данных
-    # Храним L и U в формате словарей строк: row_dict[i][j] = значение
-    L_rows = [{} for _ in range(n)]  # L - нижняя треугольная (i >= j)
-    U_rows = [{} for _ in range(n)]  # U - верхняя треугольная (i <= j)
+    # Инициализируем L и U как списки словарей
+    L_rows = [{} for _ in range(n)]  # L[i][j] для i >= j
+    U_rows = [{} for _ in range(n)]  # U[i][j] для i <= j
     
-    # Вектор перестановок (изначально тождественная перестановка)
-    P = list(range(n))
-    
-    # Копируем исходную матрицу в U (будем модифицировать в процессе)
+    # Копируем A в U
     for i in range(n):
         row_dict = A_csr.get_row_as_dict(i)
-        # Фильтруем только элементы с j >= 0 (все)
         for j, val in row_dict.items():
             if abs(val) > 1e-14:
                 U_rows[i][j] = val
     
-    # Основной цикл LU-разложения с частичным выбором
+    # Вектор перестановок
+    P = list(range(n))
+    
+    # Основной цикл LU-разложения
     for k in range(n):
-        # ЧАСТИЧНЫЙ ВЫБОР (partial pivoting)
-        # Ищем максимальный элемент в столбце k, начиная с строки k
+        # Частичный выбор ведущего элемента в столбце k
         max_val = 0.0
         max_row = k
         
+        # Ищем максимальный элемент в столбце k (от строки k до n-1)
         for i in range(k, n):
             if k in U_rows[i]:
                 val = abs(U_rows[i][k])
@@ -50,9 +47,8 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix, List[
                     max_val = val
                     max_row = i
         
-        # Проверка на вырожденность
         if max_val < 1e-12:
-            # Пробуем найти ненулевой элемент в других столбцах
+            # Если не нашли ненулевой элемент, ищем в других столбцах
             for j in range(k + 1, n):
                 for i in range(k, n):
                     if j in U_rows[i]:
@@ -60,74 +56,59 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix, List[
                         if val > max_val:
                             max_val = val
                             max_row = i
-                            # Меняем столбцы местами (это сложнее)
             
             if max_val < 1e-12:
                 return None  # Матрица вырожденная
         
         # Перестановка строк, если необходимо
         if max_row != k:
-            # Меняем местами строки k и max_row
-            P[k], P[max_row] = P[max_row], P[k]
+            # Меняем строки в U
             U_rows[k], U_rows[max_row] = U_rows[max_row], U_rows[k]
-            L_rows[k], L_rows[max_row] = L_rows[max_row], L_rows[k]
             
-            # Также нужно обновить уже вычисленные L элементы для строк < k
-            for i in range(k):
-                if k in L_rows[i] and max_row in L_rows[i]:
-                    L_rows[i][k], L_rows[i][max_row] = L_rows[i][max_row], L_rows[i][k]
+            # Меняем строки в L (только уже вычисленные элементы)
+            for j in range(k):
+                if k in L_rows[max_row] and j in L_rows[k]:
+                    L_rows[k][j], L_rows[max_row][j] = L_rows[max_row][j], L_rows[k][j]
+                elif k in L_rows[max_row]:
+                    L_rows[k][j] = L_rows[max_row][j]
+                    del L_rows[max_row][j]
+                elif j in L_rows[k]:
+                    L_rows[max_row][j] = L_rows[k][j]
+                    del L_rows[k][j]
+            
+            # Обновляем перестановку
+            P[k], P[max_row] = P[max_row], P[k]
         
-        # Диагональный элемент U[k][k]
+        # Диагональный элемент U
         u_kk = U_rows[k].get(k, 0.0)
         if abs(u_kk) < 1e-14:
-            # Если после перестановки диагональ все еще 0
             return None
         
-        # Записываем диагональный элемент L
+        # Устанавливаем диагональный элемент L = 1
         L_rows[k][k] = 1.0
         
-        # Обрабатываем строки ниже k
-        rows_to_update = []
+        # Обновляем строки ниже k
         for i in range(k + 1, n):
             if k in U_rows[i]:
-                rows_to_update.append(i)
-        
-        # Оптимизация: вычисляем все множители заранее
-        multipliers = {}
-        for i in rows_to_update:
-            multipliers[i] = U_rows[i][k] / u_kk
-            L_rows[i][k] = multipliers[i]
-        
-        # Обновляем строки U с учетом fill-in
-        # ВАЖНО: учитываем, что при вычитании могут появиться новые ненулевые элементы
-        for i in rows_to_update:
-            multiplier = multipliers[i]
-            
-            # Создаем копию строки k U для безопасной итерации
-            uk_items = list(U_rows[k].items())
-            
-            for j, u_kj in uk_items:
-                if j >= k:  # Только элементы справа от диагонали
-                    # Вычисляем новое значение
-                    current = U_rows[i].get(j, 0.0)
-                    new_val = current - multiplier * u_kj
-                    
-                    # Обновляем или удаляем элемент
-                    if abs(new_val) > 1e-12:
-                        U_rows[i][j] = new_val
-                    elif j in U_rows[i]:
-                        del U_rows[i][j]
-            
-            # Удаляем элемент (i, k) из U (он перешел в L)
-            if k in U_rows[i]:
-                del U_rows[i][k]
-        
-        # Очищаем столбец k в U (кроме диагонального)
-        for i in range(k + 1, n):
-            if k in U_rows[i] and i != k:
-                del U_rows[i][k]
+                # Вычисляем множитель
+                l_ik = U_rows[i][k] / u_kk
+                L_rows[i][k] = l_ik
+                
+                # Обновляем строку i матрицы U
+                # U[i][j] = U[i][j] - l_ik * U[k][j] для j >= k
+                for j, u_kj in list(U_rows[k].items()):
+                    if j >= k:
+                        new_val = U_rows[i].get(j, 0.0) - l_ik * u_kj
+                        if abs(new_val) > 1e-12:
+                            U_rows[i][j] = new_val
+                        elif j in U_rows[i]:
+                            del U_rows[i][j]
+                
+                # Удаляем элемент (i, k) из U (он теперь в L)
+                if k in U_rows[i]:
+                    del U_rows[i][k]
     
-    # Очищаем очень маленькие значения для экономии памяти
+    # Очищаем очень маленькие значения
     for i in range(n):
         # Очищаем L
         to_remove = []
@@ -146,23 +127,21 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix, List[
             del U_rows[i][j]
     
     # Конвертируем L и U в CSC формат
-    L_csc = _sparse_rows_to_csc(L_rows, n, is_lower=True)
-    U_csc = _sparse_rows_to_csc(U_rows, n, is_lower=False)
+    L_csc = _sparse_dict_to_csc(L_rows, n, is_lower=True)
+    U_csc = _sparse_dict_to_csc(U_rows, n, is_lower=False)
     
     return L_csc, U_csc, P
 
 
-def _sparse_rows_to_csc(rows: List[Dict[int, float]], n: int, is_lower: bool) -> CSCMatrix:
-    """
-    Конвертирует список словарей строк в CSCMatrix.
-    is_lower=True для нижней треугольной матрицы, False для верхней.
-    """
-    # Сначала собираем все ненулевые элементы
+def _sparse_dict_to_csc(rows: List[Dict[int, float]], n: int, is_lower: bool) -> CSCMatrix:
+    """Конвертирует список словарей строк в CSCMatrix."""
+    # Собираем все элементы
     elements = []
     
     for i in range(n):
         for j, val in rows[i].items():
             if abs(val) > 1e-14:
+                # Проверяем треугольность
                 if (is_lower and i >= j) or (not is_lower and i <= j):
                     elements.append((i, j, val))
     
@@ -182,7 +161,7 @@ def _sparse_rows_to_csc(rows: List[Dict[int, float]], n: int, is_lower: bool) ->
         data.append(val)
         indices.append(i)
         
-        # Обновляем indptr
+        # Заполняем indptr пропущенных столбцов
         while current_col < j:
             current_col += 1
             indptr[current_col + 1] = indptr[current_col]
@@ -198,8 +177,7 @@ def _sparse_rows_to_csc(rows: List[Dict[int, float]], n: int, is_lower: bool) ->
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     """
-    Решение СЛАУ Ax = b через LU-разложение с перестановками.
-    Полностью работает с разреженными структурами.
+    Решение СЛАУ Ax = b через LU-разложение.
     """
     lu_result = lu_decomposition(A)
     if lu_result is None:
@@ -208,47 +186,40 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     L, U, P = lu_result
     n = len(b)
     
-    # Применяем перестановку к вектору b: b_perm = P * b
+    # Применяем перестановку к b
     b_perm = [b[P[i]] for i in range(n)]
     
-    # Конвертируем L в CSR для удобного доступа по строкам
+    # Конвертируем L в CSR для удобного доступа
     L_csr = L._to_csr()
     
     # Решение Ly = b_perm (прямая подстановка)
     y = [0.0] * n
-    
     for i in range(n):
-        # Получаем ненулевые элементы строки i матрицы L
+        sum_val = 0.0
         row_dict = L_csr.get_row_as_dict(i)
         
-        # Суммируем вклад уже вычисленных y[j]
-        sum_val = 0.0
-        for j, l_ij in row_dict.items():
-            if j < i:  # Только элементы левее диагонали
-                sum_val += l_ij * y[j]
+        for j, val in row_dict.items():
+            if j < i:  # Нижняя треугольная часть
+                sum_val += val * y[j]
         
         # Диагональный элемент L всегда 1.0
         y[i] = b_perm[i] - sum_val
     
-    # Конвертируем U в CSR для удобного доступа по строкам
+    # Конвертируем U в CSR для удобного доступа
     U_csr = U._to_csr()
     
     # Решение Ux = y (обратная подстановка)
     x = [0.0] * n
-    
     for i in range(n - 1, -1, -1):
-        # Получаем ненулевые элементы строки i матрицы U
+        sum_val = 0.0
         row_dict = U_csr.get_row_as_dict(i)
         
-        # Суммируем вклад уже вычисленных x[j]
-        sum_val = 0.0
         diag_val = 0.0
-        
-        for j, u_ij in row_dict.items():
-            if j > i:  # Элементы правее диагонали
-                sum_val += u_ij * x[j]
+        for j, val in row_dict.items():
+            if j > i:  # Верхняя треугольная часть
+                sum_val += val * x[j]
             elif j == i:  # Диагональный элемент
-                diag_val = u_ij
+                diag_val = val
         
         if abs(diag_val) < 1e-14:
             return None
@@ -261,7 +232,6 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     """
     Нахождение определителя через LU-разложение.
-    det(A) = (-1)^s * product(U[i][i]), где s - количество перестановок.
     """
     lu_result = lu_decomposition(A)
     if lu_result is None:
@@ -271,32 +241,29 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     n = A.shape[0]
     
     # Вычисляем знак перестановки
-    # Количество транспозиций = четность перестановки
+    # Подсчитываем количество транспозиций
     visited = [False] * n
-    transpositions = 0
+    swaps = 0
     
     for i in range(n):
         if not visited[i]:
-            j = i
             cycle_len = 0
+            j = i
             while not visited[j]:
                 visited[j] = True
                 j = P[j]
                 cycle_len += 1
             if cycle_len > 1:
-                transpositions += cycle_len - 1
+                swaps += cycle_len - 1
     
-    sign = 1 if transpositions % 2 == 0 else -1
+    sign = 1 if swaps % 2 == 0 else -1
     
     # Произведение диагональных элементов U
     det = sign
-    U_csr = U._to_csr()
-    
     for i in range(n):
-        diag_val = U_csr.get(i, i)
-        if abs(diag_val) < 1e-14:
+        diag = U.get(i, i)
+        if abs(diag) < 1e-14:
             return 0.0
-        det *= diag_val
+        det *= diag
     
     return det
-
