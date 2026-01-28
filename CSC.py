@@ -132,3 +132,4 @@ class CSCMatrix(Matrix):
                 col.append(c)
                 row.append(self.indices[j])
         return COOMatrix(data, row, col, self.shape)
+
