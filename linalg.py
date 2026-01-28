@@ -53,43 +53,81 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
         return []
 
     rows: list[dict[int, float]] = [dict() for _ in range(n)]
-    _, n_colsA = A.shape
-    for j in range(n_colsA):
+    col_rows: list[set[int]] = [set() for _ in range(n)]
+
+    for j in range(n):
         start, end = A.indptr[j], A.indptr[j + 1]
         for p in range(start, end):
             i = A.indices[p]
             v = float(A.data[p])
-            if v != 0.0:
-                rows[i][j] = rows[i].get(j, 0.0) + v
+            if abs(v) < _EPS:
+                continue
+            rows[i][j] = rows[i].get(j, 0.0) + v
+            col_rows[j].add(i)
 
     rhs = [float(bi) for bi in b]
 
     for i in range(n):
-        pivot = rows[i].get(i, 0.0)
+        candidates = [r for r in col_rows[i] if r >= i]
+        if not candidates:
+            return None
+
+        pivot_row = max(candidates, key=lambda r: abs(rows[r].get(i, 0.0)))
+        pivot = rows[pivot_row].get(i, 0.0)
         if abs(pivot) < _EPS:
             return None
 
-        for r in range(i + 1, n):
-            a_ri = rows[r].get(i, 0.0)
+        if pivot_row != i:
+            ri = rows[i]
+            rp = rows[pivot_row]
+            cols_i = set(ri.keys())
+            cols_p = set(rp.keys())
+
+            only_i = cols_i - cols_p
+            only_p = cols_p - cols_i
+
+            for c in only_i:
+                col_rows[c].discard(i)
+                col_rows[c].add(pivot_row)
+            for c in only_p:
+                col_rows[c].discard(pivot_row)
+                col_rows[c].add(i)
+
+            rows[i], rows[pivot_row] = rows[pivot_row], rows[i]
+            rhs[i], rhs[pivot_row] = rhs[pivot_row], rhs[i]
+
+            pivot = rows[i].get(i, 0.0)
+            if abs(pivot) < _EPS:
+                return None
+
+        row_i = rows[i]
+        rhs_i = rhs[i]
+
+        u_items = [(j, v) for j, v in row_i.items() if j > i]
+
+        affected = [r for r in col_rows[i] if r > i]
+        for r in affected:
+            row_r = rows[r]
+            a_ri = row_r.get(i, 0.0)
             if abs(a_ri) < _EPS:
+                col_rows[i].discard(r)
                 continue
 
             factor = a_ri / pivot
-            rows[r][i] = factor
+            row_r[i] = factor
 
-            row_i = rows[i]
-            row_r = rows[r]
-
-            for j, u_ij in row_i.items():
-                if j <= i:
-                    continue
+            for j, u_ij in u_items:
                 newv = row_r.get(j, 0.0) - factor * u_ij
                 if abs(newv) < _EPS:
-                    row_r.pop(j, None)
+                    if j in row_r:
+                        del row_r[j]
+                        col_rows[j].discard(r)
                 else:
+                    if j not in row_r:
+                        col_rows[j].add(r)
                     row_r[j] = newv
 
-            rhs[r] -= factor * rhs[i]
+            rhs[r] -= factor * rhs_i
 
     x = [0.0] * n
     for i in range(n - 1, -1, -1):
@@ -107,6 +145,7 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     return x
 
 
+
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     n_rows, n_cols = A.shape
     if n_rows != n_cols:
@@ -116,40 +155,79 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
         return 1.0
 
     rows: list[dict[int, float]] = [dict() for _ in range(n)]
-    _, n_colsA = A.shape
-    for j in range(n_colsA):
+    col_rows: list[set[int]] = [set() for _ in range(n)]
+
+    for j in range(n):
         start, end = A.indptr[j], A.indptr[j + 1]
         for p in range(start, end):
             i = A.indices[p]
             v = float(A.data[p])
-            if v != 0.0:
-                rows[i][j] = rows[i].get(j, 0.0) + v
+            if abs(v) < _EPS:
+                continue
+            rows[i][j] = rows[i].get(j, 0.0) + v
+            col_rows[j].add(i)
+
+    sign = 1.0
 
     for i in range(n):
-        pivot = rows[i].get(i, 0.0)
+        candidates = [r for r in col_rows[i] if r >= i]
+        if not candidates:
+            return None
+
+        pivot_row = max(candidates, key=lambda r: abs(rows[r].get(i, 0.0)))
+        pivot = rows[pivot_row].get(i, 0.0)
         if abs(pivot) < _EPS:
             return None
 
-        for r in range(i + 1, n):
-            a_ri = rows[r].get(i, 0.0)
+        if pivot_row != i:
+            ri = rows[i]
+            rp = rows[pivot_row]
+            cols_i = set(ri.keys())
+            cols_p = set(rp.keys())
+
+            only_i = cols_i - cols_p
+            only_p = cols_p - cols_i
+
+            for c in only_i:
+                col_rows[c].discard(i)
+                col_rows[c].add(pivot_row)
+            for c in only_p:
+                col_rows[c].discard(pivot_row)
+                col_rows[c].add(i)
+
+            rows[i], rows[pivot_row] = rows[pivot_row], rows[i]
+            sign = -sign
+
+            pivot = rows[i].get(i, 0.0)
+            if abs(pivot) < _EPS:
+                return None
+
+        row_i = rows[i]
+        u_items = [(j, v) for j, v in row_i.items() if j > i]
+
+        affected = [r for r in col_rows[i] if r > i]
+        for r in affected:
+            row_r = rows[r]
+            a_ri = row_r.get(i, 0.0)
             if abs(a_ri) < _EPS:
+                col_rows[i].discard(r)
                 continue
 
             factor = a_ri / pivot
-            rows[r][i] = factor  
+            row_r[i] = factor
 
-            row_i = rows[i]
-            row_r = rows[r]
-            for j, u_ij in row_i.items():
-                if j <= i:
-                    continue
+            for j, u_ij in u_items:
                 newv = row_r.get(j, 0.0) - factor * u_ij
                 if abs(newv) < _EPS:
-                    row_r.pop(j, None)
+                    if j in row_r:
+                        del row_r[j]
+                        col_rows[j].discard(r)
                 else:
+                    if j not in row_r:
+                        col_rows[j].add(r)
                     row_r[j] = newv
 
-    det = 1.0
+    det = sign
     for i in range(n):
         det *= rows[i].get(i, 0.0)
     return det
