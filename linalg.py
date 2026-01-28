@@ -68,13 +68,15 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     rhs = [float(bi) for bi in b]
 
     for i in range(n):
-        candidates = [r for r in col_rows[i] if r >= i]
-        if not candidates:
-            return None
-
-        pivot_row = max(candidates, key=lambda r: abs(rows[r].get(i, 0.0)))
-        pivot = rows[pivot_row].get(i, 0.0)
-        if abs(pivot) < _EPS:
+        pivot_row = -1
+        best = 0.0
+        for r in col_rows[i]:
+            if r >= i:
+                v = abs(rows[r].get(i, 0.0))
+                if v > best:
+                    best = v
+                    pivot_row = r
+        if pivot_row == -1 or best < _EPS:
             return None
 
         if pivot_row != i:
@@ -96,13 +98,12 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
             rows[i], rows[pivot_row] = rows[pivot_row], rows[i]
             rhs[i], rhs[pivot_row] = rhs[pivot_row], rhs[i]
 
-            pivot = rows[i].get(i, 0.0)
-            if abs(pivot) < _EPS:
-                return None
-
         row_i = rows[i]
-        rhs_i = rhs[i]
+        pivot = row_i.get(i, 0.0)
+        if abs(pivot) < _EPS:
+            return None
 
+        rhs_i = rhs[i]
         u_items = [(j, v) for j, v in row_i.items() if j > i]
 
         affected = [r for r in col_rows[i] if r > i]
@@ -111,10 +112,13 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
             a_ri = row_r.get(i, 0.0)
             if abs(a_ri) < _EPS:
                 col_rows[i].discard(r)
+                row_r.pop(i, None)
                 continue
 
             factor = a_ri / pivot
-            row_r[i] = factor
+
+            row_r.pop(i, None)
+            col_rows[i].discard(r)
 
             for j, u_ij in u_items:
                 newv = row_r.get(j, 0.0) - factor * u_ij
@@ -170,13 +174,15 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     sign = 1.0
 
     for i in range(n):
-        candidates = [r for r in col_rows[i] if r >= i]
-        if not candidates:
-            return None
-
-        pivot_row = max(candidates, key=lambda r: abs(rows[r].get(i, 0.0)))
-        pivot = rows[pivot_row].get(i, 0.0)
-        if abs(pivot) < _EPS:
+        pivot_row = -1
+        best = 0.0
+        for r in col_rows[i]:
+            if r >= i:
+                v = abs(rows[r].get(i, 0.0))
+                if v > best:
+                    best = v
+                    pivot_row = r
+        if pivot_row == -1 or best < _EPS:
             return None
 
         if pivot_row != i:
@@ -198,11 +204,11 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
             rows[i], rows[pivot_row] = rows[pivot_row], rows[i]
             sign = -sign
 
-            pivot = rows[i].get(i, 0.0)
-            if abs(pivot) < _EPS:
-                return None
-
         row_i = rows[i]
+        pivot = row_i.get(i, 0.0)
+        if abs(pivot) < _EPS:
+            return None
+
         u_items = [(j, v) for j, v in row_i.items() if j > i]
 
         affected = [r for r in col_rows[i] if r > i]
@@ -211,10 +217,13 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
             a_ri = row_r.get(i, 0.0)
             if abs(a_ri) < _EPS:
                 col_rows[i].discard(r)
+                row_r.pop(i, None)
                 continue
 
             factor = a_ri / pivot
-            row_r[i] = factor
+
+            row_r.pop(i, None)
+            col_rows[i].discard(r)
 
             for j, u_ij in u_items:
                 newv = row_r.get(j, 0.0) - factor * u_ij
