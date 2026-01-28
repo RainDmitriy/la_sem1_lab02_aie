@@ -12,10 +12,9 @@ class COOMatrix(Matrix):
         self.row = []
         self.col = []
         for d, r, c in zip(data, row, col):
-            if abs(d) > TOLERANCE:
-                self.data.append(d)
-                self.row.append(r)
-                self.col.append(c)
+            self.data.append(d)
+            self.row.append(r)
+            self.col.append(c)
 
     def to_dense(self) -> DenseMatrix:
         """Преобразует COO в плотную матрицу."""
