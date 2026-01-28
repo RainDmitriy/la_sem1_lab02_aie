@@ -46,55 +46,10 @@ class CSCMatrix(Matrix):
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSC матриц."""
 
-        assert isinstance(other, CSCMatrix), "Addition is only supported between two CSC matrices"
-        assert self.shape == other.shape, "Matrix shapes must match for addition"
+        coo_self = self._to_coo()
+        coo_other = other._to_coo()
 
-        n_rows, n_cols = self.shape
-        result_data, result_indices, result_indptr = [], [], [0]
-
-        for col in range(n_cols):
-            self_start, self_end = self.indptr[col], self.indptr[col + 1]
-            other_start, other_end = other.indptr[col], other.indptr[col + 1]
-
-            i, j = self_start, other_start
-
-            while i < self_end and j < other_end:
-                row1, row2 = self.indices[i], other.indices[j]
-
-                if row1 < row2:
-                    # Элемент только в первой матрице
-                    result_indices.append(row1)
-                    result_data.append(self.data[i])
-                    i += 1
-                elif row1 > row2:
-                    # Элемент только во второй матрице
-                    result_indices.append(row2)
-                    result_data.append(other.data[j])
-                    j += 1
-                else:
-                    # Элемент в обеих матрицах
-                    sum_val = self.data[i] + other.data[j]
-                    if fabs(sum_val) >= self.ZERO_TOLERANCE:
-                        result_indices.append(row1)
-                        result_data.append(sum_val)
-                    i += 1
-                    j += 1
-
-            # Остатки из первой матрицы
-            while i < self_end:
-                result_indices.append(self.indices[i])
-                result_data.append(self.data[i])
-                i += 1
-
-            # Остатки из второй матрицы
-            while j < other_end:
-                result_indices.append(other.indices[j])
-                result_data.append(other.data[j])
-                j += 1
-
-            result_indptr.append(len(result_data))
-
-        return CSCMatrix(result_data, result_indices, result_indptr, self.shape)
+        return coo_self._add_impl(coo_other)._to_csc()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
@@ -103,20 +58,7 @@ class CSCMatrix(Matrix):
 
         new_data = [val * scalar for val in self.data]
 
-        result_data, result_indices = [], []
-        result_indptr = [0]
-
-        for col in range(self.shape[1]):
-            start, end = self.indptr[col], self.indptr[col + 1]
-
-            for idx in range(start, end):
-                if fabs(new_data[idx]) >= self.ZERO_TOLERANCE:
-                    result_indices.append(self.indices[idx])
-                    result_data.append(new_data[idx])
-
-            result_indptr.append(len(result_data))
-
-        return CSCMatrix(result_data, result_indices, result_indptr, self.shape)
+        return CSCMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
         """
@@ -205,7 +147,7 @@ class CSCMatrix(Matrix):
         for row_idx in self.indices:
             row_counts[row_idx] += 1
 
-        row_ptr = [0] * (new_n_rows + 1)
+        row_ptr = [0] * (n_rows + 1)
         for i in range(new_n_rows):
             row_ptr[i + 1] = row_ptr[i] + row_counts[i]
 
