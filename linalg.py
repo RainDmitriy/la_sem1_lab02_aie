@@ -15,10 +15,11 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     ]
     u: DenseMatrix = [[0 for _ in range(A.shape[1])] for _ in range(A.shape[0])]
 
+    A_dense = A.to_dense()
     for i in range(A.shape[0]):
 
         for j in range(i, A.shape[1]):
-            val_u = elem_from_csc(A, i, j)
+            val_u = A_dense[i][j]
             for k in range(i):
                 val_u -= l[i][k] * u[k][j]
             u[i][j] = val_u
@@ -26,7 +27,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         for j in range(i + 1, A.shape[0]):
             if u[i][i] == 0:
                 raise ValueError("нулевой главный минор")
-            val_l = elem_from_csc(A, j, i)
+            val_l = A_dense[j][i]
             for k in range(i):
                 val_l -= l[j][k] * u[k][i]
             l[j][i] = val_l / u[i][i]
@@ -48,17 +49,17 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     for i in range(l.shape[0]):
         val_y = b[i]
         for k in range(i):
-            val_y -= l[i][k] * y[k]
+            val_y -= elem_from_csc(l, i, k) * y[k]
         y[i] = val_y
 
     for i in range(u.shape[0] - 1, -1, -1):
         val_x = y[i]
         for k in range(i + 1, u.shape[0]):
-            val_x -= u[i][k] * x[k]
+            val_x -= elem_from_csc(u, i, k) * x[k]
         
-        elem_to_devide = u[i][i]
+        elem_to_devide = elem_from_csc(u, i, i)
         if elem_to_devide == 0:
-            raise ValueError
+            raise ValueError("нулевой главный минор")
 
         x[i] = val_x / elem_to_devide
 
@@ -75,7 +76,7 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     det_l = 1
     det_u = 1
     for i in range(u.shape[0]):
-        det_u *= u[i][i]
+        det_u *= elem_from_csc(u, i, i)
 
     return det_u * det_l
 
