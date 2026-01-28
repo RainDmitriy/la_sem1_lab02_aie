@@ -34,16 +34,13 @@ def _set_val(
             if not c:
                 del cols[j]
         return
-    r = rows.get(i)
-    if r is None:
-        r = {}
-        rows[i] = r
-    r[j] = val
-    c = cols.get(j)
-    if c is None:
-        c = {}
-        cols[j] = c
-    c[i] = val
+    if i not in rows:
+        rows[i] = {}
+    rows[i][j] = val
+
+    if j not in cols:
+        cols[j] = {}
+    cols[j][i] = val
 
 
 def _new_structure(A: CSCMatrix) -> Tuple[Dict[int, Dict[int, float]], Dict[int, Dict[int, float]]]:
@@ -133,65 +130,28 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
 
     for k in range(n):
         row_k = rows.get(k, {})
-        pivot = None
-        for j in range(k, n):
-            total = row_k.get(j, 0.0)
-            for t in range(k):
-                l_kt = 0.0
-                for (r, c, v) in L_trip:
-                    if r == k and c == t:
-                        l_kt = v
-                        break
-
-                u_tj = 0.0
-                for (r, c, v) in U_trip:
-                    if r == t and c == j:
-                        u_tj = v
-                        break
-                total -= l_kt * u_tj
-
-            if j == k:
-                pivot = total
-                if abs(pivot) < TOLERANCE:
-                    return None
-                U_trip.append((k, k, float(pivot)))
-            elif abs(total) > TOLERANCE:
-                U_trip.append((k, j, float(total)))
-
-        if pivot is None or abs(pivot) < TOLERANCE:
+        pivot = row_k.get(k, 0.0)
+        if abs(pivot) < TOLERANCE:
             return None
+
+        for j in range(k, n):
+            val = row_k.get(j, 0.0)
+            if abs(val) > TOLERANCE:
+                U_trip.append((k, j, float(val)))
         col_k = cols.get(k, {})
         for i in range(k + 1, n):
             if i in col_k:
-                total = col_k[i]
-                for t in range(k):
-                    l_it = 0.0
-                    for (r, c, v) in L_trip:
-                        if r == i and c == t:
-                            l_it = v
-                            break
-
-                    u_tk = 0.0
-                    for (r, c, v) in U_trip:
-                        if r == t and c == k:
-                            u_tk = v
-                            break
-                    total -= l_it * u_tk
-                l_ik = total / pivot
-                if abs(l_ik) > TOLERANCE:
-                    L_trip.append((i, k, float(l_ik)))
-
-        current_U_row = {}
-        for (r, c, v) in U_trip:
-            if r == k and c > k:
-                current_U_row[c] = v
-
-        for (r, c, l_ik) in L_trip:
-            if c == k and r > k:
-                for j, u_kj in current_U_row.items():
-                    current = rows.get(r, {}).get(j, 0.0)
-                    new_val = current - l_ik * u_kj
-                    _set_val(rows, cols, r, j, new_val)
+                a_ik = col_k[i]
+                mult = a_ik / pivot
+                if abs(mult) > TOLERANCE:
+                    L_trip.append((i, k, float(mult)))
+                _set_val(rows, cols, i, k, 0.0)
+                for j in range(k + 1, n):
+                    if j in row_k:
+                        u_kj = row_k[j]
+                        a_ij = rows.get(i, {}).get(j, 0.0)
+                        new_val = a_ij - mult * u_kj
+                        _set_val(rows, cols, i, j, new_val)
 
     L_csc = _triplets_to_csc(n, n, L_trip)
     U_csc = _triplets_to_csc(n, n, U_trip)
