@@ -64,27 +64,13 @@ class COOMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
-        new_data = []
-        new_row = []
-        new_col = []
-        for i in range(len(self.data)):
-            val = self.data[i] * scalar
-            new_data.append(val)
-            new_row.append(self.row[i])
-            new_col.append(self.col[i])
-        return COOMatrix(new_data, new_row, new_col, self.shape)
+        new_data = [d * scalar for d in self.data]
+        return COOMatrix(new_data, self.row[:], self.col[:], self.shape)
 
     def transpose(self) -> 'Matrix':
         """Транспонирование COO матрицы."""
-        new_data = []
-        new_row = []
-        new_col = []
-        for i in range(len(self.data)):
-            new_data.append(self.data[i])
-            new_row.append(self.col[i])
-            new_col.append(self.row[i])
         new_shape = (self.shape[1], self.shape[0])
-        return COOMatrix(new_data, new_row, new_col, new_shape)
+        return COOMatrix(self.data[:], self.col[:], self.row[:], new_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение COO матриц."""

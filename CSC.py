@@ -83,26 +83,8 @@ class CSCMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
-        if scalar == 0.0:
-            rows, cols = self.shape
-            return CSCMatrix([], [], [0] * (cols + 1), self.shape)
-        new_data = []
-        new_indices = []
-        new_indptr = [0]
-
-        for col in range(self.shape[1]):
-            start = self.indptr[col]
-            end = self.indptr[col + 1]
-            count = 0
-            for idx in range(start, end):
-                val = self.data[idx] * scalar
-                if abs(val) > TOLERANCE:
-                    new_data.append(val)
-                    new_indices.append(self.indices[idx])
-                    count += 1
-            new_indptr.append(new_indptr[-1] + count)
-
-        return CSCMatrix(new_data, new_indices, new_indptr, self.shape)
+        new_data = [d * scalar for d in self.data]
+        return CSCMatrix(new_data, self.indices, self.indptr, self.shape)
 
     def transpose(self) -> 'Matrix':
         """

@@ -85,25 +85,8 @@ class CSRMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
-        if scalar == 0.0:
-            rows, cols = self.shape
-            return CSRMatrix([], [], [0] * (rows + 1), self.shape)
-        new_data = []
-        new_indices = []
-        new_indptr = [0]
-        for row in range(self.shape[0]):
-            start = self.indptr[row]
-            end = self.indptr[row + 1]
-            count = 0
-            for idx in range(start, end):
-                val = self.data[idx] * scalar
-                if abs(val) > TOLERANCE:
-                    new_data.append(val)
-                    new_indices.append(self.indices[idx])
-                    count += 1
-            new_indptr.append(new_indptr[-1] + count)
-
-        return CSRMatrix(new_data, new_indices, new_indptr, self.shape)
+        new_data = [d * scalar for d in self.data]
+        return CSRMatrix(new_data, self.indices, self.indptr, self.shape)
 
     def transpose(self) -> 'Matrix':
         """
