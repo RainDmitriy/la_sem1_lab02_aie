@@ -1,6 +1,6 @@
 from CSC import CSCMatrix
 from CSR import CSRMatrix
-from type import Vector
+from types import Vector
 from typing import Tuple, Optional
 
 

@@ -1,5 +1,5 @@
 from base import Matrix
-from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
+from types import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 
 
 class CSRMatrix(Matrix):
