@@ -61,7 +61,6 @@ class COOMatrix(Matrix):
         rows, cols = self.shape
         new_shape = (cols, rows)
         
-        # Просто переставляем row и col, транспонируя координаты
         return COOMatrix(self.data[:], self.col[:], self.row[:], new_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
@@ -102,7 +101,6 @@ class COOMatrix(Matrix):
 
         cols_elements = [[] for _ in range(num_cols)]
         
-        # Группируем по столбцам
         data_iter = self.data
         row_iter = self.row
         col_iter = self.col
@@ -129,7 +127,6 @@ class COOMatrix(Matrix):
 
         rows_elements = [[] for _ in range(num_rows)]
         
-        # Группируем по строкам
         data_iter = self.data
         row_iter = self.row
         col_iter = self.col

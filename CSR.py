@@ -58,7 +58,6 @@ class CSRMatrix(Matrix):
                 j = other_indices[k]
                 row_sum[j] = row_sum.get(j, 0) + other_data[k]
 
-            # Добавляем в порядке ключей для сохранения отсортированности
             for j in sorted(row_sum.keys()):
                 v = row_sum[j]
                 if v != 0:
