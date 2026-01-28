@@ -20,25 +20,18 @@ class COOMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение COO матриц."""
-        if isinstance(other, COOMatrix):
-            other_coo = other
-        else:
-            other_coo = other._to_coo()
-        combined_data = self.data + other_coo.data
-        combined_row = self.row + other_coo.row
-        combined_col = self.col + other_coo.col
-        sum_dict = {}
-        for idx in range(len(combined_data)):
-            key = (combined_row[idx], combined_col[idx])
-            sum_dict[key] = sum_dict.get(key, 0.0) + combined_data[idx]
-        sorted_positions = sorted(sum_dict.keys())
-        new_data = []
-        new_row = []
-        new_col = []
-        for (i, j) in sorted_positions:
-            val = sum_dict[(i, j)]
-            if abs(val) > 1e-12:
-                new_data.append(val)
+        other_coo = other if isinstance(other, COOMatrix) else other._to_coo()
+        if self.shape != other_coo.shape:
+            raise ValueError()
+        sum_dict: dict[tuple[int, int], float] = {}
+        for v, i, j in zip(self.data, self.row, self.col):
+            sum_dict[(i, j)] = sum_dict.get((i, j), 0.0) + v
+        for v, i, j in zip(other_coo.data, other_coo.row, other_coo.col):
+            sum_dict[(i, j)] = sum_dict.get((i, j), 0.0) + v
+        new_data, new_row, new_col = [], [], []
+        for (i, j), v in sorted(sum_dict.items()):
+            if abs(v) > 1e-12:
+                new_data.append(v)
                 new_row.append(i)
                 new_col.append(j)
         return COOMatrix(new_data, new_row, new_col, self.shape)
@@ -118,12 +111,13 @@ class COOMatrix(Matrix):
         """
         from CSC import CSCMatrix
         n_rows, n_cols = self.shape
-        sorted_indices = sorted(range(self.nnz), key=lambda idx: (self.col[idx], self.row[idx]))
-        data = [self.data[i] for i in sorted_indices]
-        indices = [self.row[i] for i in sorted_indices]
+        sorted_idx = sorted(range(self.nnz), key=lambda k: (self.col[k], self.row[k]))
+        data = [self.data[i] for i in sorted_idx]
+        indices = [self.row[i] for i in sorted_idx]
         indptr = [0] * (n_cols + 1)
-        for idx in sorted_indices:
-            indptr[self.col[idx] + 1] += 1
+        for i in sorted_idx:
+            col = self.col[i]
+            indptr[col + 1] += 1
         for j in range(n_cols):
             indptr[j + 1] += indptr[j]
         return CSCMatrix(data, indices, indptr, self.shape)
@@ -134,12 +128,13 @@ class COOMatrix(Matrix):
         """
         from CSR import CSRMatrix
         n_rows, n_cols = self.shape
-        sorted_indices = sorted(range(self.nnz), key=lambda idx: (self.row[idx], self.col[idx]))
-        data = [self.data[i] for i in sorted_indices]
-        indices = [self.col[i] for i in sorted_indices]
+        sorted_idx = sorted(range(self.nnz), key=lambda k: (self.row[k], self.col[k]))
+        data = [self.data[i] for i in sorted_idx]
+        indices = [self.col[i] for i in sorted_idx]
         indptr = [0] * (n_rows + 1)
-        for idx in sorted_indices:
-            indptr[self.row[idx] + 1] += 1
+        for i in sorted_idx:
+            row = self.row[i]
+            indptr[row + 1] += 1
         for i in range(n_rows):
             indptr[i + 1] += indptr[i]
         return CSRMatrix(data, indices, indptr, self.shape)
