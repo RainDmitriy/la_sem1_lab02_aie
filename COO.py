@@ -117,21 +117,13 @@ class COOMatrix(Matrix):
         from CSC import CSCMatrix
         n_rows, n_cols = self.shape
         sorted_indices = sorted(range(self.nnz), key=lambda idx: (self.col[idx], self.row[idx]))
-        data = []
-        indices = []
+        data = [self.data[i] for i in sorted_indices]
+        indices = [self.row[i] for i in sorted_indices]
         indptr = [0] * (n_cols + 1)
-        current_col = -1
         for idx in sorted_indices:
-            col_idx = self.col[idx]
-            while current_col < col_idx:
-                current_col += 1
-                indptr[current_col + 1] = indptr[current_col]
-            data.append(self.data[idx])
-            indices.append(self.row[idx])
-            indptr[col_idx + 1] += 1
-        while current_col < n_cols - 1:
-            current_col += 1
-            indptr[current_col + 1] = indptr[current_col]
+            indptr[self.col[idx] + 1] += 1
+        for j in range(n_cols):
+            indptr[j + 1] += indptr[j]
         return CSCMatrix(data, indices, indptr, self.shape)
 
     def _to_csr(self) -> 'CSRMatrix':
@@ -141,21 +133,13 @@ class COOMatrix(Matrix):
         from CSR import CSRMatrix
         n_rows, n_cols = self.shape
         sorted_indices = sorted(range(self.nnz), key=lambda idx: (self.row[idx], self.col[idx]))
-        data = []
-        indices = []
+        data = [self.data[i] for i in sorted_indices]
+        indices = [self.col[i] for i in sorted_indices]
         indptr = [0] * (n_rows + 1)
-        current_row = -1
         for idx in sorted_indices:
-            row_idx = self.row[idx]
-            while current_row < row_idx:
-                current_row += 1
-                indptr[current_row + 1] = indptr[current_row]
-            data.append(self.data[idx])
-            indices.append(self.col[idx])
-            indptr[row_idx + 1] += 1
-        while current_row < n_rows - 1:
-            current_row += 1
-            indptr[current_row + 1] = indptr[current_row]
+            indptr[self.row[idx] + 1] += 1
+        for i in range(n_rows):
+            indptr[i + 1] += indptr[i]
         return CSRMatrix(data, indices, indptr, self.shape)
 
     def _to_coo(self) -> 'COOMatrix':
