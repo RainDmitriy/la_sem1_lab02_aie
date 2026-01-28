@@ -19,7 +19,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     u = [[0.0] * rows for _ in range(rows)]
     n = rows
 
-    for i in range():
+    for i in range(n):
         for j in range(i, n):
             u[i][j] = a[i][j] - sum(l[i][k] * u[k][j] for k in range(i))
 
