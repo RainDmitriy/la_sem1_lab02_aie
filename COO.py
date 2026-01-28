@@ -1,79 +1,182 @@
 from base import Matrix
-from type import COOData, COORows, COOCols, Shape, DenseMatrix
+from typing import List, Tuple
+
+TOL = 1e-12
+
 
 class COOMatrix(Matrix):
-    def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
+    def __init__(self, data: List[float], row: List[int], col: List[int], shape: Tuple[int, int]):
         super().__init__(shape)
-        # Атрибуты сохранены
-        self.data = list(data)
-        self.row = list(row)
-        self.col = list(col)
+        self.data = data
+        self.row = row
+        self.col = col
+        self.nnz = len(data)
+        
+        # Проверка, что все индексы в пределах
+        if row and max(row) >= shape[0]:
+            raise ValueError(f"Индекс строки {max(row)} превышает размер {shape[0]}")
+        if col and max(col) >= shape[1]:
+            raise ValueError(f"Индекс столбца {max(col)} превышает размер {shape[1]}")
 
-    def to_dense(self) -> DenseMatrix:
+    def to_dense(self) -> List[List[float]]:
+        """Преобразует COO в плотную матрицу."""
         rows, cols = self.shape
-        grid = [[0.0] * cols for _ in range(rows)]
-        for i in range(len(self.data)):
-            grid[self.row[i]][self.col[i]] = self.data[i]
-        return grid
-
-    @classmethod
-    def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
-        vals, r_idx, c_idx = [], [], []
-        for i, row in enumerate(dense_matrix):
-            for j, cell in enumerate(row):
-                if cell != 0:
-                    vals.append(cell)
-                    r_idx.append(i)
-                    c_idx.append(j)
-        return cls(vals, r_idx, c_idx, (len(dense_matrix), len(dense_matrix[0]) if dense_matrix else 0))
+        dense = [[0.0] * cols for _ in range(rows)]
+        
+        for i in range(self.nnz):
+            dense[self.row[i]][self.col[i]] = self.data[i]
+        
+        return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        # Используем хэш-таблицу для суммирования координат
-        coords = {}
-        # Собираем свои данные
-        for r, c, v in zip(self.row, self.col, self.data):
-            coords[(r, c)] = coords.get((r, c), 0.0) + v
+        """Сложение COO матриц."""
+        if self.shape != other.shape:
+            raise ValueError("Размерности матриц не совпадают")
         
-        # Собираем данные другой матрицы через to_dense (универсально)
-        o_dense = other.to_dense()
-        for i in range(self.shape[0]):
-            for j in range(self.shape[1]):
-                if o_dense[i][j] != 0:
-                    coords[(i, j)] = coords.get((i, j), 0.0) + o_dense[i][j]
+        # Преобразуем other в COO если нужно
+        if not isinstance(other, COOMatrix):
+            other_coo = COOMatrix.from_dense(other.to_dense())
+        else:
+            other_coo = other
         
-        new_d, new_r, new_c = [], [], []
-        for (r, c), v in coords.items():
-            if abs(v) > 1e-15: # Фильтрация нулей важна для тестов
-                new_d.append(v); new_r.append(r); new_c.append(c)
-        return COOMatrix(new_d, new_r, new_c, self.shape)
+        # Создаем словарь для суммирования
+        result_dict = {}
+        
+        # Добавляем элементы из первой матрицы
+        for i in range(self.nnz):
+            key = (self.row[i], self.col[i])
+            result_dict[key] = self.data[i]
+        
+        # Добавляем элементы из второй матрицы
+        for i in range(other_coo.nnz):
+            key = (other_coo.row[i], other_coo.col[i])
+            result_dict[key] = result_dict.get(key, 0.0) + other_coo.data[i]
+        
+        # Собираем результат, НЕ удаляя нулевые элементы
+        result_data = []
+        result_row = []
+        result_col = []
+        
+        for (r, c), val in sorted(result_dict.items()):
+            result_data.append(val)
+            result_row.append(r)
+            result_col.append(c)
+        
+        return COOMatrix(result_data, result_row, result_col, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        if abs(scalar) < 1e-15:
+        """Умножение COO на скаляр."""
+        if scalar == 0.0:
             return COOMatrix([], [], [], self.shape)
-        return COOMatrix([v * scalar for v in self.data], self.row, self.col, self.shape)
+        
+        # Умножаем все значения, НЕ удаляя элементы
+        new_data = [val * scalar for val in self.data]
+        return COOMatrix(new_data, self.row.copy(), self.col.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
-        return COOMatrix(self.data, self.col, self.row, (self.shape[1], self.shape[0]))
+        """Транспонирование COO матрицы."""
+        # Создаем транспонированную COO
+        new_shape = (self.shape[1], self.shape[0])
+        return COOMatrix(self.data.copy(), self.col.copy(), self.row.copy(), new_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        # Матричное умножение через плотный формат для стабильности
-        r1, c1 = self.shape
-        c2 = other.shape[1]
-        a_dense = self.to_dense()
-        b_dense = other.to_dense()
-        res = [[0.0] * c2 for _ in range(r1)]
+        """Умножение COO матриц."""
+        if self.shape[1] != other.shape[0]:
+            raise ValueError("Несовместимые размерности для умножения")
         
-        for i in range(r1):
-            for k in range(c1):
-                if a_dense[i][k] != 0:
-                    for j in range(c2):
-                        res[i][j] += a_dense[i][k] * b_dense[k][j]
-        return COOMatrix.from_dense(res)
+        # Преобразуем в плотные для умножения
+        dense_self = self.to_dense()
+        
+        if isinstance(other, COOMatrix):
+            dense_other = other.to_dense()
+        else:
+            dense_other = other.to_dense()
+        
+        rows_A, cols_A = self.shape
+        rows_B, cols_B = other.shape
+        
+        # Умножение матриц
+        result_data = []
+        result_row = []
+        result_col = []
+        
+        for i in range(rows_A):
+            for j in range(cols_B):
+                val = 0.0
+                for k in range(cols_A):
+                    val += dense_self[i][k] * dense_other[k][j]
+                if abs(val) > TOL:
+                    result_data.append(val)
+                    result_row.append(i)
+                    result_col.append(j)
+        
+        return COOMatrix(result_data, result_row, result_col, (rows_A, cols_B))
 
-    def _to_csc(self):
+    @classmethod
+    def from_dense(cls, dense_matrix: List[List[float]]) -> 'COOMatrix':
+        """Создание COO из плотной матрицы."""
+        data = []
+        rows = []
+        cols = []
+        
+        for i, row in enumerate(dense_matrix):
+            for j, val in enumerate(row):
+                if abs(val) > TOL:
+                    data.append(float(val))
+                    rows.append(i)
+                    cols.append(j)
+        
+        shape = (len(dense_matrix), len(dense_matrix[0]) if dense_matrix else 0)
+        return cls(data, rows, cols, shape)
+
+    def _to_csc(self) -> 'CSCMatrix':
+        """Преобразование COOMatrix в CSCMatrix."""
         from CSC import CSCMatrix
-        return CSCMatrix.from_dense(self.to_dense())
+        
+        if self.nnz == 0:
+            return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
+        
+        # Сортируем по столбцам, затем по строкам
+        sorted_indices = sorted(range(self.nnz), 
+                               key=lambda i: (self.col[i], self.row[i]))
+        
+        data = [self.data[i] for i in sorted_indices]
+        indices = [self.row[i] for i in sorted_indices]
+        
+        # Строим indptr
+        cols = self.shape[1]
+        indptr = [0] * (cols + 1)
+        
+        for i in sorted_indices:
+            indptr[self.col[i] + 1] += 1
+        
+        for j in range(1, cols + 1):
+            indptr[j] += indptr[j - 1]
+        
+        return CSCMatrix(data, indices, indptr, self.shape)
 
-    def _to_csr(self):
+    def _to_csr(self) -> 'CSRMatrix':
+        """Преобразование COOMatrix в CSRMatrix."""
         from CSR import CSRMatrix
-        return CSRMatrix.from_dense(self.to_dense())
+        
+        if self.nnz == 0:
+            return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
+        
+        # Сортируем по строкам, затем по столбцам
+        sorted_indices = sorted(range(self.nnz), 
+                               key=lambda i: (self.row[i], self.col[i]))
+        
+        data = [self.data[i] for i in sorted_indices]
+        indices = [self.col[i] for i in sorted_indices]
+        
+        # Строим indptr
+        rows = self.shape[0]
+        indptr = [0] * (rows + 1)
+        
+        for i in sorted_indices:
+            indptr[self.row[i] + 1] += 1
+        
+        for i in range(1, rows + 1):
+            indptr[i] += indptr[i - 1]
+        
+        return CSRMatrix(data, indices, indptr, self.shape)
