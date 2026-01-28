@@ -49,7 +49,9 @@ class CSCMatrix(Matrix):
         coo_self = self._to_coo()
         coo_other = other._to_coo()
 
-        return coo_self._add_impl(coo_other)._to_csc()
+        res = coo_self._add_impl(coo_other)
+
+        return res._to_csc()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""

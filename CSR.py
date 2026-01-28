@@ -42,11 +42,11 @@ class CSRMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSR матриц."""
-
         coo_self = self._to_coo()
         coo_other = other._to_coo()
 
-        return coo_self._add_impl(coo_other)._to_csr()
+        res = coo_self._add_impl(coo_other)
+        return res._to_csr()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
