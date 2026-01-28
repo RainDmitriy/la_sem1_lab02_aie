@@ -60,7 +60,8 @@ class CSCMatrix(Matrix):
                 result_data.append(sum_val)
 
         COOClass = getattr(sys.modules['COO'], 'COOMatrix')
-        return COOClass(result_data, result_row, result_col, self.shape)
+        coo_result = COOClass(result_data, result_row, result_col, self.shape)
+        return coo_result._to_csc()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
@@ -92,7 +93,8 @@ class CSCMatrix(Matrix):
                 new_data.append(self.data[k])
 
         COOClass = getattr(sys.modules['COO'], 'COOMatrix')
-        return COOClass(new_data, new_row, new_col, (n, m))
+        coo_result = COOClass(new_data, new_row, new_col, (n, m))
+        return coo_result._to_csr()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
