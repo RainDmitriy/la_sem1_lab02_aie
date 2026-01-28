@@ -6,9 +6,9 @@ from typing import List, Tuple
 DenseMatrix = List[List[float]]  # Плотная матрица: [[row1], [row2], ...] как в NumPy
 Shape = Tuple[int, int]  # Размерность: (rows, cols)
 
-CSRData = CSCData = List[float]      # Ненулевые значения
+CSRData = CSCData = List[float]  # Ненулевые значения
 CSRIndices = CSCIndices = List[int]  # Колонки (CSR) или строки (CSC)
-CSRIndptr = CSCIndptr = List[int]    # Указатели начала строк (CSR) или колонок (CSC)
+CSRIndptr = CSCIndptr = List[int]  # Указатели начала строк (CSR) или колонок (CSC)
 
 
 class CSRMatrix(Matrix):
@@ -24,7 +24,6 @@ class CSRMatrix(Matrix):
         assert len(indptr) == shape[0] + 1, f"indptr length must be shape[0] + 1 = {shape[0] + 1}"
         assert indptr[0] == 0, "indptr must start with 0"
         assert indptr[-1] == len(data), f"Last indptr must equal data length: {indptr[-1]} != {len(data)}"
-
 
     def to_dense(self) -> DenseMatrix:
         """Преобразует CSR в плотную матрицу."""
@@ -122,36 +121,8 @@ class CSRMatrix(Matrix):
         Транспонирование CSR матрицы.
         Результат - в CSC формате (с теми же данными, но с интерпретацией столбцов как строк).
         """
-        n_rows, n_cols = self.shape
-        new_n_rows, new_n_cols = n_cols, n_rows
-
-        col_counts = [0] * new_n_rows
-
-        for col_idx in self.indices:
-            col_counts[col_idx] += 1
-
-        col_ptr = [0] * (new_n_rows + 1)
-        for i in range(new_n_rows):
-            col_ptr[i + 1] = col_ptr[i] + col_counts[i]
-
-        positions = col_ptr.copy()
-        new_data = [0.0] * len(self.data)
-        new_indices = [0] * len(self.data)
-
-        for row in range(n_rows):
-            start, end = self.indptr[row], self.indptr[row + 1]
-            for idx in range(start, end):
-                col = self.indices[idx]
-                new_col = row
-                new_row = col
-
-                pos = positions[new_row]
-                new_data[pos] = self.data[idx]
-                new_indices[pos] = new_col
-                positions[new_row] += 1
-
         from CSC import CSCMatrix
-        return CSCMatrix(new_data, new_indices, col_ptr, (new_n_rows, new_n_cols))
+        return CSCMatrix(self.data.copy(), self.indices.copy(), self.indptr.copy(), (self.shape[1], self.shape[0]))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSR матриц"""
@@ -198,7 +169,6 @@ class CSRMatrix(Matrix):
 
         return CSRMatrix.from_dense(result_data)
 
-
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
         """Создание CSR из плотной матрицы."""
@@ -220,7 +190,36 @@ class CSRMatrix(Matrix):
         """
         Преобразование CSRMatrix в CSCMatrix.
         """
-        csc = self.transpose()
+        n_rows, n_cols = self.shape
+        new_n_rows, new_n_cols = n_cols, n_rows
+
+        col_counts = [0] * new_n_rows
+
+        for col_idx in self.indices:
+            col_counts[col_idx] += 1
+
+        col_ptr = [0] * (new_n_rows + 1)
+        for i in range(new_n_rows):
+            col_ptr[i + 1] = col_ptr[i] + col_counts[i]
+
+        positions = col_ptr.copy()
+        new_data = [0.0] * len(self.data)
+        new_indices = [0] * len(self.data)
+
+        for row in range(n_rows):
+            start, end = self.indptr[row], self.indptr[row + 1]
+            for idx in range(start, end):
+                col = self.indices[idx]
+                new_col = row
+                new_row = col
+
+                pos = positions[new_row]
+                new_data[pos] = self.data[idx]
+                new_indices[pos] = new_col
+                positions[new_row] += 1
+
+        from CSC import CSCMatrix
+        return CSCMatrix(new_data, new_indices, col_ptr, (new_n_rows, new_n_cols))
 
         return csc
 

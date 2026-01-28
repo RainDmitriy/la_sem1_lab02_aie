@@ -37,81 +37,40 @@ class COOMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение COO матриц"""
-        assert isinstance(other, COOMatrix), "Addition is only supported between two COO matrices"
         assert self.shape == other.shape, "Matrix shapes must match for addition"
 
-        # Предполагаем, что обе матрицы уже отсортированы по (row, col)
-        # В рамках моей реализации монотонность гарантированна
+        if hasattr(other, "_to_coo"):
+            other_coo = other._to_coo()
+        else:
+            other_coo = COOMatrix.from_dense(other.to_dense())
+
+        result_dict = {}
+
+        for val, r, c in zip(self.data, self.row, self.col):
+            result_dict[(r, c)] = result_dict.get((r, c), 0.0) + val
+
+        for val, r, c in zip(other_coo.data, other_coo.row, other_coo.col):
+            result_dict[(r, c)] = result_dict.get((r, c), 0.0) + val
 
         result_data, result_row, result_col = [], [], []
-        i, j = 0, 0
-        n1, n2 = len(self.data), len(other.data)
-
-        while i < n1 and j < n2:
-            r1, c1 = self.row[i], self.col[i]
-            r2, c2 = other.row[j], other.col[j]
-
-            if (r1, c1) < (r2, c2):
-                # Элемент только в первой матрице
-                result_row.append(r1)
-                result_col.append(c1)
-                result_data.append(self.data[i])
-                i += 1
-            elif (r1, c1) > (r2, c2):
-                # Элемент только во второй матрице
-                result_row.append(r2)
-                result_col.append(c2)
-                result_data.append(other.data[j])
-                j += 1
-            else:
-                # Элемент в обеих матрицах
-                sum_val = self.data[i] + other.data[j]
-                if abs(sum_val) >= self.ZERO_TOLERANCE:
-                    result_row.append(r1)
-                    result_col.append(c1)
-                    result_data.append(sum_val)
-                i += 1
-                j += 1
-
-        while i < n1:
-            result_row.append(self.row[i])
-            result_col.append(self.col[i])
-            result_data.append(self.data[i])
-            i += 1
-
-        while j < n2:
-            result_row.append(other.row[j])
-            result_col.append(other.col[j])
-            result_data.append(other.data[j])
-            j += 1
+        for (r, c), val in result_dict.items():
+            if abs(val) >= self.ZERO_TOLERANCE:
+                result_data.append(val)
+                result_row.append(r)
+                result_col.append(c)
 
         return COOMatrix(result_data, result_row, result_col, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
-        if abs(scalar) < self.ZERO_TOLERANCE:
-            return COOMatrix([], [], [], self.shape)
-
         new_data = [val * scalar for val in self.data]
 
-        data, row, col = [], [], []
-        for val, r, c in zip(new_data, self.row, self.col):
-            if abs(val) >= self.ZERO_TOLERANCE:
-                data.append(val)
-                row.append(r)
-                col.append(c)
-
-        return COOMatrix(data, row, col, self.shape)
+        return COOMatrix(new_data, self.row, self.col, self.shape)
 
     def transpose(self) -> 'Matrix':
         """Транспонирование COO матрицы."""
-        # Меняем местами строки и столбцы
-        return COOMatrix(
-            data=self.data.copy(),
-            row=self.col.copy(),
-            col=self.row.copy(),
-            shape=(self.shape[1], self.shape[0])
-        )
+
+        return COOMatrix(self.data.copy(), self.col.copy(), self.row.copy(),(self.shape[1], self.shape[0]))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение COO матриц."""
@@ -145,8 +104,7 @@ class COOMatrix(Matrix):
                     if k in row_dict:
                         dot_product += row_dict[k] * val2
 
-                if abs(dot_product) >= self.ZERO_TOLERANCE:
-                    result_dict[(i, j)] = dot_product
+                result_dict[(i, j)] = dot_product
 
         if not result_dict:
             return COOMatrix([], [], [], (self.shape[0], other.shape[1]))
@@ -159,12 +117,11 @@ class COOMatrix(Matrix):
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
         """Создание COO из плотной матрицы."""
         data, rows, cols = [], [], []
-        dense_data = dense_matrix
 
-        for i in range(len(dense_data)):
-            for j in range(len(dense_data[0])):
-                val = dense_data[i][j]
-                if abs(val) >= 1e-10:
+        for i in range(len(dense_matrix)):
+            for j in range(len(dense_matrix[0])):
+                val = dense_matrix[i][j]
+                if abs(val) > 0.0:
                     data.append(val)
                     rows.append(i)
                     cols.append(j)
