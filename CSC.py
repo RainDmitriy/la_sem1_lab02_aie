@@ -205,7 +205,7 @@ class CSCMatrix(Matrix):
                 if fabs(dot) >= self.ZERO_TOLERANCE:
                     result_data[i][j] = dot
 
-        return result_data
+        return CSCMatrix.from_dense(result_data)
 
 
     @classmethod
