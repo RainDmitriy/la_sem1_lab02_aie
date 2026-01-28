@@ -28,11 +28,15 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     U = [[0.0] * n for _ in range(n)]
 
     for i in range(n):
-        L[i][i] = 1.0
         for j in range(n):
             if i > j:
                 L[i][j] = dense[i][j]
-            elif i <= j:
+                U[i][j] = 0.0
+            elif i == j:
+                L[i][j] = 1.0
+                U[i][j] = dense[i][j]
+            else:
+                L[i][j] = 0.0
                 U[i][j] = dense[i][j]
 
     from COO import COOMatrix
@@ -57,21 +61,21 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
 
     y = [0.0] * n
     for i in range(n):
-        s = 0.0
+        sum_val = 0.0
         for j in range(i):
-            s += dense_L[i][j] * y[j]
-        y[i] = b[i] - s
+            sum_val += dense_L[i][j] * y[j]
+        y[i] = b[i] - sum_val
 
     x = [0.0] * n
     for i in range(n - 1, -1, -1):
-        s = 0.0
+        sum_val = 0.0
         for j in range(i + 1, n):
-            s += dense_U[i][j] * x[j]
+            sum_val += dense_U[i][j] * x[j]
 
         if abs(dense_U[i][i]) < 1e-12:
             return None
 
-        x[i] = (y[i] - s) / dense_U[i][i]
+        x[i] = (y[i] - sum_val) / dense_U[i][i]
 
     return x
 
