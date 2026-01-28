@@ -57,7 +57,11 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     if A.shape[0] != len(b):
         raise ValueError("Размерность A должна совпадать с размером b")
 
-    l, u = lu_decomposition(A)
+    lu = lu_decomposition(A)
+    if lu is None:
+        return None
+
+    l, u = lu
     n = len(b)
     dense_l = l.to_dense()
     dense_u = u.to_dense()
@@ -66,15 +70,17 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     for i in range(n):
         summa = 0
         for j in range(i):
-            summa += l[i][j] * y[j]
+            summa += dense_l[i][j] * y[j]
         y[i] = b[i] - summa
 
     x = [0.0] * n
     for i in range(n - 1, -1, -1):
         summa = 0
         for j in range(i + 1, n):
-            summa += u[i][j] * x[j]
-        x[i] = (y[i] - summa) / u[i][i]
+            summa += dense_u[i][j] * x[j]
+        if dense_u[i][i] == 0:
+            return None
+        x[i] = (y[i]-summa)/dense_u[i][i]
     return x
 
 
@@ -83,9 +89,13 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     Нахождение определителя через LU-разложение.
     det(A) = det(L) * det(U)
     """
+    lu = lu_decomposition(A)
+    if lu is None:
+        return 0.0
+
     det = 1
     n = A.shape[0]
-    l, u = lu_decomposition(A)
+    l, u = lu
     dense_u = u.to_dense()
     for i in range(n):
         det *= dense_u[i][i]

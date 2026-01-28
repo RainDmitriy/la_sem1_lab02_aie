@@ -23,11 +23,11 @@ class COOMatrix(Matrix):
         if not isinstance(other, COOMatrix):
             raise TypeError("Складывать можно только COO матрицы")
 
-        rows = self.row + other.row
-        cols = self.col + other.col
-        values = self.data + other.data
+        csr_self = self._to_csr()
+        csr_other = other._to_csr()
+        res_csr = csr_self + csr_other
 
-        return COOMatrix(values, rows, cols, self.shape)
+        return res_csr._to_coo()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
@@ -45,14 +45,15 @@ class COOMatrix(Matrix):
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение COO матриц."""
         if self.shape[1] != other.shape[0]:
-            print("Умножение матриц невозможно")
-            raise ValueError
-        csr = self._to_csr()
+            raise ValueError("Умножение матриц невозможно")
+
+        csr_self = self._to_csr()
+
         if isinstance(other, COOMatrix):
-            other_csr = other._to_csr()
-            return csr @ other_csr
-        res = csr @ other
-        return res._to_coo()
+            other = other._to_csr()
+
+        res_csr = csr_self @ other
+        return res_csr._to_coo()
 
 
     @classmethod
@@ -103,7 +104,7 @@ class COOMatrix(Matrix):
         Преобразование COOMatrix в CSRMatrix.
         """
         if not self.data:
-            return CSRMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
+            return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
 
         sort_coo = sorted(zip(self.row, self.col, self.data))
         rows, cols, data = zip(*sort_coo)
