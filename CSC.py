@@ -63,19 +63,37 @@ class CSCMatrix(Matrix):
         """умножение матриц"""
         if self.shape[1] != other.shape[0]:
             raise ValueError("несовместимые размерности")
-        dense_self = self.to_dense()
-        dense_other = other.to_dense()
+        return self._matmul_general(other)
+
+    def _matmul_general(self, other: 'Matrix') -> 'CSCMatrix':
+        """Общее умножение через оптимизированный алгоритм"""
+        from CSR import CSRMatrix
         result_rows = self.shape[0]
         result_cols = other.shape[1]
-        result_dense = [[0.0] * result_cols for _ in range(result_rows)]
-        for i in range(result_rows):
-            for j in range(result_cols):
-                total = 0.0
-                for k in range(self.shape[1]):
-                    total += dense_self[i][k] * dense_other[k][j]
-                result_dense[i][j] = total
-
-        return CSCMatrix.from_dense(result_dense)
+        k_dim = self.shape[1]
+        temp_result = [[0.0] * result_cols for _ in range(result_rows)]
+        for j in range(result_cols):
+            for k in range(k_dim):
+                for idx1 in range(self.indptr[k], self.indptr[k + 1]):
+                    i = self.indices[idx1]
+                    val_self = self.data[idx1]
+                    if isinstance(other, CSRMatrix):
+                        val_other = 0.0
+                        for idx2 in range(other.indptr[k], other.indptr[k + 1]):
+                            if other.indices[idx2] == j:
+                                val_other = other.data[idx2]
+                                break
+                    elif isinstance(other, CSCMatrix):
+                        val_other = 0.0
+                        for idx2 in range(other.indptr[j], other.indptr[j + 1]):
+                            if other.indices[idx2] == k:
+                                val_other = other.data[idx2]
+                                break
+                    else:
+                        other_dense = other.to_dense()
+                        val_other = other_dense[k][j]
+                    temp_result[i][j] += val_self * val_other
+        return CSCMatrix.from_dense(temp_result)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
