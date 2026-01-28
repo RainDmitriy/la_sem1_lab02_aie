@@ -1,5 +1,5 @@
 from base import Matrix
-from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
+from type import *
 
 
 class CSCMatrix(Matrix):
@@ -65,7 +65,6 @@ class CSCMatrix(Matrix):
         return cls(v, idx, ptr, (r_num, c_num))
 
     def _to_csr(self) -> 'CSRMatrix':
-        from CSR import CSRMatrix
         return self._to_coo()._to_csr()
 
     def _to_coo(self) -> 'COOMatrix':
