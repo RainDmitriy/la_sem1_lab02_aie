@@ -73,39 +73,35 @@ class CSRMatrix(Matrix):
         from CSC import CSCMatrix
 
         rows, cols = self.shape
-        nnz = len(self.data)
-
-        if nnz == 0:
-            return CSCMatrix([], [], [0] * (cols + 1), (cols, rows))
-
-        col_counts = [0] * cols
-        for i in range(rows):
-            start, end = self.indptr[i], self.indptr[i + 1]
-            for pos in range(start, end):
-                j = self.indices[pos]
-                col_counts[j] += 1
-
-        csc_indptr = [0] * (cols + 1)
-        for j in range(cols):
-            csc_indptr[j + 1] = csc_indptr[j] + col_counts[j]
-
-        csc_data = [0.0] * nnz
-        csc_indices = [0] * nnz
-
-        current_pos = csc_indptr.copy()
+        new_rows, new_cols = cols, rows
+        col_counts = [0] * new_cols
 
         for i in range(rows):
-            start, end = self.indptr[i], self.indptr[i + 1]
-            for pos in range(start, end):
-                j = self.indices[pos]
-                val = self.data[pos]
+            start = self.indptr[i]
+            end = self.indptr[i + 1]
+            col_counts[i] = end - start
 
-                pos_in_csc = current_pos[j]
-                csc_data[pos_in_csc] = val
-                csc_indices[pos_in_csc] = i
-                current_pos[j] += 1
+        new_indptr = [0] * (new_cols + 1)
 
-        return CSCMatrix(csc_data, csc_indices, csc_indptr, (cols, rows))
+        for j in range(new_cols):
+            new_indptr[j + 1] = new_indptr[j] + col_counts[j]
+
+        new_data = [0] * len(self.data)
+        new_indices = [0] * len(self.indices)
+        col_positions = new_indptr.copy()
+
+        for i in range(rows):
+            start = self.indptr[i]
+            end = self.indptr[i + 1]
+            for idx in range(start, end):
+                j = self.indices[idx]
+                value = self.data[idx]
+                pos = col_positions[i]
+                new_data[pos] = value
+                new_indices[pos] = j
+                col_positions[i] += 1
+
+        return CSCMatrix(new_data, new_indices, new_indptr, (new_rows, new_cols))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         rows_A, cols_A = self.shape

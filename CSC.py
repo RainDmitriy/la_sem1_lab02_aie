@@ -72,39 +72,35 @@ class CSCMatrix(Matrix):
         from CSR import CSRMatrix
 
         rows, cols = self.shape
-        nnz = len(self.data)
-
-        if nnz == 0:
-            return CSRMatrix([], [], [0] * (rows + 1), (cols, rows))
-
-        row_counts = [0] * rows
-        for j in range(cols):
-            start, end = self.indptr[j], self.indptr[j + 1]
-            for pos in range(start, end):
-                i = self.indices[pos]
-                row_counts[i] += 1
-
-        csr_indptr = [0] * (rows + 1)
-        for i in range(rows):
-            csr_indptr[i + 1] = csr_indptr[i] + row_counts[i]
-
-        csr_data = [0.0] * nnz
-        csr_indices = [0] * nnz
-
-        current_pos = csr_indptr.copy()
+        new_rows, new_cols = cols, rows
+        row_counts = [0] * new_rows
 
         for j in range(cols):
-            start, end = self.indptr[j], self.indptr[j + 1]
-            for pos in range(start, end):
-                i = self.indices[pos]
-                val = self.data[pos]
+            start = self.indptr[j]
+            end = self.indptr[j + 1]
+            row_counts[j] = end - start
 
-                pos_in_csr = current_pos[i]
-                csr_data[pos_in_csr] = val
-                csr_indices[pos_in_csr] = j
-                current_pos[i] += 1
+        new_indptr = [0] * (new_rows + 1)
 
-        return CSRMatrix(csr_data, csr_indices, csr_indptr, (cols, rows))
+        for i in range(new_rows):
+            new_indptr[i + 1] = new_indptr[i] + row_counts[i]
+
+        new_data = [0] * len(self.data)
+        new_indices = [0] * len(self.indices)
+        row_positions = new_indptr.copy()
+
+        for j in range(cols):
+            start = self.indptr[j]
+            end = self.indptr[j + 1]
+            for idx in range(start, end):
+                i = self.indices[idx]
+                value = self.data[idx]
+                pos = row_positions[j]
+                new_data[pos] = value
+                new_indices[pos] = i
+                row_positions[j] += 1
+
+        return CSRMatrix(new_data, new_indices, new_indptr, (new_rows, new_cols))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         from CSR import CSRMatrix
