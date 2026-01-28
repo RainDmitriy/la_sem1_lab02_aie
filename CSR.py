@@ -89,7 +89,7 @@ class CSRMatrix(Matrix):
         csc_data = [0.0] * nnz
         csc_indices = [0] * nnz
 
-        current_pos = csc_indptr.copy()
+        current_pos = list(csc_indptr)
 
         for i in range(rows):
             start, end = self.indptr[i], self.indptr[i + 1]

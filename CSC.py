@@ -89,7 +89,7 @@ class CSCMatrix(Matrix):
         csr_data = [0.0] * nnz
         csr_indices = [0] * nnz
 
-        current_pos = csr_indptr.copy()
+        current_pos = list(csr_indptr)
 
         for j in range(cols):
             start, end = self.indptr[j], self.indptr[j + 1]
@@ -120,8 +120,36 @@ class CSCMatrix(Matrix):
         rows = len(dense_matrix)
         cols = len(dense_matrix[0]) if rows > 0 else 0
 
-        coo = COOMatrix.from_dense(dense_matrix)
-        return coo._to_csc()
+        data = []
+        indices = []
+        col_indices = []
+
+        for j in range(cols):
+            for i in range(rows):
+                val = dense_matrix[i][j]
+                if abs(val) > 1e-12:
+                    data.append(val)
+                    indices.append(i)
+                    col_indices.append(j)
+
+        if not data:
+            return cls([], [], [0] * (cols + 1), (rows, cols))
+
+        sorted_indices = sorted(range(len(data)), key=lambda idx: (col_indices[idx], indices[idx]))
+
+        sorted_data = [data[idx] for idx in sorted_indices]
+        sorted_indices_list = [indices[idx] for idx in sorted_indices]
+        sorted_col_indices = [col_indices[idx] for idx in sorted_indices]
+
+        col_counts = [0] * cols
+        for j in sorted_col_indices:
+            col_counts[j] += 1
+
+        indptr = [0] * (cols + 1)
+        for j in range(cols):
+            indptr[j + 1] = indptr[j] + col_counts[j]
+
+        return cls(sorted_data, sorted_indices_list, indptr, (rows, cols))
 
     def _to_csr(self) -> 'CSRMatrix':
         return self.transpose()
