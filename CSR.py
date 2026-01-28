@@ -1,5 +1,5 @@
 from base import Matrix
-from my_types import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
+from types import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 from CSC import CSCMatrix
 from COO import COOMatrix
 
@@ -13,63 +13,64 @@ class CSRMatrix(Matrix):
 
     def to_dense(self) -> DenseMatrix:
         n, m = self.shape
-        dense = [[0.0] * m for _ in range(n)]
-        for i in range(n):
-            for k in range(self.indptr[i], self.indptr[i + 1]):
-                j = self.indices[k]
-                dense[i][j] += self.data[k]
-        return dense
+        res = [[0.0 for _ in range(m)] for _ in range(n)]
+        for i, (start, end) in enumerate(zip(self.indptr, self.indptr[1:])):
+            for k in range(start, end):
+                res[i][self.indices[k]] = self.data[k]
+        return res
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         if not isinstance(other, CSRMatrix):
             other = other._to_csr() if hasattr(other, "_to_csr") else CSRMatrix.from_dense(other.to_dense())
-        coo = self._to_coo()
-        coo2 = other._to_coo()
-        return coo._add_impl(coo2)._to_csr()
+
+        # сложение через посредника
+        c1 = self._to_coo()
+        c2 = other._to_coo()
+        return c1._add_impl(c2)._to_csr()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         if scalar == 0:
             return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
-        return CSRMatrix([v * scalar for v in self.data], list(self.indices), list(self.indptr), self.shape)
+        return CSRMatrix([v * scalar for v in self.data], self.indices[:], self.indptr[:], self.shape)
 
     def transpose(self) -> 'Matrix':
         n, m = self.shape
-        return CSCMatrix(list(self.data), list(self.indices), list(self.indptr), (m, n))
+        # смена формата на CSC
+        return CSCMatrix(self.data[:], self.indices[:], self.indptr[:], (m, n))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        a = self._to_coo()
+        from COO import COOMatrix
+        a_coo = self._to_coo()
         if isinstance(other, COOMatrix):
-            b = other
-        elif hasattr(other, "_to_coo"):
-            b = other._to_coo()
+            b_coo = other
         else:
-            b = COOMatrix.from_dense(other.to_dense())
-        return a._matmul_impl(b)._to_csr()
+            b_coo = other._to_coo() if hasattr(other, "_to_coo") else COOMatrix.from_dense(other.to_dense())
+        return a_coo._matmul_impl(b_coo)._to_csr()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
-        n = len(dense_matrix)
-        m = len(dense_matrix[0]) if n > 0 else 0
-        data, indices, indptr, count = [], [], [0], 0
-        for i in range(n):
-            for j in range(m):
-                v = dense_matrix[i][j]
-                if v != 0:
-                    data.append(v)
-                    indices.append(j)
-                    count += 1
-            indptr.append(count)
-        return cls(data, indices, indptr, (n, m))
+        rows = len(dense_matrix)
+        cols = len(dense_matrix[0]) if rows > 0 else 0
+        v, idx, ptr = [], [], [0]
+
+        for r in range(rows):
+            for c in range(cols):
+                val = dense_matrix[r][c]
+                if val != 0:
+                    v.append(val)
+                    idx.append(c)
+            ptr.append(len(v))
+        return cls(v, idx, ptr, (rows, cols))
 
     def _to_csc(self) -> 'CSCMatrix':
         return self._to_coo()._to_csc()
 
     def _to_coo(self) -> 'COOMatrix':
         n, m = self.shape
-        row, col, data = [], [], []
+        v_out, r_out, c_out = [], [], []
         for i in range(n):
             for k in range(self.indptr[i], self.indptr[i + 1]):
-                row.append(i)
-                col.append(self.indices[k])
-                data.append(self.data[k])
-        return COOMatrix(data, row, col, (n, m))
+                v_out.append(self.data[k])
+                r_out.append(i)
+                c_out.append(self.indices[k])
+        return COOMatrix(v_out, r_out, c_out, (n, m))

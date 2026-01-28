@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from my_types import DenseMatrix, Shape
+from types import DenseMatrix, Shape
 
 
 class Matrix(ABC):

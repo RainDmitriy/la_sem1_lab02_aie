@@ -1,4 +1,4 @@
-# my_types.py
+# types.py
 from typing import List, Tuple
 
 # Основные типы данных

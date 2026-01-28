@@ -1,63 +1,82 @@
 from CSC import CSCMatrix
 from CSR import CSRMatrix
-from my_types import Vector
+from types import Vector
 from typing import Tuple, Optional
 
+
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
-    n, m = A.shape
-    if n != m: return None
+    """LU-разложение."""
+    size, _ = A.shape
+    if size != A.shape[1]:
+        return None
 
-    a = A.to_dense()
-    L = [[0.0] * n for _ in range(n)]
-    U = [[0.0] * n for _ in range(n)]
+    raw = A.to_dense()
+    low = [[1.0 if i == j else 0.0 for j in range(size)] for i in range(size)]
+    up = [[0.0 for _ in range(size)] for _ in range(size)]
 
-    for i in range(n): L[i][i] = 1.0
+    for i in range(size):
+        # Верхняя
+        curr_row = i
+        while curr_row < size:
+            sum_val = 0.0
+            for k in range(i):
+                sum_val += low[i][k] * up[k][curr_row]
+            up[i][curr_row] = raw[i][curr_row] - sum_val
+            curr_row += 1
 
-    for k in range(n):
-        s = sum(L[k][p] * U[p][k] for p in range(k))
-        pivot = a[k][k] - s
-        if pivot == 0: return None
-        U[k][k] = pivot
+        # Нижняя
+        curr_col = i + 1
+        while curr_col < size:
+            if abs(up[i][i]) < 1e-16:
+                return None
+            sum_val = 0.0
+            for k in range(i):
+                sum_val += low[curr_col][k] * up[k][i]
+            low[curr_col][i] = (raw[curr_col][i] - sum_val) / up[i][i]
+            curr_col += 1
 
-        for j in range(k + 1, n):
-            s = sum(L[k][p] * U[p][j] for p in range(k))
-            U[k][j] = a[k][j] - s
+    return CSCMatrix.from_dense(low), CSCMatrix.from_dense(up)
 
-        for i in range(k + 1, n):
-            s = sum(L[i][p] * U[p][k] for p in range(k))
-            L[i][k] = (a[i][k] - s) / U[k][k]
-
-    return CSCMatrix.from_dense(L), CSCMatrix.from_dense(U)
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
-    res = lu_decomposition(A)
-    if res is None: return None
-    L, U = res
+    """Решение через LU."""
+    decomp = lu_decomposition(A)
+    if not decomp:
+        return None
+    l_obj, u_obj = decomp
 
-    n, m = A.shape
-    if len(b) != n: return None
+    n = A.shape[0]
+    if len(b) != n:
+        return None
 
-    Ld, Ud = L.to_dense(), U.to_dense()
+    l_mtx, u_mtx = l_obj.to_dense(), u_obj.to_dense()
 
+    # Прямой
     y = [0.0] * n
     for i in range(n):
-        s = sum(Ld[i][j] * y[j] for j in range(i))
-        y[i] = b[i] - s
+        tmp = sum(l_mtx[i][j] * y[j] for j in range(i))
+        y[i] = b[i] - tmp
 
+    # Обратный
     x = [0.0] * n
     for i in range(n - 1, -1, -1):
-        s = sum(Ud[i][j] * x[j] for j in range(i + 1, n))
-        if Ud[i][i] == 0: return None
-        x[i] = (y[i] - s) / Ud[i][i]
+        if abs(u_mtx[i][i]) < 1e-16:
+            return None
+        tmp = sum(u_mtx[i][j] * x[j] for j in range(i + 1, n))
+        x[i] = (y[i] - tmp) / u_mtx[i][i]
 
     return x
 
+
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
+    """Определитель."""
     res = lu_decomposition(A)
-    if res is None: return None
-    _, U = res
-    Ud = U.to_dense()
-    det = 1.0
-    for i in range(len(Ud)):
-        det *= Ud[i][i]
-    return det
+    if res is None:
+        return None
+    _, u_part = res
+    u_data = u_part.to_dense()
+
+    total = 1.0
+    for idx in range(len(u_data)):
+        total *= u_data[idx][idx]
+    return total
