@@ -44,32 +44,35 @@ class CSRMatrix(Matrix):
         from CSC import CSCMatrix
 
         rows, cols = self.shape
-        data, row, col = [], [], []
+
+        data = self.data[:]
+        row = []
+        col = []
 
         for r in range(rows):
-            for idx in range(self.indptr[r], self.indptr[r + 1]):
-                c = self.indices[idx]
-                v = self.data[idx]
-                row.append(c)  #менянм row и col
-                col.append(r)
-                data.append(v)
+            start = self.indptr[r]
+            end = self.indptr[r + 1]
+            for idx in range(start, end):
+                row.append(r)
+                col.append(self.indices[idx])
 
-        elements = list(zip(row, col, data))
+        elements = list(zip(col, row, data))  # меняем местами
         elements.sort(key=lambda x: (x[0], x[1]))
 
-        sorted_col = [e[0] for e in elements]
-        sorted_row = [e[1] for e in elements]
-        sorted_data = [e[2] for e in elements]
+        if not elements:
+            return CSCMatrix([], [], [0] * (cols + 1), (cols, rows))
 
-        new_shape = (cols, rows)
-        new_cols = cols
-        indptr = [0] * (new_cols + 1)
-        for c in sorted_col:
-            indptr[c + 1] += 1
-        for i in range(1, new_cols + 1):
+        sorted_col = [elem[0] for elem in elements]
+        sorted_row = [elem[1] for elem in elements]
+        sorted_data = [elem[2] for elem in elements]
+
+        indptr = [0] * (cols + 1)
+        for col_idx in sorted_col:
+            indptr[col_idx + 1] += 1
+        for i in range(1, cols + 1):
             indptr[i] += indptr[i - 1]
 
-        return CSCMatrix(sorted_data, sorted_row, indptr, new_shape)
+        return CSCMatrix(sorted_data, sorted_row, indptr, (cols, rows))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSR матриц."""
