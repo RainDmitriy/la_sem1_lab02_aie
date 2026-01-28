@@ -185,15 +185,14 @@ class CSCMatrix(Matrix):
         """
 
         n_rows, n_cols = self.shape
-        new_n_rows, new_n_cols = n_cols, n_rows
 
-        row_counts = [0] * new_n_rows
+        row_counts = [0] * n_rows
 
         for row_idx in self.indices:
             row_counts[row_idx] += 1
 
         row_ptr = [0] * (n_rows + 1)
-        for i in range(new_n_rows):
+        for i in range(n_rows):
             row_ptr[i + 1] = row_ptr[i] + row_counts[i]
 
         positions = row_ptr.copy()
@@ -213,7 +212,7 @@ class CSCMatrix(Matrix):
                 positions[new_row] += 1
 
         from CSR import CSRMatrix
-        return CSRMatrix(new_data, new_indices, row_ptr, (new_n_rows, new_n_cols))
+        return CSRMatrix(new_data, new_indices, row_ptr, (n_rows, n_cols))
 
     def _to_coo(self) -> 'COOMatrix':
         """
