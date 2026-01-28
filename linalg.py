@@ -105,39 +105,38 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     """
     Решение СЛАУ Ax = b через LU-разложение.
     """
-    LU = lu_decomposition(A)
-    if LU is None:
-        raise ValueError("LU-разложение не удалось выполнить")
-
-    L, U = LU
-    n = len(b)
-
-    y = [0.0] * n
-    for i in range(n):
+    lu = lu_decomposition(A)
+    if lu is None:
+        return None
+    L, U = lu
+    sr = A.shape[0]
+    # Прямой ход Ly = b
+    y = [0.0] * sr
+    for i in range(sr):
         s = b[i]
-        row_start = L.indptr[i]
-        row_end = L.indptr[i + 1]
-        for k in range(row_start, row_end):
-            col_idx = L.indices[k]
-            if col_idx < i:
-                s -= L.data[k] * y[col_idx]
+        col_start = L.indptr[i]
+        col_end = L.indptr[i + 1]
+        for k in range(col_start, col_end):
+            row_idx = L.indices[k]
+            if row_idx < i:  # поддиагональ
+                s -= L.data[k] * y[row_idx]
         y[i] = s
-
-    x = [0.0] * n
-    for i in range(n - 1, -1, -1):
+    x = [0.0] * sr
+    for i in range(sr - 1, -1, -1):
         s = y[i]
-        row_start = U.indptr[i]
-        row_end = U.indptr[i + 1]
-        for k in range(row_start + 1, row_end):
-            col_idx = U.indices[k]
-            s -= U.data[k] * x[col_idx]
-        diag_pos = row_start
-        while diag_pos < row_end and U.indices[diag_pos] != i:
+        col_start = U.indptr[i]
+        col_end = U.indptr[i + 1]
+        diag_pos = col_start
+        while diag_pos < col_end and U.indices[diag_pos] != i:
             diag_pos += 1
-        if diag_pos < row_end:
-            x[i] = s / U.data[diag_pos]
-        else:
-            raise ValueError(f"Диагональный элемент U[{i},{i}] не найден в строке {i}")
+        u_ii = U.data[diag_pos] if diag_pos < col_end else 0.0
+        for k in range(col_start, col_end):
+            col_idx = U.indices[k]
+            if col_idx > i:
+                s -= U.data[k] * x[col_idx]
+        if abs(u_ii) < 1e-10:
+            return None
+        x[i] = s / u_ii
 
     return x
 

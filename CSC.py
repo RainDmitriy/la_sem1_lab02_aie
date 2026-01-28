@@ -63,38 +63,12 @@ class CSCMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
-        other_csr = other._to_csr()
-        rows_a, cols_a = self.shape
-        cols_b = other_csr.shape[1]
-        res_row, res_col, res_val = [], [], []
-        for i in range(rows_a):
-            # cтрока i матрицы A
-            a_row_idx = []
-            a_row_val = []
-            for k in range(self.indptr[i], self.indptr[i + 1]):
-                a_row_idx.append(self.indices[k])
-                a_row_val.append(self.data[k])
-            for j in range(cols_b):
-                # cтолбец j матрицы B
-                b_col_start = other_csr.indptr[j]
-                b_col_end = other_csr.indptr[j + 1]
-                s = 0.0
-                ka, kb = 0, b_col_start
-                while ka < len(a_row_idx) and kb < b_col_end:
-                    if a_row_idx[ka] == other_csr.indices[kb]:
-                        s += a_row_val[ka] * other_csr.data[kb]
-                        ka += 1
-                        kb += 1
-                    elif a_row_idx[ka] < other_csr.indices[kb]:
-                        ka += 1
-                    else:
-                        kb += 1
-                if abs(s) > 1e-12:
-                    res_row.append(i)
-                    res_col.append(j)
-                    res_val.append(s)
+        a = self._to_csr()
+        c = a._matmul_impl(other)
+        if hasattr(c, "_to_csc"):
+            return c._to_csc()
         from COO import COOMatrix
-        return COOMatrix(res_val, res_row, res_col, (rows_a, cols_b))._to_csc()
+        return COOMatrix.from_dense(c.to_dense())._to_csc()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
