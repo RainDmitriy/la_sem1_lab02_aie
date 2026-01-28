@@ -117,11 +117,12 @@ class CSRMatrix(Matrix):
                     col = other_indices[t]
                     row[col] = row.get(col, 0) + a * other_data[t]
 
-            for j in sorted(row.keys()):
-                v = row[j]
-                if v != 0:
-                    indices.append(j)
-                    data.append(v)
+            if row:
+                row_items = sorted(row.items())
+                for j, v in row_items:
+                    if v != 0:
+                        indices.append(j)
+                        data.append(v)
 
             indptr.append(len(data))
 

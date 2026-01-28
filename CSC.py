@@ -58,11 +58,12 @@ class CSCMatrix(Matrix):
                 i = other_indices[k]
                 col_sum[i] = col_sum.get(i, 0) + other_data[k]
 
-            for i in sorted(col_sum.keys()):
-                v = col_sum[i]
-                if v != 0:
-                    plus_indices.append(i)
-                    plus_data.append(v)
+            if col_sum:
+                col_items = sorted(col_sum.items())
+                for i, v in col_items:
+                    if v != 0:
+                        plus_indices.append(i)
+                        plus_data.append(v)
 
             plus_indptr.append(len(plus_data))
 

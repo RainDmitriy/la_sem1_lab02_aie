@@ -24,16 +24,23 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         L[i][i] = 1.0
 
     for k in range(n):
+        U_k = U[k]
+        L_k = L[k]
+        a_k = a[k]
         for j in range(k, n):
-            s = sum(L[k][p] * U[p][j] for p in range(k))
-            U[k][j] = a[k][j] - s
+            s = 0.0
+            for p in range(k):
+                s += L_k[p] * U[p][j]
+            U_k[j] = a_k[j] - s
 
-        pivot = U[k][k]
+        pivot = U_k[k]
         if pivot == 0.0:
             return None
 
         for i in range(k + 1, n):
-            s = sum(L[i][p] * U[p][k] for p in range(k))
+            s = 0.0
+            for p in range(k):
+                s += L[i][p] * U[p][k]
             L[i][k] = (a[i][k] - s) / pivot
 
     return CSCMatrix.from_dense(L), CSCMatrix.from_dense(U)
@@ -56,17 +63,23 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
 
     y = [0.0] * n
     for i in range(n):
-        s = sum(L[i][j] * y[j] for j in range(i))
-        if L[i][i] == 0.0:
+        s = 0.0
+        L_i = L[i]
+        for j in range(i):
+            s += L_i[j] * y[j]
+        if L_i[i] == 0.0:
             return None
-        y[i] = (b[i] - s) / L[i][i]
+        y[i] = (b[i] - s) / L_i[i]
 
     x = [0.0] * n
     for i in range(n - 1, -1, -1):
-        s = sum(U[i][j] * x[j] for j in range(i + 1, n))
-        if U[i][i] == 0.0:
+        s = 0.0
+        U_i = U[i]
+        for j in range(i + 1, n):
+            s += U_i[j] * x[j]
+        if U_i[i] == 0.0:
             return None
-        x[i] = (y[i] - s) / U[i][i]
+        x[i] = (y[i] - s) / U_i[i]
 
     return x
 
@@ -85,4 +98,3 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
         det *= U[i][i]
 
     return det
-
