@@ -1,5 +1,5 @@
 from base import Matrix
-from type import COOData, COORows, COOCols, Shape, DenseMatrix
+from .type import COOData, COORows, COOCols, Shape, DenseMatrix
 
 class COOMatrix(Matrix):
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):

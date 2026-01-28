@@ -1,8 +1,7 @@
 import heapq
 from CSC import CSCMatrix
 from CSR import CSRMatrix
-from types import Vector
-from type import Vector
+from .type import Vector
 from typing import Tuple, Optional
 
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
