@@ -1,7 +1,7 @@
 from base import Matrix
-from linalg import TOLERANCE
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
 
+TOLERANCE = 1e-8
 
 class COOMatrix(Matrix):
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
