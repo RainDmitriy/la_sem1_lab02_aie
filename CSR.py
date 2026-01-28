@@ -81,7 +81,6 @@ class CSRMatrix(Matrix):
 
         if nnz == 0:
             return CSCMatrix([], [], [0] * (cols + 1), (cols, rows))
-
         col_counts = [0] * cols
         for i in range(rows):
             start, end = self.indptr[i], self.indptr[i + 1]
@@ -92,7 +91,6 @@ class CSRMatrix(Matrix):
         csc_indptr = [0] * (cols + 1)
         for j in range(cols):
             csc_indptr[j + 1] = csc_indptr[j] + col_counts[j]
-
         csc_data = [0.0] * nnz
         csc_indices = [0] * nnz
         current_pos = csc_indptr.copy()
@@ -108,7 +106,9 @@ class CSRMatrix(Matrix):
                 csc_indices[csc_pos] = i
                 current_pos[j] += 1
 
-        return CSCMatrix(csc_data, csc_indices, csc_indptr, (cols, rows))
+        coo = self._to_coo()
+        transposed_coo = coo.transpose()
+        return transposed_coo._to_csc()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение матриц напрямую в разреженном формате."""

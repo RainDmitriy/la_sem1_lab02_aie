@@ -1,11 +1,12 @@
 from type import Vector
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 
 
 def lu_decomposition(A: 'CSCMatrix') -> Optional[Tuple['CSCMatrix', 'CSCMatrix']]:
     """
     LU-разложение для CSC матрицы.
     """
+    from CSC import CSCMatrix
     from COO import COOMatrix
 
     n = A.shape[0]
@@ -60,7 +61,6 @@ def solve_SLAE_lu(A: 'CSCMatrix', b: Vector) -> Optional[Vector]:
     dense_L = L.to_dense()
     dense_U = U.to_dense()
 
-
     y = [0.0] * n
     for i in range(n):
         total = b[i]
@@ -93,16 +93,8 @@ def find_det_with_lu(A: 'CSCMatrix') -> Optional[float]:
     n = A.shape[0]
 
     dense_U = U.to_dense()
-
     det = 1.0
     for i in range(n):
         det *= dense_U[i][i]
 
     return det
-
-
-def lu_decomposition_sparse(A: 'CSCMatrix') -> Optional[Tuple['CSCMatrix', 'CSCMatrix']]:
-    """
-    Более простая версия LU-разложения для тестирования.
-    """
-    return lu_decomposition(A)

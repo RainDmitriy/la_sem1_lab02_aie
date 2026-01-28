@@ -109,19 +109,27 @@ class CSCMatrix(Matrix):
                 csr_indices[csr_pos] = j
                 current_pos[i] += 1
 
-        return CSRMatrix(csr_data, csr_indices, csr_indptr, (cols, rows))
+        coo = self._to_coo()
+        transposed_coo = coo.transpose()
+        return transposed_coo._to_csr()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение матриц напрямую в разреженном формате."""
-        csr_self = self.transpose().transpose()  # Двойное транспонирование = CSR
-
         from CSR import CSRMatrix
-        from CSC import CSCMatrix
+        from COO import COOMatrix
+
+        coo_self = self._to_coo()
+        csr_self = coo_self._to_csr()
+
 
         if isinstance(other, CSRMatrix):
             return csr_self._matmul_impl(other)
         elif isinstance(other, CSCMatrix):
-            csr_other = other.transpose().transpose()
+            coo_other = other._to_coo()
+            csr_other = coo_other._to_csr()
+            return csr_self._matmul_impl(csr_other)
+        elif isinstance(other, COOMatrix):
+            csr_other = other._to_csr()
             return csr_self._matmul_impl(csr_other)
         else:
             other_csr = other._to_csr() if hasattr(other, '_to_csr') else CSRMatrix.from_dense(other.to_dense())
