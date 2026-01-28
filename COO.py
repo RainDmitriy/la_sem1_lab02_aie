@@ -21,8 +21,7 @@ class COOMatrix(Matrix):
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение COO матриц."""
         if not isinstance(other, COOMatrix):
-            print("Складывать можно только COO матрицы")
-            raise TypeError
+            raise TypeError("Складывать можно только COO матрицы")
 
         rows = self.row + other.row
         cols = self.col + other.col
@@ -52,7 +51,8 @@ class COOMatrix(Matrix):
         if isinstance(other, COOMatrix):
             other_csr = other._to_csr()
             return csr @ other_csr
-        return csr @ other
+        res = csr @ other
+        return res._to_coo()
 
 
     @classmethod
@@ -79,9 +79,12 @@ class COOMatrix(Matrix):
         """
         Преобразование COOMatrix в CSCMatrix.
         """
-        sorted_triplets = sorted(zip(self.row, self.col, self.data),
+        if not self.data:
+            return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
+
+        sort_coo = sorted(zip(self.row, self.col, self.data),
                                  key=lambda x: (x[1], x[0]))
-        rows, cols, data = zip(*sorted_triplets)
+        rows, cols, data = zip(*sort_coo)
         indptr = [0] * (self.shape[1] + 1)
         numbers = [0] * self.shape[1]
         for c in cols:
@@ -99,6 +102,9 @@ class COOMatrix(Matrix):
         """
         Преобразование COOMatrix в CSRMatrix.
         """
+        if not self.data:
+            return CSRMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
+
         sort_coo = sorted(zip(self.row, self.col, self.data))
         rows, cols, data = zip(*sort_coo)
         indptr = [0] * (self.shape[0] + 1)

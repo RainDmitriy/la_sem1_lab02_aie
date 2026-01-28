@@ -30,7 +30,10 @@ class CSRMatrix(Matrix):
         if rows != other.shape[0] or cols != other.shape[1]:
             raise ValueError("Матрицы должны быть одной размерности")
         if not isinstance(other, CSRMatrix):
-            raise TypeError("Матрица должна быть CSR")
+            if hasattr(other, '_to_csr'):
+                other = other._to_csr()
+            else:
+                raise TypeError("Матрица должна быть CSR")
 
         data = []
         indices = []
@@ -71,7 +74,11 @@ class CSRMatrix(Matrix):
         if self.shape[1] != other.shape[0]:
             raise ValueError("Умножение матриц невозможно")
         if not isinstance(other, CSRMatrix):
-            raise TypeError("Матрица должна быть CSR")
+            if hasattr(other, '_to_csr'):
+                other = other._to_csr()
+            else:
+                raise TypeError("Матрица должна быть CSR")
+
         a = self
         b = other
         rows_a = a.shape[0]
