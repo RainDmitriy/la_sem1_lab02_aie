@@ -41,8 +41,8 @@ class CSRMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
-        for i in self.data:
-            i *= scalar
+        for i in range(len(self.data)):
+            self.data[i] *= scalar
         return self
 
     def transpose(self) -> 'Matrix':
@@ -71,17 +71,27 @@ class CSRMatrix(Matrix):
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
         """Создание CSR из плотной матрицы."""
-        data, indices, indptr = [], [], [0]
-        shape = (len(dense_matrix), len(dense_matrix[0]))
-
-        for r in range(shape[0]):
-            count = 0
-            for c in range(shape[1]):
-                if dense_matrix[r][c] != 0:
-                    data.append(dense_matrix[r][c])
+        rows = len(dense_matrix)
+        if rows > 0:
+            cols = len(dense_matrix[0])
+        else:
+            cols = 0
+        
+        data = []
+        indices = []
+        indptr = [0]
+        
+        cumulative_count = 0
+        for r in range(rows):
+            for c in range(cols):
+                val = dense_matrix[r][c]
+                if val != 0:
+                    data.append(float(val))
                     indices.append(c)
-            indptr.append(indptr[-1] + count)
-        return cls(data, indices, indptr, shape)
+                    cumulative_count += 1
+            indptr.append(cumulative_count)
+            
+        return cls(data, indices, indptr, (rows, cols))
 
     def _to_csc(self) -> 'CSCMatrix':
         """
@@ -131,17 +141,3 @@ class CSRMatrix(Matrix):
                 col.append(self.indices[j])
         return COOMatrix(data, row, col, self.shape)
     
-
-
-if __name__ == "__main__":
-    csr1 = CSRMatrix([3, 4, 5, 6, 7], [2, 3, 2, 1, 2], [0, 2, 3, 5], (3, 4))
-    csr1_in_coo = csr1._to_coo()
-    print(csr1_in_coo.data, csr1_in_coo.row, csr1_in_coo.col, csr1_in_coo.shape)
-
-    csr2 = CSRMatrix([1, 7, 2, 4, 1, 3, 5], [0, 1, 1, 3, 1, 2, 3], [0, 2, 4, 7], (3, 4))
-
-    print(csr1.to_dense())
-    print(csr2.to_dense())
-
-    csr_sum = csr1 + csr2
-    print(csr_sum.data, csr_sum.indices, csr_sum.indptr, csr_sum.shape)

@@ -40,13 +40,12 @@ class CSCMatrix(Matrix):
         return CSCMatrix(data, indices, indptr, self.shape)
 
 
-
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
-        for i in self.data:
-            i *= scalar
+        for i in range(len(self.data)):
+            self.data[i] *= scalar
         return self
-
+    
     def transpose(self) -> 'Matrix':
         """
         Транспонирование CSC матрицы.
@@ -73,17 +72,27 @@ class CSCMatrix(Matrix):
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
         """Создание CSC из плотной матрицы."""
-        data, indices, indptr = [], [], [0]
-        shape = (len(dense_matrix), len(dense_matrix[0]))
-
-        for c in range(shape[1]):
-            count = 0
-            for r in range(shape[0]):
-                if dense_matrix[r][c] != 0:
-                    data.append(dense_matrix[r][c])
+        rows = len(dense_matrix)
+        if rows > 0:
+            cols = len(dense_matrix[0])
+        else:
+            cols = 0
+        
+        data = []
+        indices = []
+        indptr = [0]
+        
+        cumulative_count = 0
+        for c in range(cols):
+            for r in range(rows):
+                val = dense_matrix[r][c]
+                if val != 0:
+                    data.append(float(val))
                     indices.append(r)
-            indptr.append(indptr[-1] + count)
-        return cls(data, indices, indptr, shape)
+                    cumulative_count += 1
+            indptr.append(cumulative_count)
+            
+        return cls(data, indices, indptr, (rows, cols))
 
     def _to_csr(self) -> 'CSRMatrix':
         """
