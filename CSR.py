@@ -2,6 +2,12 @@ from base import Matrix
 from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 
 class CSRMatrix(Matrix):
+    def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
+        super().__init__(shape)
+        if indptr[0] != 0:
+            raise ValueError("Первый элемент indptr должен быть равен 0")
+        self.data = data
+
     def _to_csr(self) -> 'CSRMatrix':
         """CSR -> CSR (просто возвращаем себя)"""
         return self

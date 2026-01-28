@@ -2,6 +2,13 @@ from base import Matrix
 from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 
 class CSCMatrix(Matrix):
+    def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
+        super().__init__(shape)
+        if indptr[0] != 0:
+            raise ValueError("Первый элемент indptr должен быть равен 0")
+        self.data = data
+
+
     def _to_csc(self) -> 'CSCMatrix':
         """CSC -> CSC (просто возвращаем себя)"""
         return self

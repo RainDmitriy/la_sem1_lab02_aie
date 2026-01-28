@@ -3,58 +3,46 @@ from typing import Dict, Tuple, List
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
 
 class COOMatrix(Matrix):
-
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
         super().__init__(shape)
-        self.data = list(data)
-        self.row = list(row)
-        self.col = list(col)
-        self.nnz = len(data)  # Временное значение
         if len(data) != len(row) or len(data) != len(col):
             raise ValueError("data, row и col не совпадают")
-
-        for r, c in zip(row, col):
-            if r < 0 or r >= shape[0] or c < 0 or c >= shape[1]:
-                raise ValueError("индекс за границой матрицы")
-        # Нормализуем в конце конструктора
-        self._normalize()
-
-    def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
-        super().__init__(shape)
-        if len(data) != len(row) or len(data) != len(col) or len(row) != len(col):
-            raise ValueError("data, row, col должны быть одинаковой длины")
-
         sr, sc = shape
         for r in row:
             if r < 0 or r >= sr:
-                raise ValueError("row индекс вне диапазона")
+                raise ValueError(f"row индекс {r} вне диапазона [0, {sr - 1}]")
         for c in col:
             if c < 0 or c >= sc:
-                raise ValueError("col индекс вне диапазона")
+                raise ValueError(f"col индекс {c} вне диапазона [0, {sc - 1}]")
 
         self.data = list(data)
         self.row = list(row)
         self.col = list(col)
+        self.nnz = len(data)
         self._normalize()
-        self.shape = shape
 
     def _to_coo(self) -> 'COOMatrix':
         """COO -> COO (просто возвращаем копию)"""
         return COOMatrix(self.data.copy(), self.row.copy(), self.col.copy(), self.shape)
 
     def _normalize(self) -> None:
+        """Нормализует COO матрицу: суммирует дубликаты, удаляет нули, сортирует"""
         mp = {}
         for d, r, c in zip(self.data, self.row, self.col):
-            d = float(d)
-            if d == 0.0:
+            d_val = float(d)
+            if abs(d_val) < 1e-14:  # Пропускаем почти нули
                 continue
-            mp[(int(r), int(c))] = mp.get((int(r), int(c)), 0.0) + d
-        items = [((r, c), d) for (r, c), d in mp.items() if d != 0.0]
+            key = (int(r), int(c))
+            mp[key] = mp.get(key, 0.0) + d_val
+        items = []
+        for (r, c), d in mp.items():
+            if abs(d) > 1e-14:
+                items.append(((r, c), d))
         items.sort(key=lambda x: (x[0][0], x[0][1]))
         self.row = [r for (r, _), _ in items]
         self.col = [c for (_, c), _ in items]
         self.data = [d for _, d in items]
-        self.nnz = len(self.data)
+        self.nnz = len(self.data)  # ОБНОВИТЬ!
 
     def to_dense(self) -> DenseMatrix:
         """из COO в плотную матрицу"""
@@ -81,8 +69,6 @@ class COOMatrix(Matrix):
                 data.append(d)
                 row.append(r)
                 col.append(c)
-
-        # Используйте конструктор
         return COOMatrix(data, row, col, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
@@ -126,21 +112,23 @@ class COOMatrix(Matrix):
         return COOMatrix(data, row, col, (sr, sc))
 
     @classmethod
-    def from_dense(cls, dense: DenseMatrix) -> 'COOMatrix':
-        """Создаёт COO‑матрицу из плотного представления."""
-        data, row, col = [], [], []
-        sr = len(dense)
-        sc = len(dense[0]) if sr > 0 else 0
+    @classmethod
+    def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
+        """создание coo из плотной матрицы"""
+        rows = len(dense_matrix)
+        cols = len(dense_matrix[0]) if rows > 0 else 0
+        data = []
+        row_indices = []
+        col_indices = []
+        for i in range(rows):
+            for j in range(cols):
+                value = dense_matrix[i][j]
+                if value != 0.0:
+                    data.append(float(value))
+                    row_indices.append(i)
+                    col_indices.append(j)
 
-        for r in range(sr):
-            for c in range(sc):
-                d = float(dense[r][c])
-                if d != 0.0:  # Используйте != вместо abs() > порог
-                    data.append(d)
-                    row.append(r)
-                    col.append(c)
-
-        return cls(data, row, col, (sr, sc))
+        return cls(data, row_indices, col_indices, (rows, cols))
 
     def _to_csc(self) -> 'CSCMatrix':
         """Конвертирует текущую матрицу в формат CSC."""
