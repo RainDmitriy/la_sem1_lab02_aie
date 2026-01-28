@@ -24,21 +24,21 @@ class COOMatrix(Matrix):
             other_coo = other
         else:
             other_coo = other._to_coo()
+        all_data = self.data + other_coo.data
+        all_row = self.row + other_coo.row
+        all_col = self.col + other_coo.col
         result_dict = {}
-        for idx in range(self.nnz):
-            key = (self.row[idx], self.col[idx])
-            result_dict[key] = self.data[idx]
-        for idx in range(other_coo.nnz):
-            key = (other_coo.row[idx], other_coo.col[idx])
-            result_dict[key] = result_dict.get(key, 0.0) + other_coo.data[idx]
+        for idx in range(len(all_data)):
+            key = (all_row[idx], all_col[idx])
+            result_dict[key] = result_dict.get(key, 0.0) + all_data[idx]
         new_data = []
         new_row = []
         new_col = []
-        for (i, j), val in sorted(result_dict.items()):
-            if abs(val) > 1e-12:
-                new_data.append(val)
-                new_row.append(i)
-                new_col.append(j)
+        for (i, j) in sorted(result_dict.keys()):
+            val = result_dict[(i, j)]
+            new_data.append(val)
+            new_row.append(i)
+            new_col.append(j)
         return COOMatrix(new_data, new_row, new_col, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
