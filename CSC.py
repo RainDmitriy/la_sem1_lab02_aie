@@ -11,7 +11,7 @@ class CSCMatrix(Matrix):
         self.shape = shape
 
     def to_dense(self) -> DenseMatrix:
-        """Преобразует CSC в плотную матрицу"""
+        """Преобразует CSC в плотную матрицу."""
         n, m = self.shape
         matrix = [[0] * m for _ in range(n)]
 
@@ -62,7 +62,7 @@ class CSCMatrix(Matrix):
         return CSCMatrix(data, indices, indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        """Умножение CSC на скаляр"""
+        """Умножение CSC на скаляр."""
         if scalar == 0:
             return CSCMatrix(list(), list(), [0] * len(self.indptr), self.shape)
 
@@ -72,25 +72,24 @@ class CSCMatrix(Matrix):
 
     def transpose(self) -> 'Matrix':
         """
-        Транспонирование CSC матрицы
-        Результат - в CSR формате
+        Транспонирование CSC матрицы.
+        Hint:
+        Результат - в CSR формате (с теми же данными, но с интерпретацией строк как столбцов).
         """
         from CSR import CSRMatrix
         return CSRMatrix(self.data, self.indices, self.indptr, (self.shape[1], self.shape[0]))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """Умножение CSC матриц"""
+        """Умножение CSC матриц."""
         csr_self = self._to_csr()
         csr_other = other._to_csr()
 
         csr_result = csr_self._matmul_impl(csr_other)
-
-        return csr_result.to_csc()
         return csr_result._to_csc()
-
+    
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
-        """Создание CSC из плотной матрицы"""
+        """Создание CSC из плотной матрицы."""
         indptr, indices, data = [0], list(), list()
         n, m = len(dense_matrix), len(dense_matrix[0])
 
@@ -109,7 +108,7 @@ class CSCMatrix(Matrix):
 
     def _to_csr(self) -> 'CSRMatrix':
         """
-        Преобразование CSCMatrix в CSRMatrix
+        Преобразование CSCMatrix в CSRMatrix.
         """
         from CSR import CSRMatrix
 
@@ -145,7 +144,7 @@ class CSCMatrix(Matrix):
 
     def _to_coo(self) -> 'COOMatrix':
         """
-        Преобразование CSCMatrix в COOMatrix
+        Преобразование CSCMatrix в COOMatrix.
         """
         from COO import COOMatrix
 

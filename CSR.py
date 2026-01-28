@@ -11,7 +11,7 @@ class CSRMatrix(Matrix):
         self.shape = shape
 
     def to_dense(self) -> DenseMatrix:
-        """Преобразует CSR в плотную матрицу"""
+        """Преобразует CSR в плотную матрицу."""
         n, m = self.shape
         matrix = [[0] * m for _ in range(n)]
 
@@ -28,7 +28,7 @@ class CSRMatrix(Matrix):
         return matrix
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Сложение CSR матриц"""
+        """Сложение CSR матриц."""
         indptr, indices, data = [0], list(), list()
         counter_col1, counter_col2 = 0, 0
         row = 0
@@ -46,28 +46,19 @@ class CSRMatrix(Matrix):
                 key = other.indices[counter_col2]
                 merged_row[key] = merged_row.get(key, 0) + other.data[counter_col2]
                 counter_col2 += 1
-
             added_counter = 0
-            if merged_row:
-                indices_row, data_row = zip(*sorted(merged_row.items()))
-
-                indices.extend(indices_row)
-                data.extend(data_row)
-                for c, val in sorted(merged_row.items()):
+            for c, val in sorted(merged_row.items()):
                     if val != 0:
                         indices.append(c)
                         data.append(val)
                         added_counter += 1
-
-            indptr.append(indptr[-1] + len(merged_row))
             indptr.append(indptr[-1] + added_counter)
-
             row += 1
 
         return CSRMatrix(data, indices, indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        """Умножение CSR на скаляр"""
+        """Умножение CSR на скаляр."""
         if scalar == 0:
             return CSRMatrix(list(), list(), [0] * len(self.indptr), self.shape)
 
@@ -77,15 +68,15 @@ class CSRMatrix(Matrix):
 
     def transpose(self) -> 'Matrix':
         """
-        Транспонирование CSR матрицы
+        Транспонирование CSR матрицы.
         Hint:
-        Результат в CSC формате
+        Результат - в CSC формате (с теми же данными, но с интерпретацией столбцов как строк).
         """
         from CSC import CSCMatrix
         return CSCMatrix(self.data, self.indices, self.indptr, (self.shape[1], self.shape[0]))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """Умножение CSR матриц"""
+        """Умножение CSR матриц."""
         n_rows_A = self.shape[0]
         n_cols_B = other.shape[1]
 
@@ -141,7 +132,7 @@ class CSRMatrix(Matrix):
 
     def _to_csc(self) -> 'CSCMatrix':
         """
-        Преобразование CSRMatrix в CSCMatrix
+        Преобразование CSRMatrix в CSCMatrix.
         """
         from CSC import CSCMatrix
 
@@ -177,7 +168,7 @@ class CSRMatrix(Matrix):
 
     def _to_coo(self) -> 'COOMatrix':
         """
-        Преобразование CSRMatrix в COOMatrix
+        Преобразование CSRMatrix в COOMatrix.
         """
         from COO import COOMatrix
 
