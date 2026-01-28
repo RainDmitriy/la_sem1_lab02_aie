@@ -1,5 +1,5 @@
 from base import Matrix
-from la_sem1_lab02_aie.linalg import TOLERANCE
+from linalg import TOLERANCE
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
 
 
