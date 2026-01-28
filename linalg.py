@@ -148,4 +148,3 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
         det *= diag
 
     return det
-

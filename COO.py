@@ -1,7 +1,6 @@
 from base import Matrix
 from types import COOData, COORows, COOCols, Shape, DenseMatrix
 
-
 class COOMatrix(Matrix):
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
         super().__init__(shape)
