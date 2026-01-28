@@ -17,6 +17,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: RainDmitriy/AIE_matrix_lab
+          ref: master
           token: ${{ secrets.REFERENCE_TOKEN }}
           path: reference
 
