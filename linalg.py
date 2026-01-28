@@ -9,10 +9,12 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     Возвращает (L, U) - нижнюю и верхнюю треугольные матрицы.
     Ожидается, что матрица L хранит единицы на главной диагонали.
     """
+    n = A.shape[0]
+    if n != A.shape[1] or n == 0:
+        return None
+    
     dense = A.to_dense()
-    n = len(dense)
-
-    if n == 0 or any(len(row) != n for row in dense):
+    if any(len(row) != n for row in dense):
         return None
 
     a = [row[:] for row in dense]
@@ -24,24 +26,10 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         L[i][i] = 1.0
 
     for k in range(n):
-        max_idx = k
-        max_val = abs(a[k][k])
-        for i in range(k + 1, n):
-            if abs(a[i][k]) > max_val:
-                max_val = abs(a[i][k])
-                max_idx = i
-        
-        if max_val < 1e-10:
-            return None
-        
-        if max_idx != k:
-            a[k], a[max_idx] = a[max_idx], a[k]
-            for j in range(k):
-                L[k][j], L[max_idx][j] = L[max_idx][j], L[k][j]
-        
         U_k = U[k]
         L_k = L[k]
         a_k = a[k]
+        
         for j in range(k, n):
             s = 0.0
             for p in range(k):
