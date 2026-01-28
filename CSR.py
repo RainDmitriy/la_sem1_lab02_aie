@@ -73,6 +73,7 @@ class CSRMatrix(Matrix):
         Hint:
         Результат - в CSC формате (с теми же данными, но с интерпретацией столбцов как строк).
         """
+        from CSC import CSCMatrix
         rows, cols = self.shape
         return CSCMatrix(
             self.data,

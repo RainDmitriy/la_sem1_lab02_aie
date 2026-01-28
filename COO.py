@@ -52,7 +52,7 @@ class COOMatrix(Matrix):
 
         for i, j, v in self.iter_nonzero():
             new_v = v * scalar
-            if new_v != 0:
+            if abs(newv) > 1e-10:
                 data.append(new_v)
                 row.append(i)
                 col.append(j)
@@ -152,6 +152,7 @@ class COOMatrix(Matrix):
         data, indices, indptr = [], [], [0]
 
         for i in range(num_rows):
+            row_items = sorted(rowselements[i])
             for c, v in rows_elements[i]:
                 data.append(v)
                 indices.append(c)

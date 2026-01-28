@@ -74,6 +74,7 @@ class CSCMatrix(Matrix):
         Hint:
         Результат - в CSR формате (с теми же данными, но с интерпретацией строк как столбцов).
         """
+        from CSR import CSRMatrix
         return CSRMatrix(
             self.data,
             self.indices,
