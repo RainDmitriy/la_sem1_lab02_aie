@@ -2,6 +2,7 @@ from CSC import CSCMatrix
 from CSR import CSRMatrix
 from type import Vector
 from typing import Tuple, Optional
+import heapq
 EPS = 1e-10
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     """
@@ -10,54 +11,47 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     Ожидается, что матрица L хранит единицы на главной диагонали.
     """
     n = A.shape[0]
-
+    if n != A.shape[1]:
+        return None
     U_data = A.data[:]
     U_indices = A.indices[:]
     U_indptr = A.indptr[:]
-
-    L_data = []
-    L_indices = []
-    L_indptr = [0] * (n + 1)
-
+    # L множители: [(строка, значение), ...]
+    L_multipliers = [[] for _ in range(n)]
     for k in range(n):
         col_start = U_indptr[k]
         col_end = U_indptr[k + 1]
         diag_pos = -1
-
         for pos in range(col_start, col_end):
             if U_indices[pos] == k:
                 diag_pos = pos
                 break
-
         if diag_pos == -1 or abs(U_data[diag_pos]) < EPS:
             return None
-
         u_kk = U_data[diag_pos]
-
         for pos in range(diag_pos + 1, col_end):
             row_idx = U_indices[pos]
             if row_idx > k:
-                L_data.append(U_data[pos] / u_kk)
-                L_indices.append(row_idx)
-
-        L_indptr[k + 1] = len(L_data)
-
+                l_ki = U_data[pos] / u_kk
+                L_multipliers[k].append((row_idx, l_ki))
+                U_data[pos] = 0.0  # очистим под L
         for j in range(k + 1, n):
             col_j_start = U_indptr[j]
             col_j_end = U_indptr[j + 1]
-            #столбец k и столбец j
-            new_data = []
-            new_indices = []
-            p1 = col_start
-            p2 = col_j_start
+            new_data, new_indices = [], []
+            p1, p2 = col_start, col_j_start
             while p1 < col_end and p2 < col_j_end:
                 idx1, idx2 = U_indices[p1], U_indices[p2]
-
-                if idx1 == idx2:
-                    if idx1 > k:
-                        l_ki = U_data[p1] / u_kk  # коэффициент
-                        new_data.append(U_data[p2] - l_ki * U_data[p1])
-                    p1 += 1
+                if idx1 == idx2 and idx1 > k:
+                    # вычитаю l_ki * u_kj
+                    correction = 0.0
+                    for row_r, l_val in L_multipliers[k]:
+                        if row_r == idx2:
+                            correction = l_val * U_data[p1]
+                            break
+                    new_data.append(U_data[p2] - correction)
+                    new_indices.append(idx1)
+                    p1 += 1;
                     p2 += 1
                 elif idx1 < idx2:
                     if idx1 > k:
@@ -68,7 +62,6 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                     new_data.append(U_data[p2])
                     new_indices.append(idx2)
                     p2 += 1
-
             while p1 < col_end:
                 if U_indices[p1] > k:
                     new_data.append(U_data[p1])
@@ -78,32 +71,22 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                 new_data.append(U_data[p2])
                 new_indices.append(U_indices[p2])
                 p2 += 1
-
             new_nnz = len(new_data)
             U_indptr[j + 1] = U_indptr[j] + new_nnz
-
             for pos in range(new_nnz):
                 U_data[col_j_start + pos] = new_data[pos]
                 U_indices[col_j_start + pos] = new_indices[pos]
-
-            while len(U_data) < U_indptr[-1]:
-                U_data.append(0.0)
-                U_indices.append(0)
-
-    L_data_full = []
-    L_indices_full = []
-    L_indptr_full = [0] * (n + 1)
+    L_data, L_indices, L_indptr = [], [], [0]
     for j in range(n):
-        L_data_full.append(1.0)
-        L_indices_full.append(j)
-        for pos in range(L_indptr[j], L_indptr[j + 1]):
-            L_data_full.append(L_data[pos])
-            L_indices_full.append(L_indices[pos])
-        L_indptr_full[j + 1] = len(L_data_full)
-    L = CSCMatrix(L_data_full, L_indices_full, L_indptr_full, (n, n))
-    U = CSCMatrix(U_data, U_indices, U_indptr, (n, n))
-
-    return L, U
+        L_data.append(1.0)
+        L_indices.append(j)
+        L_indptr.append(len(L_data))
+        for row_idx, val in L_multipliers[j]:
+            L_data.append(val)
+            L_indices.append(row_idx)
+            L_indptr.append(len(L_data))
+    return (CSCMatrix(L_data, L_indices, L_indptr, (n, n)),
+            CSCMatrix(U_data, U_indices, U_indptr, (n, n)))
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     """
