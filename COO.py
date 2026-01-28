@@ -66,29 +66,24 @@ class COOMatrix(Matrix):
 
     def _matmul_impl(self, other: Matrix) -> Matrix:
         """Умножение COO матриц."""
-        a_csr = self._to_csr()
-        b_csc = other._to_csc()
-        m, _ = self.shape
-        _, n = other.shape
+        # Ensure the inner dimensions match for matrix multiplication
+        if self.shape[1] != other.shape[0]:
+            raise ValueError()
+        m, n = self.shape[0], other.shape[1]
+        # Convert the second matrix to CSR format once for efficient row access
+        other_csr = other._to_csr()
         result: Dict[Tuple[int, int], float] = {}
-        
-        for i in range(m):
-            row_start = a_csr.indptr[i]
-            row_end = a_csr.indptr[i + 1]
-            if row_start == row_end:
-                continue
-            
-            for p in range(row_start, row_end):
-                k = a_csr.indices[p]
-                a_val = a_csr.data[p]
-                
-                col_start = b_csc.indptr[k]
-                col_end = b_csc.indptr[k + 1]
-                for q in range(col_start, col_end):
-                    j = b_csc.indices[q]
-                    b_val = b_csc.data[q]
-                    result[(i, j)] = result.get((i, j), 0.0) + a_val * b_val
-        
+        # Iterate over each non-zero element of the first matrix
+        for val_a, row_a, col_a in zip(self.data, self.row, self.col):
+            # Access the row in the second matrix corresponding to the column index of the current element
+            row_start = other_csr.indptr[col_a]
+            row_end = other_csr.indptr[col_a + 1]
+            for k in range(row_start, row_end):
+                col_b = other_csr.indices[k]
+                val_b = other_csr.data[k]
+                key = (row_a, col_b)
+                result[key] = result.get(key, 0.0) + val_a * val_b
+        # Build result COO matrix from the accumulated values
         res_data: COOData = []
         res_row: COORows = []
         res_col: COOCols = []
