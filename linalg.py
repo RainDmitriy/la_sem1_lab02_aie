@@ -14,128 +14,135 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     if n != m:
         return None
 
-    row_adj = [dict() for _ in range(n)]
-    col_adj = [dict() for _ in range(n)]
-    for c in range(m):
-        for k in range(A.indptr[c], A.indptr[c + 1]):
-             r = A.indices[k]
-             val = A.data[k]
-             row_adj[r][c] = val
-             col_adj[c][r] = val
-    L_triplets = []
-    U_triplets = []
-    for k in range(n):
-        pivot = col_adj[k].get(k, 0.0)
-        if pivot == 0:
+    row_adjacent = [dict() for _ in range(n)]
+    column_adjacent = [dict() for _ in range(n)]
+    
+    for column_index in range(m):
+        for k in range(A.indptr[column_index], A.indptr[column_index + 1]):
+             row_index = A.indices[k]
+             value = A.data[k]
+             row_adjacent[row_index][column_index] = value
+             column_adjacent[column_index][row_index] = value
+    
+    L_triplets_collection = []
+    U_triplets_collection = []
+    
+    for diagonal_index in range(n):
+        pivot_element = column_adjacent[diagonal_index].get(diagonal_index, 0.0)
+        if pivot_element == 0:
             return None
-        U_triplets.append((k, k, pivot))
-        L_triplets.append((k, k, 1.0))
+        
+        U_triplets_collection.append((diagonal_index, diagonal_index, pivot_element))
+        L_triplets_collection.append((diagonal_index, diagonal_index, 1.0))
 
-        u_indices = []
-        u_vals = []
+        upper_indices_list = []
+        upper_values_list = []
 
-        if row_adj[k]:
-            for c, val in sorted(row_adj[k].items()):
-                if c > k:
-                    if abs(val) > 1e-15:
-                        U_triplets.append((k, c, val))
-                        u_indices.append(c)
-                        u_vals.append(val)
+        if row_adjacent[diagonal_index]:
+            for column, value in sorted(row_adjacent[diagonal_index].items()):
+                if column > diagonal_index:
+                    if abs(value) > 1e-15:
+                        U_triplets_collection.append((diagonal_index, column, value))
+                        upper_indices_list.append(column)
+                        upper_values_list.append(value)
 
-        l_indices = []
-        l_vals = []
+        lower_indices_list = []
+        lower_values_list = []
 
-        if col_adj[k]:
-            for r, val in sorted(col_adj[k].items()):
-                if r > k:
-                    l_val = val / pivot
-                    if abs(l_val) > 1e-15:
-                        L_triplets.append((r, k, l_val))
-                        l_indices.append(r)
-                        l_vals.append(l_val)
+        if column_adjacent[diagonal_index]:
+            for row, value in sorted(column_adjacent[diagonal_index].items()):
+                if row > diagonal_index:
+                    lower_value = value / pivot_element
+                    if abs(lower_value) > 1e-15:
+                        L_triplets_collection.append((row, diagonal_index, lower_value))
+                        lower_indices_list.append(row)
+                        lower_values_list.append(lower_value)
 
-        for i in range(len(l_indices)):
-            r = l_indices[i]
-            l_val = l_vals[i]
+        for idx in range(len(lower_indices_list)):
+            current_row = lower_indices_list[idx]
+            current_lower_value = lower_values_list[idx]
 
-            for j in range(len(u_indices)):
-                c = u_indices[j]
-                u_val = u_vals[j]
+            for jdx in range(len(upper_indices_list)):
+                current_column = upper_indices_list[jdx]
+                current_upper_value = upper_values_list[jdx]
 
-                update = l_val * u_val
+                adjustment = current_lower_value * current_upper_value
 
-                old_val = row_adj[r].get(c, 0.0)
-                new_val = old_val - update
+                previous_value = row_adjacent[current_row].get(current_column, 0.0)
+                updated_value = previous_value - adjustment
 
-                if abs(new_val) > 1e-15:
-                    row_adj[r][c] = new_val
-                    col_adj[c][r] = new_val
-                elif c in row_adj[r]:
-                    del row_adj[r][c]
-                    del col_adj[c][r]
+                if abs(updated_value) > 1e-15:
+                    row_adjacent[current_row][current_column] = updated_value
+                    column_adjacent[current_column][current_row] = updated_value
+                elif current_column in row_adjacent[current_row]:
+                    del row_adjacent[current_row][current_column]
+                    del column_adjacent[current_column][current_row]
 
-    def to_csc(triplets, size):
-        triplets.sort(key=lambda x: (x[1], x[0]))
+    def convert_to_csc_format(triplets, matrix_size):
+        triplets.sort(key=lambda element: (element[1], element[0]))
 
-        data = [x[2] for x in triplets]
-        indices = [x[0] for x in triplets]
-        indptr = [0] * (size + 1)
+        values_data = [element[2] for element in triplets]
+        row_indices_data = [element[0] for element in triplets]
+        column_pointers = [0] * (matrix_size + 1)
 
-        curr_col = 0
-        for _, col, _ in triplets:
-            while curr_col < col:
-                curr_col += 1
-                indptr[curr_col + 1] = indptr[curr_col]
-            indptr[curr_col + 1] += 1
+        current_column = 0
+        for _, col_idx, _ in triplets:
+            while current_column < col_idx:
+                current_column += 1
+                column_pointers[current_column + 1] = column_pointers[current_column]
+            column_pointers[current_column + 1] += 1
 
-        while curr_col < size - 1:
-            curr_col += 1
-            indptr[curr_col + 1] = indptr[curr_col]
+        while current_column < matrix_size - 1:
+            current_column += 1
+            column_pointers[current_column + 1] = column_pointers[current_column]
 
-        return CSCMatrix(data, indices, indptr, (size, size))
+        return CSCMatrix(values_data, row_indices_data, column_pointers, (matrix_size, matrix_size))
 
-    return to_csc(L_triplets, n), to_csc(U_triplets, n)
+    return (convert_to_csc_format(L_triplets_collection, n), 
+            convert_to_csc_format(U_triplets_collection, n))
 
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     """
     Решение СЛАУ Ax = b через LU-разложение.
     """
-    lu = lu_decomposition(A)
-    if lu is None:
+    decomposition_result = lu_decomposition(A)
+    if decomposition_result is None:
         return None
-    L, U = lu
-    n = len(b)
+    
+    L_matrix, U_matrix = decomposition_result
+    dimension = len(b)
 
-    y = list(b)
-    for j in range(n):
-        if y[j] != 0:
-            for k in range(L.indptr[j], L.indptr[j + 1]):
-                row = L.indices[k]
-                val = L.data[k]
-                if row > j:
-                    y[row] -= val * y[j]
+    intermediate_vector = list(b)
+    for column in range(dimension):
+        if intermediate_vector[column] != 0:
+            for k in range(L_matrix.indptr[column], L_matrix.indptr[column + 1]):
+                row_idx = L_matrix.indices[k]
+                element_value = L_matrix.data[k]
+                if row_idx > column:
+                    intermediate_vector[row_idx] -= element_value * intermediate_vector[column]
 
-    x = list(y)
-    for j in range(n - 1, -1, -1):
-        diag_val = 0
-        for k in range(U.indptr[j], U.indptr[j + 1]):
-            if U.indices[k] == j:
-                diag_val = U.data[k]
+    solution_vector = list(intermediate_vector)
+    for column in range(dimension - 1, -1, -1):
+        diagonal_value = 0
+        for k in range(U_matrix.indptr[column], U_matrix.indptr[column + 1]):
+            if U_matrix.indices[k] == column:
+                diagonal_value = U_matrix.data[k]
                 break
 
-        if diag_val == 0: return None
+        if diagonal_value == 0: 
+            return None
 
-        x[j] /= diag_val
+        solution_vector[column] /= diagonal_value
 
-        if x[j] != 0:
-            for k in range(U.indptr[j], U.indptr[j + 1]):
-                row = U.indices[k]
-                val = U.data[k]
-                if row < j:
-                    x[row] -= val * x[j]
+        if solution_vector[column] != 0:
+            for k in range(U_matrix.indptr[column], U_matrix.indptr[column + 1]):
+                row_idx = U_matrix.indices[k]
+                element_value = U_matrix.data[k]
+                if row_idx < column:
+                    solution_vector[row_idx] -= element_value * solution_vector[column]
 
-    return x
+    return solution_vector
 
 
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
@@ -143,22 +150,22 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     Нахождение определителя через LU-разложение.
     det(A) = det(L) * det(U)
     """
-    lu = lu_decomposition(A)
-    if lu is None:
+    decomposition_result = lu_decomposition(A)
+    if decomposition_result is None:
         return 0.0
 
-    _, U = lu
-    det = 1
-    n = U.shape[0]
+    _, upper_matrix = decomposition_result
+    determinant_value = 1
+    n_dim = upper_matrix.shape[0]
 
-    for j in range(n):
-        diag_found = False
-        for k in range(U.indptr[j], U.indptr[j + 1]):
-            if U.indices[k] == j:
-                det *= U.data[k]
-                diag_found = True
+    for column in range(n_dim):
+        diagonal_found_flag = False
+        for k in range(upper_matrix.indptr[column], upper_matrix.indptr[column + 1]):
+            if upper_matrix.indices[k] == column:
+                determinant_value *= upper_matrix.data[k]
+                diagonal_found_flag = True
                 break
-        if not diag_found:
+        if not diagonal_found_flag:
             return 0.0
 
-    return det
+    return determinant_value
