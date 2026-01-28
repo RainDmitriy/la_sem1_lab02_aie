@@ -104,30 +104,7 @@ class CSCMatrix(Matrix):
         Hint:
         Результат - в CSR формате (с теми же данными, но с интерпретацией строк как столбцов).
         """
-        from CSR import CSRMatrix
-        rows, cols = self.shape
-        new_rows, new_cols = cols, rows
-        row_counts: list[int] = [0] * new_rows
-        for j in range(cols):
-            start = self.indptr[j]
-            end = self.indptr[j + 1]
-            row_counts[j] = end - start
-        new_indptr: CSCIndptr = [0] * (new_rows + 1)
-        for i in range(new_rows):
-            new_indptr[i + 1] = new_indptr[i] + row_counts[i]
-        new_data: CSCData = [0.0] * len(self.data)
-        new_indices: CSCIndices = [0] * len(self.indices)
-        row_positions = new_indptr.copy()
-        for j in range(cols):
-            start = self.indptr[j]
-            end = self.indptr[j + 1]
-            for idx in range(start, end):
-                i = self.indices[idx]
-                pos = row_positions[j]
-                new_data[pos] = self.data[idx]
-                new_indices[pos] = i
-                row_positions[j] += 1
-        return CSRMatrix(new_data, new_indices, new_indptr, (new_rows, new_cols))
+        return self._to_csr()
 
     def _matmul_impl(self, other: "Matrix") -> "Matrix":
         """Умножение CSC матриц."""
