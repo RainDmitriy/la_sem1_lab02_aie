@@ -4,7 +4,7 @@ from type1 import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
-        super().__init__(shape)
+        self.shape = shape
         self.data = data
         self.indices = indices
         self.indptr = indptr

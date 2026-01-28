@@ -4,7 +4,7 @@ from type1 import COOData, COORows, COOCols, Shape, DenseMatrix
 
 class COOMatrix(Matrix):
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
-        super().__init__(shape)
+        self.shape = shape
         self.data = data
         self.row = row
         self.col = col

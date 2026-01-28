@@ -4,10 +4,10 @@ from type1 import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
-        super().__init__(shape)
         self.data = data
         self.indices = indices
         self.indptr = indptr
+        self.shape = shape
 
     def to_dense(self) -> DenseMatrix:
         """Преобразует CSR в плотную матрицу."""
@@ -127,3 +127,4 @@ class CSRMatrix(Matrix):
                 row.append(r)
                 col.append(self.indices[j])
         return COOMatrix(data, row, col, self.shape)
+    
