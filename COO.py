@@ -31,28 +31,16 @@ class COOMatrix(Matrix):
         for idx in range(len(combined_data)):
             key = (combined_row[idx], combined_col[idx])
             sum_dict[key] = sum_dict.get(key, 0.0) + combined_data[idx]
+        sorted_positions = sorted(sum_dict.keys())
         new_data = []
         new_row = []
         new_col = []
-        seen = set()
-        for idx in range(self.nnz):
-            key = (self.row[idx], self.col[idx])
-            if key not in seen:
-                seen.add(key)
-                val = sum_dict[key]
-                if abs(val) > 1e-12:
-                    new_data.append(val)
-                    new_row.append(key[0])
-                    new_col.append(key[1])
-        for idx in range(other_coo.nnz):
-            key = (other_coo.row[idx], other_coo.col[idx])
-            if key not in seen:
-                seen.add(key)
-                val = sum_dict[key]
-                if abs(val) > 1e-12:
-                    new_data.append(val)
-                    new_row.append(key[0])
-                    new_col.append(key[1])
+        for (i, j) in sorted_positions:
+            val = sum_dict[(i, j)]
+            if abs(val) > 1e-12:
+                new_data.append(val)
+                new_row.append(i)
+                new_col.append(j)
         return COOMatrix(new_data, new_row, new_col, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
