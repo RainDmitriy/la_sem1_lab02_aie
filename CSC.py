@@ -72,8 +72,14 @@ class CSCMatrix(Matrix):
         """Умножение CSC матриц."""
         if self.shape[1] != other.shape[0]:
             raise ValueError("Умножение матриц невозможно")
-        csr = self._to_csr()
-        return csr @ other
+        if not isinstance(other, CSCMatrix):
+            if hasattr(other, "_to_csc"):
+                other = other._to_csc()
+            else:
+                raise TypeError("Матрица должна быть CSC")
+
+        res_csr = self._to_csr() @ other._to_csr()
+        return res_csr._to_csc()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
