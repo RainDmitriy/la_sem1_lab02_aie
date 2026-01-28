@@ -67,7 +67,7 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
             s += dense_u[i][j] * x[j]
         x[i] = (y[i] - s) / dense_u[i][i]
 
-    return Vector(x)
+    return x
 
 
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
