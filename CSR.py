@@ -88,8 +88,14 @@ class CSRMatrix(Matrix):
         if scalar == 0.0:
             rows, cols = self.shape
             return CSRMatrix([], [], [0] * (rows + 1), self.shape)
-        new_data = [x * scalar for x in self.data]
-        return CSRMatrix(new_data, self.indices[:], self.indptr[:], self.shape)
+        new_data = []
+        new_indices = []
+        for i in range(len(self.data)):
+            val = self.data[i] * scalar
+            if abs(val) > TOLERANCE:
+                new_data.append(val)
+                new_indices.append(self.indices[i])
+        return CSRMatrix(new_data, new_indices, self.indptr[:], self.shape)
 
     def transpose(self) -> 'Matrix':
         """

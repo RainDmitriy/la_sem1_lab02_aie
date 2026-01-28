@@ -66,8 +66,16 @@ class COOMatrix(Matrix):
         """Умножение COO на скаляр."""
         if scalar == 0.0:
             return COOMatrix([], [], [], self.shape)
-        new_data = [x * scalar for x in self.data]
-        return COOMatrix(new_data, self.row[:], self.col[:], self.shape)
+        new_data = []
+        new_row = []
+        new_col = []
+        for i in range(len(self.data)):
+            val = self.data[i] * scalar
+            if abs(val) > TOLERANCE:
+                new_data.append(val)
+                new_row.append(self.row[i])
+                new_col.append(self.col[i])
+        return COOMatrix(new_data, new_row, new_col, self.shape)
 
     def transpose(self) -> 'Matrix':
         """Транспонирование COO матрицы."""
