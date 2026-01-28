@@ -35,7 +35,8 @@ class COOMatrix(Matrix):
         
         # Преобразуем other в COO если нужно
         if not isinstance(other, COOMatrix):
-            other_coo = COOMatrix.from_dense(other.to_dense())
+            other_dense = other.to_dense()
+            other_coo = COOMatrix.from_dense(other_dense)
         else:
             other_coo = other
         
@@ -52,29 +53,42 @@ class COOMatrix(Matrix):
             key = (other_coo.row[i], other_coo.col[i])
             result_dict[key] = result_dict.get(key, 0.0) + other_coo.data[i]
         
-        # Собираем результат, НЕ удаляя нулевые элементы
+        # Удаляем нулевые элементы и собираем результат
         result_data = []
         result_row = []
         result_col = []
         
         for (r, c), val in sorted(result_dict.items()):
-            result_data.append(val)
-            result_row.append(r)
-            result_col.append(c)
+            if abs(val) > TOL:
+                result_data.append(val)
+                result_row.append(r)
+                result_col.append(c)
         
         return COOMatrix(result_data, result_row, result_col, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
-        if scalar == 0.0:
+        if abs(scalar) < TOL:
             return COOMatrix([], [], [], self.shape)
         
-        # Умножаем все значения, НЕ удаляя элементы
-        new_data = [val * scalar for val in self.data]
-        return COOMatrix(new_data, self.row.copy(), self.col.copy(), self.shape)
+        new_data = []
+        new_row = []
+        new_col = []
+        
+        for i in range(self.nnz):
+            val = self.data[i] * scalar
+            if abs(val) > TOL:
+                new_data.append(val)
+                new_row.append(self.row[i])
+                new_col.append(self.col[i])
+        
+        return COOMatrix(new_data, new_row, new_col, self.shape)
 
     def transpose(self) -> 'Matrix':
         """Транспонирование COO матрицы."""
+        from CSR import CSRMatrix
+        from CSC import CSCMatrix
+        
         # Создаем транспонированную COO
         new_shape = (self.shape[1], self.shape[0])
         return COOMatrix(self.data.copy(), self.col.copy(), self.row.copy(), new_shape)
@@ -86,11 +100,7 @@ class COOMatrix(Matrix):
         
         # Преобразуем в плотные для умножения
         dense_self = self.to_dense()
-        
-        if isinstance(other, COOMatrix):
-            dense_other = other.to_dense()
-        else:
-            dense_other = other.to_dense()
+        dense_other = other.to_dense()
         
         rows_A, cols_A = self.shape
         rows_B, cols_B = other.shape
@@ -147,11 +157,11 @@ class COOMatrix(Matrix):
         cols = self.shape[1]
         indptr = [0] * (cols + 1)
         
-        for i in sorted_indices:
-            indptr[self.col[i] + 1] += 1
+        for col in self.col:
+            indptr[col + 1] += 1
         
-        for j in range(1, cols + 1):
-            indptr[j] += indptr[j - 1]
+        for i in range(1, cols + 1):
+            indptr[i] += indptr[i - 1]
         
         return CSCMatrix(data, indices, indptr, self.shape)
 
@@ -173,8 +183,8 @@ class COOMatrix(Matrix):
         rows = self.shape[0]
         indptr = [0] * (rows + 1)
         
-        for i in sorted_indices:
-            indptr[self.row[i] + 1] += 1
+        for row in self.row:
+            indptr[row + 1] += 1
         
         for i in range(1, rows + 1):
             indptr[i] += indptr[i - 1]
