@@ -1,13 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import List, Tuple
 
-# Импортируем типы из type.py
-try:
-    from type import DenseMatrix, Shape
-except ImportError:
-    # Если type.py не доступен, определяем локально
-    DenseMatrix = List[List[float]]
-    Shape = Tuple[int, int]
+# Определяем типы здесь, чтобы избежать циклических импортов
+DenseMatrix = List[List[float]]
+Shape = Tuple[int, int]
 
 
 class Matrix(ABC):
