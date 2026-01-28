@@ -1,7 +1,5 @@
 from base import Matrix
 from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
-from COO import COOMatrix
-from CSR import CSRMatrix
 from typing import Dict, List
 import bisect
 
@@ -39,6 +37,7 @@ class CSCMatrix(Matrix):
         if isinstance(other, CSCMatrix):
             coo_other = other._to_coo()
         else:
+            from COO import COOMatrix
             coo_other = COOMatrix.from_dense(other.to_dense())
         
         result_coo = coo_self._add_impl(coo_other)
@@ -145,6 +144,8 @@ class CSCMatrix(Matrix):
         """
         Преобразование CSCMatrix в COOMatrix.
         """
+        from COO import COOMatrix
+        
         data = []
         row = []
         col = []

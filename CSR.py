@@ -1,7 +1,5 @@
 from base import Matrix
 from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
-from COO import COOMatrix
-from CSC import CSCMatrix
 from typing import Dict, List
 import bisect
 
@@ -39,6 +37,7 @@ class CSRMatrix(Matrix):
         if isinstance(other, CSRMatrix):
             coo_other = other._to_coo()
         else:
+            from COO import COOMatrix
             coo_other = COOMatrix.from_dense(other.to_dense())
         
         result_coo = coo_self._add_impl(coo_other)
@@ -63,12 +62,13 @@ class CSRMatrix(Matrix):
         """Умножение CSR матриц."""
         if isinstance(other, CSRMatrix):
             return self._matmul_csr(other)
-        elif isinstance(other, COOMatrix):
-            # Конвертируем other в CSR
-            other_csr = other._to_csr()
+        elif hasattr(other, '_to_coo'):
+            # Конвертируем other в CSR через COO
+            other_csr = other._to_coo()._to_csr()
             return self._matmul_csr(other_csr)
         else:
             # Конвертируем в COO для умножения
+            from COO import COOMatrix
             coo_self = self._to_coo()
             coo_other = COOMatrix.from_dense(other.to_dense())
             result_coo = coo_self._matmul_impl(coo_other)
@@ -190,6 +190,8 @@ class CSRMatrix(Matrix):
         """
         Преобразование CSRMatrix в COOMatrix.
         """
+        from COO import COOMatrix
+        
         data = []
         row = []
         col = []

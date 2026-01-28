@@ -142,6 +142,7 @@ class COOMatrix(Matrix):
         """
         Преобразование COOMatrix в CSCMatrix.
         """
+        # Импортируем тут, а не в начале файла
         from CSC import CSCMatrix
         
         if not self.data:
@@ -172,6 +173,7 @@ class COOMatrix(Matrix):
         """
         Преобразование COOMatrix в CSRMatrix.
         """
+        # Импортируем тут, а не в начале файла
         from CSR import CSRMatrix
         
         if not self.data:
