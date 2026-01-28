@@ -9,12 +9,12 @@ if TYPE_CHECKING:
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
         super().__init__(shape)
-        # if len(indptr) != shape[1] + 1:
-        #     raise ValueError(f"indptr должен иметь длину {shape[1] + 1}")
-        # if indptr[0] != 0 or indptr[-1] != len(data):
-        #     raise ValueError("Некорректный indptr")
-        # if len(data) != len(indices):
-        #     raise ValueError("Длины data и indices должны совпадать")
+        if len(indptr) != shape[1] + 1:
+            raise ValueError(f"indptr должен иметь длину {shape[1] + 1}")
+        if indptr[0] != 0 or indptr[-1] != len(data):
+            raise ValueError("Некорректный indptr")
+        if len(data) != len(indices):
+            raise ValueError("Длины data и indices должны совпадать")
         self.data, self.indices, self.indptr  = data, indices, indptr
 
     def to_dense(self) -> DenseMatrix:
