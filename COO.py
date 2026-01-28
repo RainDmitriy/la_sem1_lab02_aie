@@ -19,6 +19,9 @@ class COOMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение COO матриц."""
+        if not isinstance(other, COOMatrix):
+            other = other._to_coo()
+
         return COOMatrix(
             self.data + other.data,
             self.row + other.row,
@@ -44,6 +47,9 @@ class COOMatrix(Matrix):
         """Умножение COO матриц."""
         if self.shape[1] != other.shape[0]:
             raise ValueError("Size mismatch")
+
+        if not isinstance(other, COOMatrix):
+            other = other._to_coo()
 
         tmp = {}
         b_map = {}
@@ -90,11 +96,25 @@ class COOMatrix(Matrix):
         from CSC import CSCMatrix
 
         s = sorted(zip(self.row, self.col, self.data), key=lambda x: (x[1], x[0]))
-        d = [x[2] for x in s]
-        ind = [x[0] for x in s]
+        
+        merged = []
+        if s:
+            curr_r, curr_c, curr_v = s[0]
+            for r, c, v in s[1:]:
+                if r == curr_r and c == curr_c:
+                    curr_v += v
+                else:
+                    if curr_v != 0:
+                        merged.append((curr_r, curr_c, curr_v))
+                    curr_r, curr_c, curr_v = r, c, v
+            if curr_v != 0:
+                merged.append((curr_r, curr_c, curr_v))
+
+        d = [x[2] for x in merged]
+        ind = [x[0] for x in merged]
         ptr = [0] * (self.shape[1] + 1)
 
-        for _, c, _ in s:
+        for _, c, _ in merged:
             ptr[c + 1] += 1
 
         for i in range(self.shape[1]):
