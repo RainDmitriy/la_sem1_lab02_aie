@@ -12,30 +12,93 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     Возвращает (L, U) - нижнюю и верхнюю треугольные матрицы.
     Ожидается, что матрица L хранит единицы на главной диагонали.
     """
-    n_rows, n_cols = A.shape
-    if n_rows != n_cols:
+    # LU decomposition is only defined for square matrices
+    n = A.shape[0]
+    if A.shape[1] != n:
         raise ValueError("LU‑разложение определено только для квадратных матриц")
-    n = n_rows
-    dense_A = A.to_dense()
-    L: list[list[float]] = [[0.0] * n for _ in range(n)]
-    U: list[list[float]] = [[0.0] * n for _ in range(n)]
-    for i in range(n):
-        for j in range(i, n):
-            sum_u = 0.0
-            for k in range(i):
-                sum_u += L[i][k] * U[k][j]
-            U[i][j] = dense_A[i][j] - sum_u
-        if abs(U[i][i]) < EPSILON:
+    # Prepare structures to store columns of L and rows of U as dictionaries
+    L_cols: list[dict[int, float]] = [{} for _ in range(n)]
+    U_rows: list[dict[int, float]] = [{} for _ in range(n)]
+    # Convert the CSC matrix into a row-based dictionary representation for faster access
+    rows_A: list[dict[int, float]] = [{} for _ in range(n)]
+    for col in range(n):
+        for idx in range(A.indptr[col], A.indptr[col + 1]):
+            row = A.indices[idx]
+            rows_A[row][col] = float(A.data[idx])
+    # Active rows accumulate updates during the decomposition
+    active_rows: list[dict[int, float]] = [{} for _ in range(n)]
+    # Perform decomposition
+    for k in range(n):
+        # Compute the k-th row of U (columns j >= k)
+        row_k: dict[int, float] = {}
+        # Start with original matrix entries in row k
+        for j, val in rows_A[k].items():
+            if j >= k:
+                row_k[j] = float(val)
+        # Add contributions from active rows (previous updates)
+        for j, val in active_rows[k].items():
+            if j >= k:
+                current = row_k.get(j, 0.0)
+                row_k[j] = current + float(val)
+        u_kk = row_k.get(k, 0.0)
+        # Check pivot
+        if abs(u_kk) < EPSILON:
             return None
-        L[i][i] = 1.0
-        for j in range(i + 1, n):
-            sum_l = 0.0
-            for k in range(i):
-                sum_l += L[j][k] * U[k][i]
-            L[j][i] = (dense_A[j][i] - sum_l) / U[i][i]
-    L_csc = CSCMatrix.from_dense(L)
-    U_csc = CSCMatrix.from_dense(U)
-    return L_csc, U_csc
+        # Store k-th row of U
+        U_rows[k] = {}
+        for j, val in row_k.items():
+            if j >= k and abs(val) > EPSILON:
+                U_rows[k][j] = val
+        # Ensure diagonal element is stored
+        U_rows[k][k] = u_kk
+        # Set diagonal of L to 1
+        L_cols[k][k] = 1.0
+        # Compute multipliers for rows below k and update active_rows
+        for i in range(k + 1, n):
+            # Compute the element at position (i, k)
+            elem = 0.0
+            # Contribution from original A
+            if k in rows_A[i]:
+                elem += float(rows_A[i][k])
+            # Contribution from previously accumulated updates
+            if k in active_rows[i]:
+                elem += float(active_rows[i][k])
+            # If non-zero, compute L[i,k] and update active rows for future rows
+            if abs(elem) > EPSILON:
+                L_ik = elem / u_kk
+                L_cols[k][i] = L_ik
+                # Update active_rows for columns > k
+                for j, U_kj in U_rows[k].items():
+                    if j > k:
+                        delta = -L_ik * U_kj
+                        if abs(delta) > EPSILON:
+                            current = active_rows[i].get(j, 0.0)
+                            active_rows[i][j] = current + delta
+    # Convert the dictionaries to CSC format for L
+    L_data: list[float] = []
+    L_indices: list[int] = []
+    L_indptr: list[int] = [0]
+    for col in range(n):
+        rows = sorted(L_cols[col].keys())
+        for i in rows:
+            L_data.append(L_cols[col][i])
+            L_indices.append(i)
+        L_indptr.append(len(L_data))
+    # Build U in CSC format (transpose of U_rows representation)
+    U_cols: list[dict[int, float]] = [{} for _ in range(n)]
+    for i in range(n):
+        for j, val in U_rows[i].items():
+            U_cols[j][i] = val
+    U_data: list[float] = []
+    U_indices: list[int] = []
+    U_indptr: list[int] = [0]
+    for col in range(n):
+        rows = sorted(U_cols[col].keys())
+        for i in rows:
+            U_data.append(U_cols[col][i])
+            U_indices.append(i)
+        U_indptr.append(len(U_data))
+    return CSCMatrix(L_data, L_indices, L_indptr, (n, n)), CSCMatrix(U_data, U_indices, U_indptr, (n, n))
 
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
