@@ -35,7 +35,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         if u_diag == 0:
             return None
 
-        for i in range(j + 1, n):
+        for i in range(j + 1, A.shape[0]):
             if spa[i] != 0:
                 l_data.append(spa[i] / u_diag)
                 l_indices.append(i)
