@@ -1,10 +1,20 @@
 from base import Matrix
 from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
-import sys
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from CSR import CSRMatrix
+    from CSC import CSCMatrix
+    from COO import COOMatrix
 
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
         super().__init__(shape)
+        if len(indptr) != shape[0] + 1:
+            raise ValueError(f"indptr должен иметь длину {shape[0] + 1}")
+        if indptr[0] != 0 or indptr[-1] != len(data):
+            raise ValueError("Некорректный indptr")
+        if len(data) != len(indices):
+            raise ValueError("Длины data и indices должны совпадать")
         self.data, self.indices, self.indptr  = data, indices, indptr
 
     def to_dense(self) -> DenseMatrix:
@@ -18,40 +28,10 @@ class CSRMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSR матриц."""
-        data_self = list(self.data)
-        indices_self = list(self.indices)
-        indptr_self = list(self.indptr)
-        data_other = list(other.data)
-        indices_other = list(other.indices)
-        indptr_other = list(other.indptr)
-        result_data, result_indices, result_indptr = [], [], [0]
-        rows, cols = self.shape
-        for r in range(rows):
-            self_start = indptr_self[r]
-            other_start = indptr_other[r]
-            self_end = indptr_self[r + 1]
-            other_end = indptr_other[r + 1]
-            while self_start < self_end or other_start < other_end:
-                if self_start == self_end:
-                    c, val = indices_other[other_start], data_other[other_start]
-                    other_start += 1
-                elif other_start == other_end:
-                    c, val = indices_self[self_start], data_self[self_start]
-                    self_start += 1
-                elif indices_self[self_start] < indices_other[other_start]:
-                    c, val = indices_self[self_start], data_self[self_start]
-                    self_start += 1
-                elif indices_other[other_start] < indices_self[self_start]:
-                    c, val = indices_other[other_start], data_other[other_start]
-                    other_start += 1
-                else:
-                    c, val = indices_self[self_start], data_self[self_start] + data_other[other_start]
-                    self_start += 1
-                    other_start += 1
-                result_indices.append(c)
-                result_data.append(val)
-            result_indptr.append(len(result_data))
-        return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
+        self_coo = self._to_coo()
+        other_coo = other._to_coo()
+        result_coo = self_coo._add_impl(other_coo)
+        return result_coo._to_csr()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
@@ -67,29 +47,23 @@ class CSRMatrix(Matrix):
         Hint:
         Результат - в CSC формате (с теми же данными, но с интерпретацией столбцов как строк).
         """
-        rows = self.shape[0]
-        cols = self.shape[1]
-
         new_row = []
         new_col = []
         new_data = []
-
-        for i in range(rows):
+        for i in range(self.shape[0]):
             row_start = self.indptr[i]
             row_end = self.indptr[i + 1]
             for k in range(row_start, row_end):
                 new_row.append(self.indices[k])
                 new_col.append(i)
                 new_data.append(self.data[k])
-
-        COOClass = getattr(sys.modules['COO'], 'COOMatrix')
-        coo_result = COOClass(new_data, new_row, new_col, (cols, rows))
+        from COO import COOMatrix
+        coo_result = COOMatrix(new_data, new_row, new_col, (self.shape[1], self.shape[0]))
         return coo_result._to_csc()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSR матриц."""
         other_csc = other._to_csc()
-
         rows = self.shape[0]
         cols = other_csc.shape[1]
 
@@ -121,9 +95,8 @@ class CSRMatrix(Matrix):
                     res_r.append(i)
                     res_c.append(j)
                     res_v.append(s)
-
-        COOClass = getattr(sys.modules['COO'], 'COOMatrix')
-        coo_result = COOClass(res_v, res_r, res_c, (rows, cols))
+        from COO import COOMatrix
+        coo_result = COOMatrix(res_v, res_r, res_c, (rows, cols))
         return coo_result._to_csr()
 
     @classmethod
@@ -165,20 +138,17 @@ class CSRMatrix(Matrix):
         """
         Преобразование CSRMatrix в COOMatrix.
         """
-        n = self.shape[1]
-        m = self.shape[0]
-
         new_row = []
         new_col = []
         new_data = []
 
-        for i in range(m):
+        for i in range(self.shape[0]):
             row_start = self.indptr[i]
             row_end = self.indptr[i + 1]
             for k in range(row_start, row_end):
-                new_row.append(self.indices[k])
-                new_col.append(i)
+                new_row.append(i)
+                new_col.append(self.indices[k])
                 new_data.append(self.data[k])
 
-        COOClass = getattr(sys.modules['COO'], 'COOMatrix')
-        return COOClass(new_data, new_row, new_col, (n, m))
+        from COO import COOMatrix
+        return COOMatrix(new_data, new_row, new_col, self.shape)
