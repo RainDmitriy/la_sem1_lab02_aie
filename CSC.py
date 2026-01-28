@@ -72,18 +72,18 @@ class CSCMatrix(Matrix):
         """Умножение CSC матриц."""
         m, n = self.shape
         n2, p = other.shape
-
-        # Преобразуем в плотные матрицы для умножения
-        dense_self = self.to_dense()
+        if n != n2:
+            raise ValueError("Размеры матриц не совместимы для умножения")
         dense_other = other.to_dense()
-
-        # Умножение матриц
-        result = [[0.0 for _ in range(p)] for _ in range(m)]
-        for i in range(m):
-            for j in range(p):
-                for k in range(n):
-                    result[i][j] += dense_self[i][k] * dense_other[k][j]
-
+        result = [[0.0] * p for _ in range(m)]
+        for col in range(n):
+            start = self.indptr[col]
+            end = self.indptr[col + 1]
+            for idx in range(start, end):
+                row = self.indices[idx]
+                val = self.data[idx]
+                for j in range(p):
+                    result[row][j] += val * dense_other[col][j]
         return self.from_dense(result)
 
     @classmethod

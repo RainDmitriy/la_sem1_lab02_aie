@@ -55,13 +55,25 @@ class COOMatrix(Matrix):
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         m, n = self.shape
         n2, p = other.shape
-        dense_self = self.to_dense()
+        if n != n2:
+            raise ValueError("Размеры матриц не совместимы для умножения")
+        row_dict = {}
+        for idx in range(len(self.data)):
+            r = self.row[idx]
+            c = self.col[idx]
+            val = self.data[idx]
+            if r not in row_dict:
+                row_dict[r] = {}
+            row_dict[r][c] = val
         dense_other = other.to_dense()
-        result = [[0 for _ in range(p)] for _ in range(m)]
+        result = [[0.0] * p for _ in range(m)]
         for i in range(m):
-            for j in range(p):
-                for k in range(n):
-                    result[i][j] += dense_self[i][k] * dense_other[k][j]
+            if i in row_dict:
+                for k in row_dict[i]:
+                    val = row_dict[i][k]
+                    for j in range(p):
+                        result[i][j] += val * dense_other[k][j]
+
         return COOMatrix.from_dense(result)
 
     @classmethod

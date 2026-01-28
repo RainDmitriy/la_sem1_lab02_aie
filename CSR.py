@@ -70,13 +70,26 @@ class CSRMatrix(Matrix):
         """Умножение CSR матриц."""
         m, n = self.shape
         n2, p = other.shape
-        dense_self = self.to_dense()
-        dense_other = other.to_dense()
-        result = [[0 for _ in range(p)] for _ in range(m)]
+        if n != n2:
+            raise ValueError("Размеры матриц не совместимы для умножения")
+        result = [[0.0] * p for _ in range(m)]
+        other_rows = {}
+        for row in range(m):
+            start = other.indptr[row]
+            end = other.indptr[row + 1]
+            other_rows[row] = {}
+            for idx in range(start, end):
+                col = other.indices[idx]
+                other_rows[row][col] = other.data[idx]
         for i in range(m):
-            for j in range(p):
-                for k in range(n):
-                    result[i][j] += dense_self[i][k] * dense_other[k][j]
+            row_start = self.indptr[i]
+            row_end = self.indptr[i + 1]
+            for idx1 in range(row_start, row_end):
+                k = self.indices[idx1]
+                val1 = self.data[idx1]
+                if k in other_rows:
+                    for j, val2 in other_rows[k].items():
+                        result[i][j] += val1 * val2
         return self.from_dense(result)
 
     @classmethod
