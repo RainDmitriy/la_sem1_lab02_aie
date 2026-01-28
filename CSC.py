@@ -24,7 +24,6 @@ class CSCMatrix(Matrix):
                 dense[i - 1][j] = self.data[cur_data]
                 cur_data += 1
 
-        dense = TransposeDense(dense)
         return dense
 
     def _add_impl(self, other: "Matrix") -> "Matrix":

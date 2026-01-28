@@ -3,9 +3,6 @@ from type1 import DenseMatrix, Shape
 
 
 class Matrix(ABC):
-    def __init__(self, shape: Shape):
-        self.shape = shape
-        self.denseMatrix: DenseMatrix = []
 
     @abstractmethod
     def to_dense(self) -> DenseMatrix:
@@ -64,5 +61,4 @@ def TransposeDense(dense_matrix: DenseMatrix) -> DenseMatrix:
             transposed[c][r] = dense_matrix[r][c]
 
     return transposed
-
 
