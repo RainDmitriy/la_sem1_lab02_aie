@@ -1,53 +1,63 @@
-# linalg.py
 from CSC import CSCMatrix
 from CSR import CSRMatrix
 from my_types import Vector
 from typing import Tuple, Optional
 
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
-    # Decompose A into L and U
-    matrix = A.to_dense()
-    n = A.shape[0]
-    L = [[0.0 for _ in range(n)] for _ in range(n)]
-    U = [[0.0 for _ in range(n)] for _ in range(n)]
+    n, m = A.shape
+    if n != m: return None
 
-    for i in range(n):
-        L[i][i] = 1.0
-        for j in range(i, n):
-            sum_lu = sum(L[i][k] * U[k][j] for k in range(i))
-            U[i][j] = matrix[i][j] - sum_lu
-        for j in range(i + 1, n):
-            if U[i][i] == 0: return None
-            sum_lu = sum(L[j][k] * U[k][i] for k in range(i))
-            L[j][i] = (matrix[j][i] - sum_lu) / U[i][i]
+    a = A.to_dense()
+    L = [[0.0] * n for _ in range(n)]
+    U = [[0.0] * n for _ in range(n)]
+
+    for i in range(n): L[i][i] = 1.0
+
+    for k in range(n):
+        s = sum(L[k][p] * U[p][k] for p in range(k))
+        pivot = a[k][k] - s
+        if pivot == 0: return None
+        U[k][k] = pivot
+
+        for j in range(k + 1, n):
+            s = sum(L[k][p] * U[p][j] for p in range(k))
+            U[k][j] = a[k][j] - s
+
+        for i in range(k + 1, n):
+            s = sum(L[i][p] * U[p][k] for p in range(k))
+            L[i][k] = (a[i][k] - s) / U[k][k]
 
     return CSCMatrix.from_dense(L), CSCMatrix.from_dense(U)
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
-    # Solve Ax = b via LU
     res = lu_decomposition(A)
-    if not res: return None
-    L_mat, U_mat = res
-    L, U = L_mat.to_dense(), U_mat.to_dense()
-    n = len(b)
+    if res is None: return None
+    L, U = res
 
-    y = [0.0 for _ in range(n)]
+    n, m = A.shape
+    if len(b) != n: return None
+
+    Ld, Ud = L.to_dense(), U.to_dense()
+
+    y = [0.0] * n
     for i in range(n):
-        y[i] = b[i] - sum(L[i][k] * y[k] for k in range(i))
+        s = sum(Ld[i][j] * y[j] for j in range(i))
+        y[i] = b[i] - s
 
-    x = [0.0 for _ in range(n)]
+    x = [0.0] * n
     for i in range(n - 1, -1, -1):
-        if U[i][i] == 0: return None
-        x[i] = (y[i] - sum(U[i][k] * x[k] for k in range(i + 1, n))) / U[i][i]
+        s = sum(Ud[i][j] * x[j] for j in range(i + 1, n))
+        if Ud[i][i] == 0: return None
+        x[i] = (y[i] - s) / Ud[i][i]
+
     return x
 
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
-    # det(A) = det(L) * det(U)
     res = lu_decomposition(A)
-    if not res: return 0.0
-    _, U_mat = res
-    U = U_mat.to_dense()
+    if res is None: return None
+    _, U = res
+    Ud = U.to_dense()
     det = 1.0
-    for i in range(len(U)):
-        det *= U[i][i]
+    for i in range(len(Ud)):
+        det *= Ud[i][i]
     return det
