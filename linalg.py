@@ -2,6 +2,8 @@ from CSC import CSCMatrix
 from type import Vector
 from typing import Tuple, Optional
 
+EPSILON = 1e-10
+
 
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     '''
@@ -14,30 +16,28 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         return None
 
     dense = A.to_dense()
-
-    for k in range(n):
-        if abs(dense[k][k]) < 1e-12:
-            return None
-
-        for i in range(k + 1, n):
-            dense[i][k] /= dense[k][k]
-            for j in range(k + 1, n):
-                dense[i][j] -= dense[i][k] * dense[k][j]
-
     L = [[0.0] * n for _ in range(n)]
     U = [[0.0] * n for _ in range(n)]
 
     for i in range(n):
-        for j in range(n):
-            if i > j:
-                L[i][j] = dense[i][j]
-                U[i][j] = 0.0
-            elif i == j:
-                L[i][j] = 1.0
-                U[i][j] = dense[i][j]
-            else:
-                L[i][j] = 0.0
-                U[i][j] = dense[i][j]
+        L[i][i] = 1.0
+
+    for i in range(n):
+        for j in range(i, n):
+            sum_u = 0.0
+            for k in range(i):
+                sum_u += L[i][k] * U[k][j]
+            U[i][j] = dense[i][j] - sum_u
+
+        for j in range(i + 1, n):
+            sum_l = 0.0
+            for k in range(i):
+                sum_l += L[j][k] * U[k][i]
+
+            if abs(U[i][i]) < EPSILON:
+                return None
+
+            L[j][i] = (dense[j][i] - sum_l) / U[i][i]
 
     from COO import COOMatrix
     L_csc = COOMatrix.from_dense(L)._to_csc()
@@ -61,21 +61,21 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
 
     y = [0.0] * n
     for i in range(n):
-        s = 0
+        sum_val = 0.0
         for j in range(i):
-            s += dense_L[i][j] * y[j]
-        y[i] = b[i] - s
+            sum_val += dense_L[i][j] * y[j]
+        y[i] = b[i] - sum_val
 
     x = [0.0] * n
     for i in range(n - 1, -1, -1):
-        s = 0
+        sum_val = 0.0
         for j in range(i + 1, n):
-            s += dense_U[i][j] * x[j]
+            sum_val += dense_U[i][j] * x[j]
 
-        if abs(dense_U[i][i]) < 1e-12:
+        if abs(dense_U[i][i]) < EPSILON:
             return None
 
-        x[i] = (y[i] - s) / dense_U[i][i]
+        x[i] = (y[i] - sum_val) / dense_U[i][i]
 
     return x
 
