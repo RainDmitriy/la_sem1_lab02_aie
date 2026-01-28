@@ -67,21 +67,23 @@ class CSCMatrix(Matrix):
         rows_a = self.shape[0]
         cols_b = other_csr.shape[1]
         res_r, res_c, res_v = [], [], []
-        for j in range(cols_b):
-            for i in range(rows_a):
-                s = 0.0
-                row_start_a = self.indptr[i]
-                row_end_a = self.indptr[i + 1]
+        for i in range(rows_a):
+            row_start_a = self.indptr[i]
+            row_end_a = self.indptr[i + 1]
+            for j in range(cols_b):
                 col_start_b = other_csr.indptr[j]
                 col_end_b = other_csr.indptr[j + 1]
+                s = 0.0
                 k1 = row_start_a
                 k2 = col_start_b
                 while k1 < row_end_a and k2 < col_end_b:
-                    if self.indices[k1] == other_csr.indices[k2]:
+                    idx_a = self.indices[k1]
+                    idx_b = other_csr.indices[k2]
+                    if idx_a == idx_b:
                         s += self.data[k1] * other_csr.data[k2]
                         k1 += 1
                         k2 += 1
-                    elif self.indices[k1] < other_csr.indices[k2]:
+                    elif idx_a < idx_b:
                         k1 += 1
                     else:
                         k2 += 1

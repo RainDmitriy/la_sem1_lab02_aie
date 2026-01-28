@@ -29,12 +29,10 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                 diag_pos = pos
                 break
 
-        if diag_pos == -1:
-            raise ValueError(f"Нет диагонального элемента на позиции {k} (столбец {k})")
+        if diag_pos == -1 or abs(U_data[diag_pos]) < 1e-14:
+            return None
 
         u_kk = U_data[diag_pos]
-        if abs(u_kk) < 1e-14:
-            raise ValueError(f"Нулевой pivot U[{k},{k}] = {u_kk:.6f}")
 
         for pos in range(diag_pos + 1, col_end):
             row_idx = U_indices[pos]
@@ -47,24 +45,28 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         for j in range(k + 1, n):
             col_j_start = U_indptr[j]
             col_j_end = U_indptr[j + 1]
-
+            #столбец k и столбец j
             new_data = []
             new_indices = []
-            p1 = diag_pos
+            p1 = col_start
             p2 = col_j_start
-
             while p1 < col_end and p2 < col_j_end:
-                if U_indices[p1] < U_indices[p2]:
-                    if U_indices[p1] > k:
-                        new_data.append(U_data[p1])
-                        new_indices.append(U_indices[p1])
+                idx1, idx2 = U_indices[p1], U_indices[p2]
+
+                if idx1 == idx2:
+                    if idx1 > k:
+                        l_ki = U_data[p1] / u_kk  # коэффициент
+                        new_data.append(U_data[p2] - l_ki * U_data[diag_pos])
                     p1 += 1
-                elif U_indices[p1] > U_indices[p2]:
-                    new_data.append(U_data[p2])
-                    new_indices.append(U_indices[p2])
                     p2 += 1
-                else:
+                elif idx1 < idx2:
+                    if idx1 > k:
+                        new_data.append(U_data[p1])
+                        new_indices.append(idx1)
                     p1 += 1
+                else:
+                    new_data.append(U_data[p2])
+                    new_indices.append(idx2)
                     p2 += 1
 
             while p1 < col_end:
@@ -78,17 +80,20 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                 p2 += 1
 
             for pos in range(len(new_data)):
-                U_data[U_indptr[j] + pos] = new_data[pos]
-                U_indices[U_indptr[j] + pos] = new_indices[pos]
+                U_data[col_j_start + pos] = new_data[pos]
+                U_indices[col_j_start + pos] = new_indices[pos]
 
-    for i in range(n):
-        pos = L_indptr[i]
-        L_data.insert(pos, 1.0)
-        L_indices.insert(pos, i)
-
-    L_indptr = list(range(0, len(L_data) + 1, 1))
-
-    L = CSCMatrix(L_data, L_indices, L_indptr, (n, n))
+    L_data_full = [1.0] * n
+    L_indices_full = list(range(n))
+    L_indptr_full = [0] * (n + 1)
+    for j in range(n):
+        L_data_full.append(1.0)
+        L_indices_full.append(j)
+        for pos in range(L_indptr[j], L_indptr[j + 1]):
+            L_data_full.append(L_data[pos])
+            L_indices_full.append(L_indices[pos])
+        L_indptr_full[j + 1] = len(L_data_full)
+    L = CSCMatrix(L_data_full, L_indices_full, L_indptr_full, (n, n))
     U = CSCMatrix(U_data, U_indices, U_indptr, (n, n))
 
     return L, U
