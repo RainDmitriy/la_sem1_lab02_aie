@@ -1,172 +1,164 @@
 from CSC import CSCMatrix
-from typing import Tuple, Optional, List
-Vector = List[float]
+from CSR import CSRMatrix
+from type import Vector
+from typing import Tuple, Optional
 
 
-def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix, List[int]]]:
+def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     """
-    LU-разложение для CSC матрицы с выбором главного элемента.
-    Возвращает (L, U, P) - нижнюю и верхнюю треугольные матрицы и вектор перестановок.
+    LU-разложение для CSC матрицы
+    Возвращает (L, U) - нижнюю и верхнюю треугольные матрицы
+    Ожидается, что матрица L хранит единицы на главной диагонали
     """
-    n = A.shape[0]
-    assert A.shape[0] == A.shape[1], "Matrix must be square for LU decomposition"
+    n, m = A.shape
+    if n != m:
+        return None
 
-    dense_A = A.to_dense()
-    L = [[0.0] * n for _ in range(n)]
-    U = [[0.0] * n for _ in range(n)]
-    P = list(range(n))
-
-    # Создаем копию матрицы для модификаций
-    A_temp = [row[:] for row in dense_A]
-
-    for i in range(n):
-        # Выбор главного элемента (partial pivoting)
-        max_row = i
-        max_val = abs(A_temp[i][i])
-        
-        for k in range(i + 1, n):
-            if abs(A_temp[k][i]) > max_val:
-                max_val = abs(A_temp[k][i])
-                max_row = k
-        
-        if max_val < 1e-15:
-            return None  # Матрица вырождена
-        
-        # Перестановка строк
-        if max_row != i:
-            A_temp[i], A_temp[max_row] = A_temp[max_row], A_temp[i]
-            P[i], P[max_row] = P[max_row], P[i]
-            # Также переставляем уже вычисленные элементы L
-            for j in range(i):
-                L[i][j], L[max_row][j] = L[max_row][j], L[i][j]
-        
-        # Вычисление элементов U и L
-        for j in range(i, n):
-            # Вычисляем U[i][j]
-            s = 0.0
-            for k in range(i):
-                s += L[i][k] * U[k][j]
-            U[i][j] = A_temp[i][j] - s
-        
-        # Проверка на нулевой диагональный элемент
-        if abs(U[i][i]) < 1e-15:
+    row_adj = [dict() for _ in range(n)]
+    col_adj = [dict() for _ in range(n)]
+    for c in range(m):
+        for k in range(A.indptr[c], A.indptr[c + 1]):
+             r = A.indices[k]
+             val = A.data[k]
+             row_adj[r][c] = val
+             col_adj[c][r] = val
+    L_triplets = []
+    U_triplets = []
+    for k in range(n):
+        pivot = col_adj[k].get(k, 0.0)
+        if pivot == 0:
             return None
-        
-        for j in range(i, n):
-            if i == j:
-                L[j][i] = 1.0
-            else:
-                # Вычисляем L[j][i]
-                s = 0.0
-                for k in range(i):
-                    s += L[j][k] * U[k][i]
-                L[j][i] = (A_temp[j][i] - s) / U[i][i]
+        U_triplets.append((k, k, pivot))
+        L_triplets.append((k, k, 1.0))
 
-    # Преобразуем L и U в разреженный формат
-    from COO import COOMatrix
-    
-    L_data, L_rows, L_cols = [], [], []
-    U_data, U_rows, U_cols = [], [], []
-    
-    for i in range(n):
-        for j in range(n):
-            if j <= i and abs(L[i][j]) > 1e-15:
-                L_data.append(L[i][j])
-                L_rows.append(i)
-                L_cols.append(j)
-            
-            if j >= i and abs(U[i][j]) > 1e-15:
-                U_data.append(U[i][j])
-                U_rows.append(i)
-                U_cols.append(j)
-    
-    L_coo = COOMatrix(L_data, L_rows, L_cols, (n, n))
-    U_coo = COOMatrix(U_data, U_rows, U_cols, (n, n))
-    
-    return L_coo._to_csc(), U_coo._to_csc(), P
+        u_indices = []
+        u_vals = []
 
+        if row_adj[k]:
+            for c, val in sorted(row_adj[k].items()):
+                if c > k:
+                    if abs(val) > 1e-15:
+                        U_triplets.append((k, c, val))
+                        u_indices.append(c)
+                        u_vals.append(val)
 
-def solve_lower_triangular(L: CSCMatrix, b: Vector) -> Vector:
-    """Решение Ly = b (L - нижняя треугольная с единицами на диагонали)."""
-    n = L.shape[0]
-    y = [0.0] * n
-    
-    # Используем плотное представление для простоты
-    dense_L = L.to_dense()
-    
-    for i in range(n):
-        s = 0.0
-        for j in range(i):
-            s += dense_L[i][j] * y[j]
-        y[i] = b[i] - s
-    
-    return y
+        l_indices = []
+        l_vals = []
 
+        if col_adj[k]:
+            for r, val in sorted(col_adj[k].items()):
+                if r > k:
+                    l_val = val / pivot
+                    if abs(l_val) > 1e-15:
+                        L_triplets.append((r, k, l_val))
+                        l_indices.append(r)
+                        l_vals.append(l_val)
 
-def solve_upper_triangular(U: CSCMatrix, y: Vector) -> Vector:
-    """Решение Ux = y (U - верхняя треугольная)."""
-    n = U.shape[0]
-    x = [0.0] * n
-    
-    # Используем плотное представление для простоты
-    dense_U = U.to_dense()
-    
-    for i in range(n - 1, -1, -1):
-        if abs(dense_U[i][i]) < 1e-15:
-            raise ValueError("Matrix U is singular")
-        
-        s = 0.0
-        for j in range(i + 1, n):
-            s += dense_U[i][j] * x[j]
-        x[i] = (y[i] - s) / dense_U[i][i]
-    
-    return x
+        for i in range(len(l_indices)):
+            r = l_indices[i]
+            l_val = l_vals[i]
+
+            for j in range(len(u_indices)):
+                c = u_indices[j]
+                u_val = u_vals[j]
+
+                update = l_val * u_val
+
+                old_val = row_adj[r].get(c, 0.0)
+                new_val = old_val - update
+
+                if abs(new_val) > 1e-15:
+                    row_adj[r][c] = new_val
+                    col_adj[c][r] = new_val
+                elif c in row_adj[r]:
+                    del row_adj[r][c]
+                    del col_adj[c][r]
+
+    def to_csc(triplets, size):
+        triplets.sort(key=lambda x: (x[1], x[0]))
+
+        data = [x[2] for x in triplets]
+        indices = [x[0] for x in triplets]
+        indptr = [0] * (size + 1)
+
+        curr_col = 0
+        for _, col, _ in triplets:
+            while curr_col < col:
+                curr_col += 1
+                indptr[curr_col + 1] = indptr[curr_col]
+            indptr[curr_col + 1] += 1
+
+        while curr_col < size - 1:
+            curr_col += 1
+            indptr[curr_col + 1] = indptr[curr_col]
+
+        return CSCMatrix(data, indices, indptr, (size, size))
+
+    return to_csc(L_triplets, n), to_csc(U_triplets, n)
 
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     """
     Решение СЛАУ Ax = b через LU-разложение.
     """
-    lu_result = lu_decomposition(A)
-    if lu_result is None:
+    lu = lu_decomposition(A)
+    if lu is None:
         return None
+    L, U = lu
+    n = len(b)
 
-    L, U, P = lu_result
-    
-    # Применяем перестановку к вектору b: b' = Pb
-    b_permuted = [b[P[i]] for i in range(len(b))]
-    
-    y = solve_lower_triangular(L, b_permuted)
-    x = solve_upper_triangular(U, y)
-    
+    y = list(b)
+    for j in range(n):
+        if y[j] != 0:
+            for k in range(L.indptr[j], L.indptr[j + 1]):
+                row = L.indices[k]
+                val = L.data[k]
+                if row > j:
+                    y[row] -= val * y[j]
+
+    x = list(y)
+    for j in range(n - 1, -1, -1):
+        diag_val = 0
+        for k in range(U.indptr[j], U.indptr[j + 1]):
+            if U.indices[k] == j:
+                diag_val = U.data[k]
+                break
+
+        if diag_val == 0: return None
+
+        x[j] /= diag_val
+
+        if x[j] != 0:
+            for k in range(U.indptr[j], U.indptr[j + 1]):
+                row = U.indices[k]
+                val = U.data[k]
+                if row < j:
+                    x[row] -= val * x[j]
+
     return x
 
 
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     """
     Нахождение определителя через LU-разложение.
+    det(A) = det(L) * det(U)
     """
-    lu_result = lu_decomposition(A)
-    if lu_result is None:
-        return None
+    lu = lu_decomposition(A)
+    if lu is None:
+        return 0.0
 
-    _, U, P = lu_result
-    n = A.shape[0]
-    
-    # Определитель U
-    det_U = 1.0
-    dense_U = U.to_dense()
-    for i in range(n):
-        det_U *= dense_U[i][i]
-    
-    # Учет перестановок (четность перестановок)
-    swaps = 0
-    for i in range(n):
-        if P[i] != i:
-            swaps += 1
-    
-    # Если swaps нечетное, меняем знак
-    if swaps % 2 == 1:
-        det_U = -det_U
-    
-    return det_U
+    _, U = lu
+    det = 1
+    n = U.shape[0]
+
+    for j in range(n):
+        diag_found = False
+        for k in range(U.indptr[j], U.indptr[j + 1]):
+            if U.indices[k] == j:
+                det *= U.data[k]
+                diag_found = True
+                break
+        if not diag_found:
+            return 0.0
+
+    return det
