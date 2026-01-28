@@ -11,48 +11,95 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     Ожидается, что матрица L хранит единицы на главной диагонали.
     """
     n, m = A.shape
+    if n != m:
+        return None
 
-    a_dict = dict()
+    row_adj = [dict() for _ in range(n)]
+    col_adj = [dict() for _ in range(n)]
+
     for c in range(m):
         for k in range(A.indptr[c], A.indptr[c + 1]):
-            a_dict[(A.indices[k], c)] = A.data[k]
+            r = A.indices[k]
+            val = A.data[k]
+            row_adj[r][c] = val
+            col_adj[c][r] = val
 
-    l_dict, u_dict = dict(), dict()
+    L_triplets = []
+    U_triplets = []
 
-    for i in range(n):
-        for k in range(i, n):
-            s_sum = sum(l_dict.get((i, s), 0) * u_dict.get((s, k), 0) for s in range(i))
-            val = a_dict.get((i, k), 0) - s_sum
-            if val != 0:
-                u_dict[(i, k)] = val
+    for k in range(n):
+        pivot = col_adj[k].get(k, 0.0)
 
-        diag_u = u_dict.get((i, i), 0)
-        if diag_u == 0:
+        if pivot == 0:
             return None
 
-        l_dict[(i, i)] = 1.0
-        for k in range(i + 1, n):
-            s_sum = sum(l_dict.get((k, s), 0) * u_dict.get((s, i), 0) for s in range(i))
-            val = (a_dict.get((k, i), 0) - s_sum) / diag_u
-            if val != 0:
-                l_dict[(k, i)] = val
+        U_triplets.append((k, k, pivot))
+        L_triplets.append((k, k, 1.0))
 
-    def to_csc(data_dict):
-        sorted_items = sorted(data_dict.items(), key=lambda x: (x[0][1], x[0][0]))
+        u_indices = []
+        u_vals = []
 
-        data = [v for k, v in sorted_items]
-        indices = [k[0] for k, v in sorted_items]
+        if row_adj[k]:
+            for c, val in sorted(row_adj[k].items()):
+                if c > k:
+                    if abs(val) > 1e-15:
+                        U_triplets.append((k, c, val))
+                        u_indices.append(c)
+                        u_vals.append(val)
 
-        indptr = [0] * (n + 1)
-        for (r, c), v in sorted_items:
-            indptr[c + 1] += 1
+        l_indices = []
+        l_vals = []
 
-        for i in range(n):
-            indptr[i + 1] += indptr[i]
+        if col_adj[k]:
+            for r, val in sorted(col_adj[k].items()):
+                if r > k:
+                    l_val = val / pivot
+                    if abs(l_val) > 1e-15:
+                        L_triplets.append((r, k, l_val))
+                        l_indices.append(r)
+                        l_vals.append(l_val)
 
-        return CSCMatrix(data, indices, indptr, (n, n))
+        for i in range(len(l_indices)):
+            r = l_indices[i]
+            l_val = l_vals[i]
 
-    return to_csc(l_dict), to_csc(u_dict)
+            for j in range(len(u_indices)):
+                c = u_indices[j]
+                u_val = u_vals[j]
+
+                update = l_val * u_val
+
+                old_val = row_adj[r].get(c, 0.0)
+                new_val = old_val - update
+
+                if abs(new_val) > 1e-15:
+                    row_adj[r][c] = new_val
+                    col_adj[c][r] = new_val
+                elif c in row_adj[r]:
+                    del row_adj[r][c]
+                    del col_adj[c][r]
+
+    def to_csc(triplets, size):
+        triplets.sort(key=lambda x: (x[1], x[0]))
+
+        data = [x[2] for x in triplets]
+        indices = [x[0] for x in triplets]
+        indptr = [0] * (size + 1)
+
+        curr_col = 0
+        for _, col, _ in triplets:
+            while curr_col < col:
+                curr_col += 1
+                indptr[curr_col + 1] = indptr[curr_col]
+            indptr[curr_col + 1] += 1
+
+        while curr_col < size - 1:
+            curr_col += 1
+            indptr[curr_col + 1] = indptr[curr_col]
+
+        return CSCMatrix(data, indices, indptr, (size, size))
+
+    return to_csc(L_triplets, n), to_csc(U_triplets, n)
 
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
