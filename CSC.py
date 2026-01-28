@@ -1,6 +1,6 @@
 from base import Matrix
 from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
-from COO import COOMatrix
+import sys
 
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
@@ -59,7 +59,8 @@ class CSCMatrix(Matrix):
                 result_col.append(curr_col)
                 result_data.append(sum_val)
 
-        return COOMatrix(result_data, result_row, result_col, self.shape)
+        COOClass = getattr(sys.modules['COO'], 'COOMatrix')
+        return COOClass(result_data, result_row, result_col, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
@@ -90,7 +91,8 @@ class CSCMatrix(Matrix):
                 new_col.append(self.indices[k])
                 new_data.append(self.data[k])
 
-        return COOMatrix(new_data, new_row, new_col, (n, m))
+        COOClass = getattr(sys.modules['COO'], 'COOMatrix')
+        return COOClass(new_data, new_row, new_col, (n, m))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
@@ -127,7 +129,8 @@ class CSCMatrix(Matrix):
                     result_cols.append(j)
                     result_data.append(sum_val)
 
-        return COOMatrix(result_data, result_rows, result_cols, (rows_a, cols_b))
+        COOClass = getattr(sys.modules['COO'], 'COOMatrix')
+        return COOClass(result_data, result_rows, result_cols, (rows_a, cols_b))
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
@@ -156,8 +159,9 @@ class CSCMatrix(Matrix):
         """
         Преобразование CSCMatrix в CSRMatrix.
         """
+        CSRClass = getattr(sys.modules['CSR'], 'CSRMatrix')
         coo = self._to_coo()
-        return coo._to_csr()
+        return CSRClass(coo.data, coo.col, coo.row, (self.shape[1], self.shape[0]))
 
     def _to_coo(self) -> 'COOMatrix':
         """
@@ -174,4 +178,5 @@ class CSCMatrix(Matrix):
                 col_list.append(j)
                 data_list.append(self.data[k])
 
-        return COOMatrix(data_list, row_list, col_list, self.shape)
+        COOClass = getattr(sys.modules['COO'], 'COOMatrix')
+        return COOClass(data_list, row_list, col_list, self.shape)
