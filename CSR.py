@@ -1,9 +1,6 @@
 from base import Matrix
 from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 
-# без этой части у меня возникают проблемы с типизацией
-# способ решения нашёл в интернете
-# (в файле каждого класса подписал на всякий случай)
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from CSC import CSCMatrix
@@ -11,231 +8,211 @@ if TYPE_CHECKING:
 
 
 class CSRMatrix(Matrix):
-    def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
-        super().__init__(shape)
+    def __init__(self, d: CSRData, idxs: CSRIndices, ptrs: CSRIndptr, s: Shape):
+        super().__init__(s)
 
-        if len(indptr) != shape[0] + 1:
-            raise ValueError(f"indptr должен иметь длину {shape[0] + 1}")
-        if indptr[0] != 0:
-            raise ValueError("indptr[0] должен быть равен 0")
-        if indptr[-1] != len(data):
-            raise ValueError(f"indptr[-1] должен быть равен {len(data)}")
-        if len(data) != len(indices):
-            raise ValueError("Длины data и indices должны совпадать")
+        if len(ptrs) != s[0] + 1:
+            raise ValueError(f"Неверная длина ptrs")
+        if ptrs[0] != 0:
+            raise ValueError("ptrs[0] должен быть 0")
+        if ptrs[-1] != len(d):
+            raise ValueError(f"Несоответствие ptrs[-1]")
+        if len(d) != len(idxs):
+            raise ValueError("Разные длины массивов")
         
-        self.data = data
-        self.indices = indices
-        self.indptr = indptr
+        self.d = d
+        self.idxs = idxs
+        self.ptrs = ptrs
 
     def to_dense(self) -> DenseMatrix:
-        """Преобразует CSR в плотную матрицу."""
-        rows, cols = self.shape
+        rows_cnt, cols_cnt = self.s
 
-        dense = [[0] * cols for _ in range(rows)]
+        result_mat = [[0] * cols_cnt for _ in range(rows_cnt)]
         
-        for i in range(rows):
-            start = self.indptr[i]
-            end = self.indptr[i + 1]
-            for idx in range(start, end):
+        for i in range(rows_cnt):
+            st = self.ptrs[i]
+            en = self.ptrs[i + 1]
+            for pos in range(st, en):
 
-                j = self.indices[idx]
-                value = self.data[idx]
-                dense[i][j] = value
+                j = self.idxs[pos]
+                v = self.d[pos]
+                result_mat[i][j] = v
         
-        return dense
+        return result_mat
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Сложение CSR матриц."""
-
-        self_coo = self._to_coo()
-        other_coo = other._to_coo()
+        coo_a = self._to_coo()
+        coo_b = other._to_coo()
         
-        result_coo = self_coo._add_impl(other_coo)
+        coo_res = coo_a._add_impl(coo_b)
         
-        return result_coo._to_csr()
+        return coo_res._to_csr()
 
-    def _mul_impl(self, scalar: float) -> 'Matrix':
-        """Умножение CSR на скаляр."""
-
-        if scalar == 0:
-            return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
+    def _mul_impl(self, k: float) -> 'Matrix':
+        if k == 0:
+            return CSRMatrix([], [], [0] * (self.s[0] + 1), self.s)
         
-        new_data = [value * scalar for value in self.data]
+        new_vals = [x * k for x in self.d]
 
-        return CSRMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
+        return CSRMatrix(new_vals, self.idxs.copy(), self.ptrs.copy(), self.s)
 
     def transpose(self) -> 'Matrix':
-        """
-        Транспонирование CSR матрицы.
-        Hint:
-        Результат - в CSC формате (с теми же данными, но с интерпретацией столбцов как строк).
-        """
         from CSC import CSCMatrix
         
-        rows, cols = self.shape
-        new_rows, new_cols = cols, rows
+        rows_cnt, cols_cnt = self.s
+        new_r_cnt, new_c_cnt = cols_cnt, rows_cnt
         
-        # считаем кол-во элементов в столбцах результата
-        col_counts = [0] * new_cols
+        cnts_per_col = [0] * new_c_cnt
         
-        for i in range(rows):
-            start = self.indptr[i]
-            end = self.indptr[i + 1]
-            col_counts[i] = end - start
+        for i in range(rows_cnt):
+            st = self.ptrs[i]
+            en = self.ptrs[i + 1]
+            cnts_per_col[i] = en - st
         
-        new_indptr = [0] * (new_cols + 1)
-        for j in range(new_cols):
-            new_indptr[j + 1] = new_indptr[j] + col_counts[j]
+        new_ptrs = [0] * (new_c_cnt + 1)
+        for j in range(new_c_cnt):
+            new_ptrs[j + 1] = new_ptrs[j] + cnts_per_col[j]
         
-        new_data = [0] * len(self.data)
-        new_indices = [0] * len(self.indices)
+        new_vals = [0] * len(self.d)
+        new_idxs = [0] * len(self.idxs)
         
-        col_positions = new_indptr.copy()
+        pos_per_col = new_ptrs.copy()
         
-        for i in range(rows):
-            start = self.indptr[i]
-            end = self.indptr[i + 1]
+        for i in range(rows_cnt):
+            st = self.ptrs[i]
+            en = self.ptrs[i + 1]
             
-            for idx in range(start, end):
-                j = self.indices[idx]
-                value = self.data[idx]
+            for pos in range(st, en):
+                j = self.idxs[pos]
+                v = self.d[pos]
                 
-                pos = col_positions[i]
-                new_data[pos] = value
-                new_indices[pos] = j
-                col_positions[i] += 1
+                p = pos_per_col[i]
+                new_vals[p] = v
+                new_idxs[p] = j
+                pos_per_col[i] += 1
         
-        return CSCMatrix(new_data, new_indices, new_indptr, (new_rows, new_cols))
+        return CSCMatrix(new_vals, new_idxs, new_ptrs, (new_r_cnt, new_c_cnt))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """Умножение CSR матриц."""
-        rows_A, cols_A = self.shape
-        rows_B, cols_B = other.shape
+        rows_a, cols_a = self.s
+        rows_b, cols_b = other.s
 
-        result_data = []
-        result_indices = []
-        result_indptr = [0] * (rows_A + 1)
+        res_vals = []
+        res_idxs = []
+        res_ptrs = [0] * (rows_a + 1)
 
-        for i in range(rows_A):
-            row_summ = {}
+        for i_idx in range(rows_a):
+            row_sum = {}
 
-            a_start = self.indptr[i]
-            a_end = self.indptr[i + 1]
+            a_st = self.ptrs[i_idx]
+            a_en = self.ptrs[i_idx + 1]
 
-            for a_idx in range(a_start, a_end):
-                k = self.indices[a_idx]
-                a_val = self.data[a_idx]
+            for a_pos in range(a_st, a_en):
+                k_idx = self.idxs[a_pos]
+                a_v = self.d[a_pos]
 
-                b_start = other.indptr[k]
-                b_end = other.indptr[k + 1]
+                b_st = other.ptrs[k_idx]
+                b_en = other.ptrs[k_idx + 1]
 
-                for b_idx in range(b_start, b_end):
-                    j = other.indices[b_idx]
-                    b_val = other.data[b_idx]
+                for b_pos in range(b_st, b_en):
+                    j_idx = other.idxs[b_pos]
+                    b_v = other.d[b_pos]
 
-                    if j not in row_summ:
-                        row_summ[j] = 0.0
-                    row_summ[j] += a_val * b_val
+                    if j_idx not in row_sum:
+                        row_sum[j_idx] = 0.0
+                    row_sum[j_idx] += a_v * b_v
 
-            sorted_cols = sorted(row_summ.keys())
-            for j in sorted_cols:
-                val = row_summ[j]
-                if abs(val) > 1e-14:
-                    result_data.append(val)
-                    result_indices.append(j)
+            sorted_cols = sorted(row_sum.keys())
+            for j_idx in sorted_cols:
+                v_val = row_sum[j_idx]
+                if abs(v_val) > 1e-14:
+                    res_vals.append(v_val)
+                    res_idxs.append(j_idx)
 
-            result_indptr[i + 1] = len(result_data)
+            res_ptrs[i_idx + 1] = len(res_vals)
 
-        return CSRMatrix(result_data, result_indices, result_indptr, (rows_A, cols_B))
+        return CSRMatrix(res_vals, res_idxs, res_ptrs, (rows_a, cols_b))
 
     @classmethod
-    def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
-        """Создание CSR из плотной матрицы."""
-        rows = len(dense_matrix)
-        cols = len(dense_matrix[0])
+    def from_dense(cls, dense_mat: DenseMatrix) -> 'CSRMatrix':
+        rows_cnt = len(dense_mat)
+        cols_cnt = len(dense_mat[0])
         
-        data = []
-        indices = []
+        vals = []
+        idxs = []
         
-        row_counts = [0] * rows
+        cnts_per_row = [0] * rows_cnt
         
-        for i in range(rows):
-            for j in range(cols):
-                value = dense_matrix[i][j]
-                if value != 0:
-                    data.append(value)
-                    indices.append(j)
-                    row_counts[i] += 1
+        for i in range(rows_cnt):
+            for j in range(cols_cnt):
+                v = dense_mat[i][j]
+                if v != 0:
+                    vals.append(v)
+                    idxs.append(j)
+                    cnts_per_row[i] += 1
         
-        indptr = [0] * (rows + 1)
-        for i in range(rows):
-            indptr[i + 1] = indptr[i] + row_counts[i]
+        ptrs = [0] * (rows_cnt + 1)
+        for i in range(rows_cnt):
+            ptrs[i + 1] = ptrs[i] + cnts_per_row[i]
         
-        return cls(data, indices, indptr, (rows, cols))
+        return cls(vals, idxs, ptrs, (rows_cnt, cols_cnt))
 
     def _to_csc(self) -> 'CSCMatrix':
-        """
-        Преобразование CSRMatrix в CSCMatrix.
-        """
         from CSC import CSCMatrix
 
-        m, n = self.shape
+        m_val, n_val = self.s
 
-        col_counts = [0] * n
+        cnts_per_col = [0] * n_val
 
-        for col_idx in self.indices:
-            col_counts[col_idx] += 1
+        for col_idx in self.idxs:
+            cnts_per_col[col_idx] += 1
 
-        indptr = [0] * (n + 1)
+        new_ptrs = [0] * (n_val + 1)
 
-        for j in range(n):
-            indptr[j + 1] = indptr[j] + col_counts[j]
+        for j in range(n_val):
+            new_ptrs[j + 1] = new_ptrs[j] + cnts_per_col[j]
 
-        data = [0] * len(self.data)
-        indices = [0] * len(self.indices)
+        new_vals = [0] * len(self.d)
+        new_idxs = [0] * len(self.idxs)
 
-        current_pos = indptr.copy()
+        cur_pos = new_ptrs.copy()
 
-        for i in range(m):
-            row_start = self.indptr[i]
-            row_end = self.indptr[i + 1]
+        for i in range(m_val):
+            row_st = self.ptrs[i]
+            row_en = self.ptrs[i + 1]
 
-            for k in range(row_start, row_end):
-                j = self.indices[k]
-                val = self.data[k]
+            for k in range(row_st, row_en):
+                j_val = self.idxs[k]
+                v_val = self.d[k]
 
-                pos = current_pos[j]
+                p_val = cur_pos[j_val]
 
-                data[pos] = val
-                indices[pos] = i
+                new_vals[p_val] = v_val
+                new_idxs[p_val] = i
 
-                current_pos[j] += 1
+                cur_pos[j_val] += 1
     
-        return CSCMatrix(data, indices, indptr, (m, n))
+        return CSCMatrix(new_vals, new_idxs, new_ptrs, (m_val, n_val))
     
     def _to_coo(self) -> 'COOMatrix':
-        """
-        Преобразование CSRMatrix в COOMatrix.
-        """
         from COO import COOMatrix
 
-        rows, cols = self.shape
+        rows_cnt, cols_cnt = self.s
 
-        data = []
-        row_indices = []
-        col_indices = []
+        vals = []
+        row_idxs = []
+        col_idxs = []
         
-        for i in range(rows):
-            start = self.indptr[i]
-            end = self.indptr[i + 1]
+        for i in range(rows_cnt):
+            st = self.ptrs[i]
+            en = self.ptrs[i + 1]
             
-            # для кажноо элемента в каждой строке находим столбец и значение
-            for idx in range(start, end):
-                j = self.indices[idx]
-                value = self.data[idx]
+            for pos in range(st, en):
+                j = self.idxs[pos]
+                v = self.d[pos]
                 
-                data.append(value)
-                row_indices.append(i)
-                col_indices.append(j)
+                vals.append(v)
+                row_idxs.append(i)
+                col_idxs.append(j)
         
-        return COOMatrix(data, row_indices, col_indices, self.shape)
+        return COOMatrix(vals, row_idxs, col_idxs, self.s)
