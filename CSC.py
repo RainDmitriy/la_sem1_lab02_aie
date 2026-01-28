@@ -60,7 +60,7 @@ class CSCMatrix(Matrix):
         return self._to_csr()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """умножение матриц"""
+        """умножение матриц """
         if self.shape[1] != other.shape[0]:
             raise ValueError("несовместимые размерности")
         return self._matmul_general(other)

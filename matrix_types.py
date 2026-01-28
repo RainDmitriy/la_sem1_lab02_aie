@@ -16,4 +16,4 @@ CSRIndptr = CSCIndptr = List[int]
 # Типы для конструкторов
 COOArgs = Tuple[COOData, COORows, COOCols, Shape]
 CSRArgs = Tuple[CSRData, CSRIndices, CSRIndptr, Shape]
-CSCArgs = Tuple[CSCData, CSCIndices, CSCIndptr, Shape ]
+CSCArgs = Tuple[CSCData, CSCIndices, CSCIndptr, Shape  ]
