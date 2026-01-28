@@ -19,5 +19,4 @@ CSRIndptr = CSCIndptr = List[int]    # Указатели начала стро�
 # Типы для конструкторов
 COOArgs = Tuple[COOData, COORows, COOCols, Shape]
 CSRArgs = Tuple[CSRData, CSRIndices, CSRIndptr, Shape]
-
 CSCArgs = Tuple[CSCData, CSCIndices, CSCIndptr, Shape]
