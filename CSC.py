@@ -1,5 +1,5 @@
 from base import Matrix
-from mtypes import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
+from types import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
@@ -50,15 +50,12 @@ class CSCMatrix(Matrix):
         Результат - в CSR формате (с теми же данными, но с интерпретацией строк как столбцов).
         """
         from CSR import CSRMatrix
-
         rows, cols = self.shape
         nnz = len(self.data)
 
         indptr = [0] * (cols + 1)
-        for col in self.indices:
-            indptr[col + 1] += 1
-
-        # Накопительная сумма
+        for row_idx in self.indices:
+            indptr[row_idx + 1] += 1
         for i in range(1, cols + 1):
             indptr[i] += indptr[i - 1]
 
@@ -67,9 +64,7 @@ class CSCMatrix(Matrix):
         counter = indptr[:]
 
         for col in range(cols):
-            start = self.indptr[col]
-            end = self.indptr[col + 1]
-            for idx in range(start, end):
+            for idx in range(self.indptr[col], self.indptr[col + 1]):
                 row = self.indices[idx]
                 val = self.data[idx]
                 pos = counter[row]
