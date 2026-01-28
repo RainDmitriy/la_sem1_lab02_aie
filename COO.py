@@ -64,17 +64,14 @@ class COOMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
-        if abs(scalar) < TOLERANCE:
-            return COOMatrix([], [], [], self.shape)
         new_data = []
         new_row = []
         new_col = []
         for i in range(len(self.data)):
             val = self.data[i] * scalar
-            if abs(val) > TOLERANCE:
-                new_data.append(val)
-                new_row.append(self.row[i])
-                new_col.append(self.col[i])
+            new_data.append(val)
+            new_row.append(self.row[i])
+            new_col.append(self.col[i])
         return COOMatrix(new_data, new_row, new_col, self.shape)
 
     def transpose(self) -> 'Matrix':
@@ -163,8 +160,7 @@ class COOMatrix(Matrix):
 
         triples = []
         for (col, row), val in merged.items():
-            if abs(val) > TOLERANCE:
-                triples.append((col, row, val))
+            triples.append((col, row, val))
 
         triples.sort(key=lambda x: (x[0], x[1]))
 
@@ -208,8 +204,7 @@ class COOMatrix(Matrix):
 
         triples = []
         for (row, col), val in merged.items():
-            if abs(val) > TOLERANCE:
-                triples.append((row, col, val))
+            triples.append((row, col, val))
 
         triples.sort(key=lambda x: (x[0], x[1]))
         data = []
