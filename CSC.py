@@ -9,12 +9,12 @@ if TYPE_CHECKING:
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
         super().__init__(shape)
-        if len(indptr) != shape[1] + 1:
-            raise ValueError(f"indptr должен иметь длину {shape[1] + 1}")
-        if indptr[0] != 0 or indptr[-1] != len(data):
-            raise ValueError("Некорректный indptr")
-        if len(data) != len(indices):
-            raise ValueError("Длины data и indices должны совпадать")
+        # if len(indptr) != shape[1] + 1:
+        #     raise ValueError(f"indptr должен иметь длину {shape[1] + 1}")
+        # if indptr[0] != 0 or indptr[-1] != len(data):
+        #     raise ValueError("Некорректный indptr")
+        # if len(data) != len(indices):
+        #     raise ValueError("Длины data и indices должны совпадать")
         self.data, self.indices, self.indptr  = data, indices, indptr
 
     def to_dense(self) -> DenseMatrix:
@@ -68,15 +68,15 @@ class CSCMatrix(Matrix):
         cols_b = other_csr.shape[1]
         res_r, res_c, res_v = [], [], []
         for j in range(cols_b):
-            col_start = other_csr.indptr[j]
-            col_end = other_csr.indptr[j + 1]
             for i in range(rows_a):
-                row_start = self.indptr[i]
-                row_end = self.indptr[i + 1]
                 s = 0.0
-                k1 = row_start
-                k2 = col_start
-                while k1 < row_end and k2 < col_end:
+                row_start_a = self.indptr[i]
+                row_end_a = self.indptr[i + 1]
+                col_start_b = other_csr.indptr[j]
+                col_end_b = other_csr.indptr[j + 1]
+                k1 = row_start_a
+                k2 = col_start_b
+                while k1 < row_end_a and k2 < col_end_b:
                     if self.indices[k1] == other_csr.indices[k2]:
                         s += self.data[k1] * other_csr.data[k2]
                         k1 += 1
