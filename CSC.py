@@ -86,7 +86,7 @@ class CSCMatrix(Matrix):
 
         csr_result = csr_self._matmul_impl(csr_other)
 
-        return csr_result.to_csc()
+        return csr_result._to_csc()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
