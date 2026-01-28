@@ -1,5 +1,5 @@
 from base import Matrix
-from types import COOData, COORows, COOCols, Shape, DenseMatrix
+from mtypes import COOData, COORows, COOCols, Shape, DenseMatrix
 
 
 class COOMatrix(Matrix):
@@ -41,23 +41,10 @@ class COOMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
-        result = {}
-        for v1, r1, c1 in zip(self.data, self.row, self.col):
-            for v2, r2, c2 in zip(other.data, other.row, other.col):
-                if c1 == r2:
-                    result[(r1, c2)] = result.get((r1, c2), 0) + v1 * v2
-
-        data = []
-        row = []
-        col = []
-        for (r, c), v in result.items():
-            if v != 0:
-                data.append(v)
-                row.append(r)
-                col.append(c)
-
-        shape = (self.shape[0], other.shape[1])
-        return COOMatrix(data, row, col, shape)
+        if scalar == 0:
+            return COOMatrix([], [], [], self.shape)
+        new_data = [v * scalar for v in self.data]
+        return COOMatrix(new_data, self.row[:], self.col[:], self.shape)
 
     def transpose(self) -> 'Matrix':
         """Транспонирование COO матрицы."""

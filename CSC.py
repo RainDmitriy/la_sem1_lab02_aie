@@ -1,5 +1,5 @@
 from base import Matrix
-from types import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
+from mtypes import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
