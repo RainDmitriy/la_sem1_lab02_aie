@@ -27,7 +27,7 @@ class Matrix(ABC):
 
     @abstractmethod
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        """Реализация умножения на скаляр."""
+        """Реализация умножения на скаляр"""
         pass
 
     def __rmul__(self, scalar: float) -> 'Matrix':
