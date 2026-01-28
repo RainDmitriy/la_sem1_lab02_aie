@@ -5,9 +5,9 @@ from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
         super().__init__(shape)
-        self.data = data
-        self.indices = indices
-        self.indptr = indptr
+        self.data = data.copy()
+        self.indices = indices.copy()
+        self.indptr = indptr.copy()
 
     def to_dense(self) -> DenseMatrix:
         """Преобразует CSC в плотную матрицу."""

@@ -5,9 +5,9 @@ from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
         super().__init__(shape)
-        self.data = data
-        self.indices = indices
-        self.indptr = indptr
+        self.data = data.copy()
+        self.indices = indices.copy()
+        self.indptr = indptr.copy()
 
     def to_dense(self) -> DenseMatrix:
         """Преобразует CSR в плотную матрицу."""
