@@ -17,15 +17,18 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     a = A.to_dense()
     l = [[0.0] * rows for _ in range(rows)]
     u = [[0.0] * rows for _ in range(rows)]
+    perm = list(range(rows))
 
     for i in range(rows):
-        p_row = max(range(i, rows), key=lambda r: abs(a[r][i]))
-        if abs(a[p_row][i]) < 1e-12:
+        p = max(range(i, rows), key=lambda r: abs(a[r][i]))
+        if abs(a[p][i]) < 1e-12:
             return None
 
-        a[i], a[p_row] = a[p_row], a[i]
+        a[i], a[p] = a[p], a[i]
+        perm[i], perm[p] = perm[p], perm[i]
+
         for k in range(i):
-            l[i][k], l[p_row][k] = l[p_row][k], l[i][k]
+            l[i][k], l[p][k] = l[p][k], l[i][k]
 
         l[i][i] = 1.0
 
@@ -34,7 +37,10 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         for j in range(i + 1, rows):
             l[j][i] = (a[j][i] - sum(l[j][k] * u[k][i] for k in range(i))) / u[i][i]
 
-    return CSCMatrix.from_dense(l), CSCMatrix.from_dense(u)
+    res_l = [l[perm.index(i)] for i in range(rows)]
+    res_u = u
+
+    return CSCMatrix.from_dense(res_l), CSCMatrix.from_dense(res_u)
 
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
