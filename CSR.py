@@ -1,6 +1,7 @@
 from base import Matrix
 from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 
+TOLERANCE = 1e-8
 
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
@@ -37,18 +38,50 @@ class CSRMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSR матриц."""
-        dense_self = self.to_dense()
-        dense_other = other.to_dense()
-        rows, cols = self.shape
-        result_dense = []
-        for i in range(rows):
-            new_row = []
-            for j in range(cols):
-                sum_val = dense_self[i][j] + dense_other[i][j]
-                new_row.append(sum_val)
-            result_dense.append(new_row)
+        if not isinstance(other, CSRMatrix):
+            B = other._to_csr()
+        else:
+            B = other
 
-        return CSRMatrix.from_dense(result_dense)
+        rows, cols = self.shape
+        if (rows, cols) != B.shape:
+            raise ValueError("matrix self and matrix other doesnt have same shape ")
+        triples = []
+        for row in range(rows):
+            start1 = self.indptr[row]
+            end1 = self.indptr[row + 1]
+            for idx in range(start1, end1):
+                col = self.indices[idx]
+                val = self.data[idx]
+                triples.append((row, col, val))
+
+        for row in range(rows):
+            start2 = B.indptr[row]
+            end2 = B.indptr[row + 1]
+            for idx in range(start2, end2):
+                col = B.indices[idx]
+                val = B.data[idx]
+                triples.append((row, col, val))
+
+        result = {}
+        for r, c, val in triples:
+            key = (r, c)
+            if key in result:
+                result[key] += val
+            else:
+                result[key] = val
+        coo_data = []
+        coo_row = []
+        coo_col = []
+        for (r, c), val in result.items():
+            if abs(val) > TOLERANCE:
+                coo_data.append(val)
+                coo_row.append(r)
+                coo_col.append(c)
+
+        from COO import COOMatrix
+        coo_result = COOMatrix(coo_data, coo_row, coo_col, (rows, cols))
+        return coo_result._to_csr()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""

@@ -33,18 +33,34 @@ class COOMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение COO матриц."""
-        dense_self = self.to_dense()
-        dense_other = other.to_dense()
+        if not isinstance(other, COOMatrix):
+            B = other._to_coo()
+        else:
+            B = other
         rows, cols = self.shape
-        result_dense = []
-        for i in range(rows):
-            new_row = []
-            for j in range(cols):
-                sum_val = dense_self[i][j] + dense_other[i][j]
-                new_row.append(sum_val)
-            result_dense.append(new_row)
-
-        return COOMatrix.from_dense(result_dense)
+        if (rows, cols) != B.shape:
+            raise ValueError("matrix self' col and matrix other' row doesnt have same length")
+        triples = []
+        for i in range(len(self.data)):
+            triples.append((self.row[i], self.col[i], self.data[i]))
+        for i in range(len(B.data)):
+            triples.append((B.row[i], B.col[i], B.data[i]))
+        res = {}
+        for r, c, value in triples:
+            key = (r, c)
+            if key in res:
+                res[key] += value
+            else:
+                res[key] = value
+        final_data = []
+        final_row = []
+        final_col = []
+        for (r, c), value in res.items():
+            if abs(value) > TOLERANCE:
+                final_data.append(value)
+                final_row.append(r)
+                final_col.append(c)
+        return COOMatrix(final_data, final_row, final_col, (rows, cols))
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""

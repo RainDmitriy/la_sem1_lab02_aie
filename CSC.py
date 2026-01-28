@@ -1,6 +1,7 @@
 from base import Matrix
 from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 
+TOLERANCE = 1e-8
 
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
@@ -36,18 +37,49 @@ class CSCMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSC матриц."""
-        dense_self = self.to_dense()
-        dense_other = other.to_dense()
-        rows, cols = self.shape
-        result_dense = []
-        for i in range(rows):
-            new_row = []
-            for j in range(cols):
-                sum_val = dense_self[i][j] + dense_other[i][j]
-                new_row.append(sum_val)
-            result_dense.append(new_row)
+        if not isinstance(other, CSCMatrix):
+            B = other._to_csc()
+        else:
+            B = other
 
-        return CSCMatrix.from_dense(result_dense)
+        rows, cols = self.shape
+        if (rows, cols) != B.shape:
+            raise ValueError("matrix self and matrix other doesnt have same SHAPE")
+        triples = []
+        for col in range(cols):
+            start1 = self.indptr[col]
+            end1 = self.indptr[col + 1]
+            for idx in range(start1, end1):
+                row = self.indices[idx]
+                val = self.data[idx]
+                triples.append((row, col, val))
+        for col in range(cols):
+            start2 = B.indptr[col]
+            end2 = B.indptr[col + 1]
+            for idx in range(start2, end2):
+                row = B.indices[idx]
+                val = B.data[idx]
+                triples.append((row, col, val))
+        result = {}
+        for r, c, val in triples:
+            key = (r, c)
+            if key in result:
+                result[key] += val
+            else:
+                result[key] = val
+        coo_data = []
+        coo_row = []
+        coo_col = []
+
+        for (r, c), val in result.items():
+            if abs(val) > TOLERANCE:
+                coo_data.append(val)
+                coo_row.append(r)
+                coo_col.append(c)
+
+        from COO import COOMatrix
+        coo_result = COOMatrix(coo_data, coo_row, coo_col, (rows, cols))
+        return coo_result._to_csc()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
