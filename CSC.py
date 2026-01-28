@@ -1,49 +1,240 @@
 from base import Matrix
 from types import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
+from math import fabs
 
 
 class CSCMatrix(Matrix):
+    # Константа для сравнения с нулем
+    ZERO_TOLERANCE = 1e-10
+
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
         super().__init__(shape)
-        pass
+        self.data = data
+        self.indices = indices
+        self.indptr = indptr
+
+        # Проверка согласованности
+        assert len(data) == len(indices), "Data and indices must have same length"
+        assert len(indptr) == shape[1] + 1, f"indptr length must be shape[1] + 1 = {shape[1] + 1}"
+        assert indptr[0] == 0, "indptr must start with 0"
+        assert indptr[-1] == len(data), f"Last indptr must equal data length: {indptr[-1]} != {len(data)}"
 
     def to_dense(self) -> DenseMatrix:
         """Преобразует CSC в плотную матрицу."""
-        pass
+        n_rows, n_cols = self.shape
+        dense_data = [[0.0 for _ in range(n_cols)] for _ in range(n_rows)]
+
+        for col in range(n_cols):
+            start = self.indptr[col]
+            end = self.indptr[col + 1]
+            for idx in range(start, end):
+                row = self.indices[idx]
+                value = self.data[idx]
+                dense_data[row][col] = value
+
+        return DenseMatrix(dense_data)
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSC матриц."""
-        pass
+
+        assert isinstance(other, CSCMatrix), "Addition is only supported between two CSC matrices"
+        assert self.shape == other.shape, "Matrix shapes must match for addition"
+
+        n_rows, n_cols = self.shape
+        result_data, result_indices, result_indptr = [], [], [0]
+
+        for col in range(n_cols):
+            self_start, self_end = self.indptr[col], self.indptr[col + 1]
+            other_start, other_end = other.indptr[col], other.indptr[col + 1]
+
+            i, j = self_start, other_start
+
+            while i < self_end and j < other_end:
+                row1, row2 = self.indices[i], other.indices[j]
+
+                if row1 < row2:
+                    # Элемент только в первой матрице
+                    result_indices.append(row1)
+                    result_data.append(self.data[i])
+                    i += 1
+                elif row1 > row2:
+                    # Элемент только во второй матрице
+                    result_indices.append(row2)
+                    result_data.append(other.data[j])
+                    j += 1
+                else:
+                    # Элемент в обеих матрицах
+                    sum_val = self.data[i] + other.data[j]
+                    if fabs(sum_val) >= self.ZERO_TOLERANCE:
+                        result_indices.append(row1)
+                        result_data.append(sum_val)
+                    i += 1
+                    j += 1
+
+            # Остатки из первой матрицы
+            while i < self_end:
+                result_indices.append(self.indices[i])
+                result_data.append(self.data[i])
+                i += 1
+
+            # Остатки из второй матрицы
+            while j < other_end:
+                result_indices.append(other.indices[j])
+                result_data.append(other.data[j])
+                j += 1
+
+            result_indptr.append(len(result_data))
+
+        return CSCMatrix(result_data, result_indices, result_indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
-        pass
+        if fabs(scalar) < self.ZERO_TOLERANCE:
+            return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
+
+        new_data = [val * scalar for val in self.data]
+
+        result_data, result_indices = [], []
+        result_indptr = [0]
+
+        for col in range(self.shape[1]):
+            start, end = self.indptr[col], self.indptr[col + 1]
+
+            for idx in range(start, end):
+                if fabs(new_data[idx]) >= self.ZERO_TOLERANCE:
+                    result_indices.append(self.indices[idx])
+                    result_data.append(new_data[idx])
+
+            result_indptr.append(len(result_data))
+
+        return CSCMatrix(result_data, result_indices, result_indptr, self.shape)
 
     def transpose(self) -> 'Matrix':
         """
         Транспонирование CSC матрицы.
-        Hint:
         Результат - в CSR формате (с теми же данными, но с интерпретацией строк как столбцов).
         """
-        pass
+
+        n_rows, n_cols = self.shape
+        new_n_rows, new_n_cols = n_cols, n_rows  # меняем местами
+
+        row_counts = [0] * new_n_rows
+
+        for row_idx in self.indices:
+            row_counts[row_idx] += 1
+
+        row_ptr = [0] * (new_n_rows + 1)
+        for i in range(new_n_rows):
+            row_ptr[i + 1] = row_ptr[i] + row_counts[i]
+
+        positions = row_ptr.copy()
+        new_data = [0.0] * len(self.data)
+        new_indices = [0] * len(self.data)
+
+        for col in range(n_cols):
+            start, end = self.indptr[col], self.indptr[col + 1]
+            for idx in range(start, end):
+                row = self.indices[idx]
+                new_row = col
+                new_col = row
+
+                pos = positions[new_row]
+                new_data[pos] = self.data[idx]
+                new_indices[pos] = new_col
+                positions[new_row] += 1
+
+        from CSR import CSRMatrix
+        return CSRMatrix(new_data, new_indices, row_ptr, (new_n_rows, new_n_cols))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
-        pass
+
+        assert self.shape[1] == other.shape[0], "Matrix dimensions incompatible for multiplication"
+        assert isinstance(other, CSCMatrix), "Multiplication is only supported between two CSC matrices"
+
+        n_rows, n_cols = self.shape
+        k = other.shape[1]
+
+        self_csr = self._to_csr()
+
+        result_data = [[0.0 for _ in range(k)] for _ in range(n_rows)]
+
+        for i in range(n_rows):
+            row_start = self_csr.indptr[i]
+            row_end = self_csr.indptr[i + 1]
+
+            if row_start == row_end:
+                continue
+
+            for j in range(k):
+                col_start = other.indptr[j]
+                col_end = other.indptr[j + 1]
+
+                if col_start == col_end:
+                    continue
+
+                dot = 0.0
+
+                p1, p2 = row_start, col_start
+                while p1 < row_end and p2 < col_end:
+                    col_in_self = self_csr.indices[p1]
+                    row_in_other = other.indices[p2]
+
+                    if col_in_self < row_in_other:
+                        p1 += 1
+                    elif col_in_self > row_in_other:
+                        p2 += 1
+                    else:
+                        # Нашли совпадающий индекс k
+                        dot += self_csr.data[p1] * other.data[p2]
+                        p1 += 1
+                        p2 += 1
+
+                if fabs(dot) >= self.ZERO_TOLERANCE:
+                    result_data[i][j] = dot
+
+        return DenseMatrix(result_data)
+
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
         """Создание CSC из плотной матрицы."""
-        pass
+        n_rows, n_cols = dense_matrix.shape
+        dense_data = dense_matrix.data
+
+        data, indices, indptr = [], [], [0]
+
+        for col in range(n_cols):
+            for row in range(n_rows):
+                val = dense_data[row][col]
+                if fabs(val) >= cls.ZERO_TOLERANCE:
+                    data.append(val)
+                    indices.append(row)
+            indptr.append(len(data))
+
+        return cls(data, indices, indptr, dense_matrix.shape)
 
     def _to_csr(self) -> 'CSRMatrix':
         """
         Преобразование CSCMatrix в CSRMatrix.
         """
-        pass
+        csr = self.transpose()
+
+        return csr
 
     def _to_coo(self) -> 'COOMatrix':
         """
         Преобразование CSCMatrix в COOMatrix.
         """
-        pass
+        data, rows, cols = [], [], []
+
+        for col in range(self.shape[1]):
+            start, end = self.indptr[col], self.indptr[col + 1]
+            for idx in range(start, end):
+                data.append(self.data[idx])
+                rows.append(self.indices[idx])
+                cols.append(col)
+
+        from COO import COOMatrix
+        return COOMatrix(data, rows, cols, self.shape)
+
