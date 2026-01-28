@@ -1,11 +1,12 @@
 from base import Matrix
 from typing import List, Tuple
+from type import DenseMatrix, Shape, COOData, COORows, COOCols
 
 TOL = 1e-12
 
 
 class COOMatrix(Matrix):
-    def __init__(self, data: List[float], row: List[int], col: List[int], shape: Tuple[int, int]):
+    def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
         super().__init__(shape)
         self.data = data
         self.row = row
@@ -18,7 +19,7 @@ class COOMatrix(Matrix):
         if col and max(col) >= shape[1]:
             raise ValueError(f"Индекс столбца {max(col)} превышает размер {shape[1]}")
 
-    def to_dense(self) -> List[List[float]]:
+    def to_dense(self) -> DenseMatrix:
         """Преобразует COO в плотную матрицу."""
         rows, cols = self.shape
         dense = [[0.0] * cols for _ in range(rows)]
@@ -29,11 +30,12 @@ class COOMatrix(Matrix):
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Сложение COO матриц через плотное представление для согласованности."""
+        """Сложение COO матриц."""
         if self.shape != other.shape:
             raise ValueError("Размерности матриц не совпадают")
         
-        # Используем плотное представление для гарантии согласованности с эталонной реализацией
+        # Используем сложение через плотное представление
+        # Это более надежно и соответствует тестам
         dense_self = self.to_dense()
         dense_other = other.to_dense()
         rows, cols = self.shape
@@ -47,12 +49,24 @@ class COOMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
-        if scalar == 0.0:
+        if abs(scalar) < TOL:
             return COOMatrix([], [], [], self.shape)
         
-        # Умножаем все значения, НЕ удаляя элементы
+        # Умножаем все значения
         new_data = [val * scalar for val in self.data]
-        return COOMatrix(new_data, self.row.copy(), self.col.copy(), self.shape)
+        
+        # Фильтруем значения, близкие к нулю
+        filtered_data = []
+        filtered_rows = []
+        filtered_cols = []
+        
+        for i in range(self.nnz):
+            if abs(new_data[i]) > TOL:
+                filtered_data.append(new_data[i])
+                filtered_rows.append(self.row[i])
+                filtered_cols.append(self.col[i])
+        
+        return COOMatrix(filtered_data, filtered_rows, filtered_cols, self.shape)
 
     def transpose(self) -> 'Matrix':
         """Транспонирование COO матрицы."""
@@ -61,11 +75,11 @@ class COOMatrix(Matrix):
         return COOMatrix(self.data.copy(), self.col.copy(), self.row.copy(), new_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """Умножение COO матриц через плотное представление для надежности."""
+        """Умножение COO матриц."""
         if self.shape[1] != other.shape[0]:
             raise ValueError("Несовместимые размерности для умножения")
         
-        # Преобразуем в плотные для надежности
+        # Используем плотное представление для надежности
         dense_self = self.to_dense()
         dense_other = other.to_dense()
         
@@ -84,7 +98,7 @@ class COOMatrix(Matrix):
         return COOMatrix.from_dense(result_dense)
 
     @classmethod
-    def from_dense(cls, dense_matrix: List[List[float]]) -> 'COOMatrix':
+    def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
         """Создание COO из плотной матрицы."""
         data = []
         rows = []
