@@ -58,16 +58,38 @@ class CSCMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
-        dense_ans: DenseMatrix = []
-        for i in range(other.shape[1]):
-            dense_ans.append([0] * self.shape[0])
-        self_dense = self.to_dense()
-        other_dense = other.to_dense()
-        for m in range(self.shape[0]):
-            for k in range(other.shape[1]):
-                for n in range(self.shape[1]):
-                    dense_ans[m][k] += self_dense[m][n] * other_dense[n][k]
-        return self.from_dense(dense_ans)
+        rows_A, cols_A = self.shape
+        cols_B = other.shape[1]
+        
+        res_data = []
+        res_indices = []
+        res_indptr = [0]
+
+        spa = [0] * rows_A
+        occupied = []
+
+        for j in range(cols_B):
+            for k_idx in range(other.indptr[j], other.indptr[j+1]):
+                k = other.indices[k_idx]
+                val_B = other.data[k_idx]
+
+                for a_idx in range(self.indptr[k], self.indptr[k+1]):
+                    row_A = self.indices[a_idx]
+                    if spa[row_A] == 0:
+                        occupied.append(row_A)
+                    spa[row_A] += val_B * self.data[a_idx]
+
+            occupied.sort()
+            for row in occupied:
+                if spa[row] != 0:
+                    res_data.append(spa[row])
+                    res_indices.append(row)
+                    spa[row] = 0
+            
+            res_indptr.append(len(res_data))
+            occupied = []
+
+        return CSCMatrix(res_data, res_indices, res_indptr, (rows_A, cols_B))
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':

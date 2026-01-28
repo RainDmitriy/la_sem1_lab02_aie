@@ -57,16 +57,40 @@ class CSRMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSR матриц."""
-        dense_ans: DenseMatrix = []
-        for i in range(other.shape[1]):
-            dense_ans.append([0] * self.shape[0])
-        self_dense = self.to_dense()
-        other_dense = other.to_dense()
-        for m in range(self.shape[0]):
-            for k in range(other.shape[1]):
-                for n in range(self.shape[1]):
-                    dense_ans[m][k] += self_dense[m][n] * other_dense[n][k]
-        return self.from_dense(dense_ans)
+        rows_A, cols_A = self.shape
+        rows_B, cols_B = other.shape
+        
+        res_data = []
+        res_indices = []
+        res_indptr = [0]
+
+        spa = [0.0] * cols_B
+        occupied = []
+
+        for i in range(rows_A):
+            for a_idx in range(self.indptr[i], self.indptr[i+1]):
+                k = self.indices[a_idx]
+                val_A = self.data[a_idx]
+
+                for b_idx in range(other.indptr[k], other.indptr[k+1]):
+                    col_B = other.indices[b_idx]
+                    val_B = other.data[b_idx]
+                    
+                    if spa[col_B] == 0:
+                        occupied.append(col_B)
+                    spa[col_B] += val_A * val_B
+
+            occupied.sort()
+            for col in occupied:
+                if spa[col] != 0:
+                    res_data.append(spa[col])
+                    res_indices.append(col)
+                    spa[col] = 0
+            
+            res_indptr.append(len(res_data))
+            occupied = []
+
+        return CSRMatrix(res_data, res_indices, res_indptr, (rows_A, cols_B))
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':

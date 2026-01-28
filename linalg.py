@@ -97,4 +97,3 @@ def elem_from_csc(csc_format: CSCMatrix, row: int, col: int) -> float:
         return 0
 
     return my_data[data_index]
-
