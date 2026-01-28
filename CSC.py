@@ -3,12 +3,14 @@ from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix, COOData, CO
 from COO import COOMatrix
 from collections import defaultdict
 
+
 class CSCMatrix(Matrix):
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
         super().__init__(shape)
         self.data = data
         self.indices = indices
         self.indptr = indptr
+
         if len(indptr) != shape[1] + 1:
             raise ValueError(f"indptr должен иметь длину shape[1] + 1 = {shape[1] + 1}")
 
@@ -66,22 +68,52 @@ class CSCMatrix(Matrix):
 
     def transpose(self) -> 'Matrix':
         from CSR import CSRMatrix
-        coo = self._to_coo()
-        transposed_coo = coo.transpose()
-        return transposed_coo._to_csr()
+
+        rows, cols = self.shape
+        nnz = len(self.data)
+
+        if nnz == 0:
+            return CSRMatrix([], [], [0] * (rows + 1), (cols, rows))
+
+        row_counts = [0] * rows
+        for j in range(cols):
+            start, end = self.indptr[j], self.indptr[j + 1]
+            for pos in range(start, end):
+                i = self.indices[pos]
+                row_counts[i] += 1
+
+        csr_indptr = [0] * (rows + 1)
+        for i in range(rows):
+            csr_indptr[i + 1] = csr_indptr[i] + row_counts[i]
+
+        csr_data = [0.0] * nnz
+        csr_indices = [0] * nnz
+
+        current_pos = csr_indptr.copy()
+
+        for j in range(cols):
+            start, end = self.indptr[j], self.indptr[j + 1]
+            for pos in range(start, end):
+                i = self.indices[pos]
+                val = self.data[pos]
+
+                csr_pos = current_pos[i]
+                csr_data[csr_pos] = val
+                csr_indices[csr_pos] = j
+                current_pos[i] += 1
+
+        return CSRMatrix(csr_data, csr_indices, csr_indptr, (cols, rows))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         from CSR import CSRMatrix
-        from COO import COOMatrix
 
-        csr_self = self.transpose().transpose()
-
+        csr_self = self.transpose()
         if isinstance(other, CSCMatrix):
-            csr_other = other.transpose().transpose()
-            result_csr = csr_self._matmul_impl(csr_other)
-            return result_csr._to_csc()
+            csr_other = other.transpose()
+            result = csr_self._matmul_impl(csr_other)
+            return result.transpose()
         else:
-            return csr_self._matmul_impl(other)
+            return csr_self._matmul_impl(other).transpose()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
@@ -107,13 +139,7 @@ class CSCMatrix(Matrix):
                 row_indices.append(self.indices[pos])
                 col_indices.append(j)
 
-        indices = sorted(range(len(data)), key=lambda i: (row_indices[i], col_indices[i]))
-
-        sorted_data = [data[i] for i in indices]
-        sorted_rows = [row_indices[i] for i in indices]
-        sorted_cols = [col_indices[i] for i in indices]
-
-        return COOMatrix(sorted_data, sorted_rows, sorted_cols, self.shape)
+        return COOMatrix(data, row_indices, col_indices, self.shape)
 
     @classmethod
     def from_coo(cls, data: COOData, rows: COORows, cols: COOCols, shape: Shape) -> 'CSCMatrix':

@@ -1,9 +1,11 @@
 from type import Vector
 from typing import Tuple, Optional, List
 
+
 def lu_decomposition(A: 'CSCMatrix') -> Optional[Tuple['CSCMatrix', 'CSCMatrix']]:
     from CSC import CSCMatrix
     from COO import COOMatrix
+
     n = A.shape[0]
 
     if n != A.shape[1]:
@@ -38,10 +40,12 @@ def lu_decomposition(A: 'CSCMatrix') -> Optional[Tuple['CSCMatrix', 'CSCMatrix']
 
     return L_coo._to_csc(), U_coo._to_csc()
 
+
 def solve_SLAE_lu(A: 'CSCMatrix', b: Vector) -> Optional[Vector]:
     result = lu_decomposition(A)
     if result is None:
         return None
+
     L, U = result
     n = A.shape[0]
 
@@ -69,10 +73,12 @@ def solve_SLAE_lu(A: 'CSCMatrix', b: Vector) -> Optional[Vector]:
 
     return x
 
+
 def find_det_with_lu(A: 'CSCMatrix') -> Optional[float]:
     result = lu_decomposition(A)
     if result is None:
         return None
+
     L, U = result
     n = A.shape[0]
 

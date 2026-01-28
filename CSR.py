@@ -3,12 +3,14 @@ from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix, COOData, CO
 from COO import COOMatrix
 from collections import defaultdict
 
+
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
         super().__init__(shape)
         self.data = data
         self.indices = indices
         self.indptr = indptr
+
         if len(indptr) != shape[0] + 1:
             raise ValueError(f"indptr должен иметь длину shape[0] + 1 = {shape[0] + 1}")
 
@@ -66,12 +68,45 @@ class CSRMatrix(Matrix):
 
     def transpose(self) -> 'Matrix':
         from CSC import CSCMatrix
-        coo = self._to_coo()
-        transposed_coo = coo.transpose()
-        return transposed_coo._to_csc()
+
+        rows, cols = self.shape
+        nnz = len(self.data)
+
+        if nnz == 0:
+            return CSCMatrix([], [], [0] * (cols + 1), (cols, rows))
+
+        col_counts = [0] * cols
+        for i in range(rows):
+            start, end = self.indptr[i], self.indptr[i + 1]
+            for pos in range(start, end):
+                j = self.indices[pos]
+                col_counts[j] += 1
+
+        csc_indptr = [0] * (cols + 1)
+        for j in range(cols):
+            csc_indptr[j + 1] = csc_indptr[j] + col_counts[j]
+
+        csc_data = [0.0] * nnz
+        csc_indices = [0] * nnz
+
+        current_pos = csc_indptr.copy()
+
+        for i in range(rows):
+            start, end = self.indptr[i], self.indptr[i + 1]
+            for pos in range(start, end):
+                j = self.indices[pos]
+                val = self.data[pos]
+
+                csc_pos = current_pos[j]
+                csc_data[csc_pos] = val
+                csc_indices[csc_pos] = i
+                current_pos[j] += 1
+
+        return CSCMatrix(csc_data, csc_indices, csc_indptr, (cols, rows))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         rows_A, cols_A = self.shape
+
         from CSC import CSCMatrix
 
         if isinstance(other, CSRMatrix):
@@ -181,13 +216,7 @@ class CSRMatrix(Matrix):
                 row_indices.append(i)
                 col_indices.append(self.indices[pos])
 
-        indices = sorted(range(len(data)), key=lambda i: (row_indices[i], col_indices[i]))
-
-        sorted_data = [data[i] for i in indices]
-        sorted_rows = [row_indices[i] for i in indices]
-        sorted_cols = [col_indices[i] for i in indices]
-
-        return COOMatrix(sorted_data, sorted_rows, sorted_cols, self.shape)
+        return COOMatrix(data, row_indices, col_indices, self.shape)
 
     @classmethod
     def from_coo(cls, data: COOData, rows: COORows, cols: COOCols, shape: Shape) -> 'CSRMatrix':
