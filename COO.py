@@ -33,7 +33,7 @@ class COOMatrix(Matrix):
         for val, r, c in zip(self.data, self.row, self.col):
             dense_data[r][c] = val
 
-        return DenseMatrix(dense_data)
+        return dense_data
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение COO матриц"""
@@ -75,43 +75,40 @@ class COOMatrix(Matrix):
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение COO матриц."""
 
-        assert isinstance(other, COOMatrix), "Multiplication is only supported between two COO matrices"
         assert self.shape[1] == other.shape[0], "Matrix dimensions incompatible for multiplication"
 
-        result_dict = {}  # (i, j) -> значение
+        sr, sc = self.shape[0], other.shape[1]
 
-        rows_dict = {}
-        for val, r, c in zip(self.data, self.row, self.col):
-            if r not in rows_dict:
-                rows_dict[r] = []
-            rows_dict[r].append((c, val))
+        if hasattr(other, "_to_csr"):
+            b_csr = other._to_csr()
+        else:
+            b_csr = COOMatrix.from_dense(other.to_dense())._to_csr()
 
-        cols_dict = {}
-        for val, r, c in zip(other.data, other.row, other.col):
-            if c not in cols_dict:
-                cols_dict[c] = []
-            cols_dict[c].append((r, val))
+        result_dict = {}
 
-        for i in rows_dict:
-            for j in cols_dict:
-                dot_product = 0.0
+        for idx in range(len(self.data)):
+            r = self.row[idx]
+            c = self.col[idx]
+            val_a = self.data[idx]
 
-                row_elems = rows_dict[i]
-                col_elems = cols_dict[j]
+            start = b_csr.indptr[c]
+            end = b_csr.indptr[c + 1]
 
-                row_dict = {k: v for k, v in row_elems}
-                for k, val2 in col_elems:
-                    if k in row_dict:
-                        dot_product += row_dict[k] * val2
+            for idx2 in range(start, end):
+                c2 = b_csr.indices[idx2]
+                val_b = b_csr.data[idx2]
 
-                result_dict[(i, j)] = dot_product
+                key = (r, c2)
+                result_dict[key] = result_dict.get(key, 0.0) + val_a * val_b
 
-        if not result_dict:
-            return COOMatrix([], [], [], (self.shape[0], other.shape[1]))
+        data, row, col = [], [], []
+        for (r, c), val in result_dict.items():
+            if abs(val) >= self.ZERO_TOLERANCE:
+                data.append(val)
+                row.append(r)
+                col.append(c)
 
-        data, row, col = zip(*[(val, r, c) for (r, c), val in result_dict.items()])
-
-        return COOMatrix(list(data), list(row), list(col), (self.shape[0], other.shape[1]))
+        return COOMatrix(data, row, col, (sr, sc))
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':

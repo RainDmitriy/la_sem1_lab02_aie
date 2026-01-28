@@ -41,7 +41,7 @@ class CSCMatrix(Matrix):
                 value = self.data[idx]
                 dense_data[row][col] = value
 
-        return DenseMatrix(dense_data)
+        return dense_data
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSC матриц."""
@@ -211,7 +211,7 @@ class CSCMatrix(Matrix):
 
         positions = row_ptr.copy()
         new_data = [0.0] * len(self.data)
-        new_indices = [0] * len(self.data)
+        new_indices = [0] * len(self.indices)
 
         for col in range(n_cols):
             start, end = self.indptr[col], self.indptr[col + 1]

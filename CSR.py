@@ -38,7 +38,7 @@ class CSRMatrix(Matrix):
                 value = self.data[idx]
                 dense_data[row][col] = value
 
-        return DenseMatrix(dense_data)
+        return dense_data
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSR матриц."""
