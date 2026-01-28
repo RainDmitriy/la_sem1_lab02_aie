@@ -1,86 +1,105 @@
 from CSC import CSCMatrix
-from CSR import CSRMatrix
 from typing import Tuple, Optional, List
 Vector = List[float]
 
 
-def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
+def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix, List[int]]]:
     """
-    LU-разложение для CSC матрицы.
-    Возвращает (L, U) - нижнюю и верхнюю треугольные матрицы.
-    БЕЗ выбора главного элемента (partial pivoting).
+    LU-разложение для CSC матрицы с выбором главного элемента.
+    Возвращает (L, U, P) - нижнюю и верхнюю треугольные матрицы и вектор перестановок.
     """
     n = A.shape[0]
     assert A.shape[0] == A.shape[1], "Matrix must be square for LU decomposition"
 
     dense_A = A.to_dense()
+    L = [[0.0] * n for _ in range(n)]
+    U = [[0.0] * n for _ in range(n)]
+    P = list(range(n))
 
-    L = [[0.0 for _ in range(n)] for _ in range(n)]
-    U = [[0.0 for _ in range(n)] for _ in range(n)]
+    # Создаем копию матрицы для модификаций
+    A_temp = [row[:] for row in dense_A]
 
     for i in range(n):
-        # Вычисляем элементы U
+        # Выбор главного элемента (partial pivoting)
+        max_row = i
+        max_val = abs(A_temp[i][i])
+        
+        for k in range(i + 1, n):
+            if abs(A_temp[k][i]) > max_val:
+                max_val = abs(A_temp[k][i])
+                max_row = k
+        
+        if max_val < 1e-15:
+            return None  # Матрица вырождена
+        
+        # Перестановка строк
+        if max_row != i:
+            A_temp[i], A_temp[max_row] = A_temp[max_row], A_temp[i]
+            P[i], P[max_row] = P[max_row], P[i]
+            # Также переставляем уже вычисленные элементы L
+            for j in range(i):
+                L[i][j], L[max_row][j] = L[max_row][j], L[i][j]
+        
+        # Вычисление элементов U и L
         for j in range(i, n):
-            sum_u = 0.0
+            # Вычисляем U[i][j]
+            s = 0.0
             for k in range(i):
-                sum_u += L[i][k] * U[k][j]
-            U[i][j] = dense_A[i][j] - sum_u
-
-        # Проверка на вырожденность
-        if abs(U[i][i]) < 1e-12:
+                s += L[i][k] * U[k][j]
+            U[i][j] = A_temp[i][j] - s
+        
+        # Проверка на нулевой диагональный элемент
+        if abs(U[i][i]) < 1e-15:
             return None
-
-        # Вычисляем элементы L
+        
         for j in range(i, n):
             if i == j:
                 L[j][i] = 1.0
             else:
-                sum_l = 0.0
+                # Вычисляем L[j][i]
+                s = 0.0
                 for k in range(i):
-                    sum_l += L[j][k] * U[k][i]
-                L[j][i] = (dense_A[j][i] - sum_l) / U[i][i]
+                    s += L[j][k] * U[k][i]
+                L[j][i] = (A_temp[j][i] - s) / U[i][i]
 
-    # Преобразуем в разреженный формат
+    # Преобразуем L и U в разреженный формат
+    from COO import COOMatrix
+    
     L_data, L_rows, L_cols = [], [], []
     U_data, U_rows, U_cols = [], [], []
-
+    
     for i in range(n):
         for j in range(n):
-            if j <= i and abs(L[i][j]) >= 1e-15:
+            if j <= i and abs(L[i][j]) > 1e-15:
                 L_data.append(L[i][j])
                 L_rows.append(i)
                 L_cols.append(j)
-
-            if j >= i and abs(U[i][j]) >= 1e-15:
+            
+            if j >= i and abs(U[i][j]) > 1e-15:
                 U_data.append(U[i][j])
                 U_rows.append(i)
                 U_cols.append(j)
-
-    from COO import COOMatrix
-
+    
     L_coo = COOMatrix(L_data, L_rows, L_cols, (n, n))
     U_coo = COOMatrix(U_data, U_rows, U_cols, (n, n))
-
-    return L_coo._to_csc(), U_coo._to_csc()
+    
+    return L_coo._to_csc(), U_coo._to_csc(), P
 
 
 def solve_lower_triangular(L: CSCMatrix, b: Vector) -> Vector:
     """Решение Ly = b (L - нижняя треугольная с единицами на диагонали)."""
     n = L.shape[0]
     y = [0.0] * n
-
+    
+    # Используем плотное представление для простоты
+    dense_L = L.to_dense()
+    
     for i in range(n):
-        sum_val = 0.0
-        row_start = L.indptr[i]
-        row_end = L.indptr[i + 1]
-
-        for idx in range(row_start, row_end):
-            j = L.indices[idx]
-            if j < i:
-                sum_val += L.data[idx] * y[j]
-
-        y[i] = b[i] - sum_val
-
+        s = 0.0
+        for j in range(i):
+            s += dense_L[i][j] * y[j]
+        y[i] = b[i] - s
+    
     return y
 
 
@@ -88,72 +107,66 @@ def solve_upper_triangular(U: CSCMatrix, y: Vector) -> Vector:
     """Решение Ux = y (U - верхняя треугольная)."""
     n = U.shape[0]
     x = [0.0] * n
-
+    
+    # Используем плотное представление для простоты
+    dense_U = U.to_dense()
+    
     for i in range(n - 1, -1, -1):
-        sum_val = 0.0
-        row_start = U.indptr[i]
-        row_end = U.indptr[i + 1]
-
-        for idx in range(row_start, row_end):
-            j = U.indices[idx]
-            if j > i:
-                sum_val += U.data[idx] * x[j]
-
-        diag_val = 0.0
-        for idx in range(row_start, row_end):
-            if U.indices[idx] == i:
-                diag_val = U.data[idx]
-                break
-
-        if abs(diag_val) < 1e-15:
+        if abs(dense_U[i][i]) < 1e-15:
             raise ValueError("Matrix U is singular")
-
-        x[i] = (y[i] - sum_val) / diag_val
-
+        
+        s = 0.0
+        for j in range(i + 1, n):
+            s += dense_U[i][j] * x[j]
+        x[i] = (y[i] - s) / dense_U[i][i]
+    
     return x
 
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     """
     Решение СЛАУ Ax = b через LU-разложение.
-    БЕЗ перестановок.
     """
     lu_result = lu_decomposition(A)
     if lu_result is None:
         return None
 
-    L, U = lu_result
-
-    y = solve_lower_triangular(L, b)
+    L, U, P = lu_result
+    
+    # Применяем перестановку к вектору b: b' = Pb
+    b_permuted = [b[P[i]] for i in range(len(b))]
+    
+    y = solve_lower_triangular(L, b_permuted)
     x = solve_upper_triangular(U, y)
-
+    
     return x
 
 
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     """
     Нахождение определителя через LU-разложение.
-    БЕЗ учета перестановок.
     """
     lu_result = lu_decomposition(A)
     if lu_result is None:
         return None
 
-    L, U = lu_result
+    _, U, P = lu_result
     n = A.shape[0]
-
-    det = 1.0
-
+    
+    # Определитель U
+    det_U = 1.0
+    dense_U = U.to_dense()
     for i in range(n):
-        row_start = U.indptr[i]
-        row_end = U.indptr[i + 1]
-        diag_val = 0.0
-
-        for idx in range(row_start, row_end):
-            if U.indices[idx] == i:
-                diag_val = U.data[idx]
-                break
-
-        det *= diag_val
-
-    return det
+        det_U *= dense_U[i][i]
+    
+    # Учет перестановок (четность перестановок)
+    swaps = 0
+    for i in range(n):
+        if P[i] != i:
+            swaps += 1
+    
+    # Если swaps нечетное, меняем знак
+    if swaps % 2 == 1:
+        det_U = -det_U
+    
+    return det_U
