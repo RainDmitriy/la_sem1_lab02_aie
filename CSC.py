@@ -121,3 +121,6 @@ class CSCMatrix(Matrix):
                 new_data.append(self.data[k])
         from COO import COOMatrix
         return COOMatrix(new_data, new_row, new_col, self.shape)
+
+    def _to_csc(self) -> 'CSCMatrix':
+        return self

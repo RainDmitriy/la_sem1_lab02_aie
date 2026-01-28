@@ -29,7 +29,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                 diag_pos = pos
                 break
 
-        if diag_pos == -1 or abs(U_data[diag_pos]) < 1e-14:
+        if diag_pos == -1 or abs(U_data[diag_pos]) < EPS:
             return None
 
         u_kk = U_data[diag_pos]
@@ -79,10 +79,16 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                 new_indices.append(U_indices[p2])
                 p2 += 1
 
-            old_nnz = U_indptr[j + 1] - U_indptr[j]
-            for pos in range(min(len(new_data), old_nnz)):
+            new_nnz = len(new_data)
+            U_indptr[j + 1] = U_indptr[j] + new_nnz
+
+            for pos in range(new_nnz):
                 U_data[col_j_start + pos] = new_data[pos]
                 U_indices[col_j_start + pos] = new_indices[pos]
+
+            while len(U_data) < U_indptr[-1]:
+                U_data.append(0.0)
+                U_indices.append(0)
 
     L_data_full = []
     L_indices_full = []
