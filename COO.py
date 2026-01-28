@@ -1,4 +1,5 @@
 from base import Matrix
+from la_sem1_lab02_aie.linalg import TOLERANCE
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
 
 
@@ -66,23 +67,35 @@ class COOMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение COO матриц."""
-        A = self.to_dense()
-        B = other.to_dense()
+        if not isinstance(other, COOMatrix):
+            B = other._to_coo()
+        else:
+            B = other
         rows_A, cols_A = self.shape
         rows_B, cols_B = other.shape
         if cols_A != rows_B:
-            raise ValueError("matrix A' col and matrix B' row doesnt have same length")
-
-        result = []
+            raise ValueError("matrix self' col and matrix other' row doesnt have same length")
+        B_cols = [{} for _ in range(cols_B)]
+        for val, r, c in zip(B.data, B.row, B.col):
+            B_cols[c][r] = val
+        A_rows = [[] for _ in range(rows_A)]
+        for val, r, c in zip(self.data, self.row, self.col):
+            A_rows[r].append((c, val))
+        result_data = []
+        result_row = []
+        result_col = []
         for i in range(rows_A):
-            new_row = []
             for j in range(cols_B):
                 total = 0.0
-                for k in range(cols_A):
-                    total += A[i][k] * B[k][j]
-                new_row.append(total)
-            result.append(new_row)
-        return COOMatrix.from_dense(result)
+                for k, a_ik in A_rows[i]:
+                    if k in B_cols[j]:
+                        total += a_ik * B_cols[j][k]
+                if abs(total) > TOLERANCE:
+                    result_data.append(total)
+                    result_row.append(i)
+                    result_col.append(j)
+
+        return COOMatrix(result_data, result_row, result_col, (rows_A, cols_B))
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':

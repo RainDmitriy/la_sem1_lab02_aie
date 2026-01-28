@@ -74,23 +74,9 @@ class CSCMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
-        A = self.to_dense()
-        B = other.to_dense()
-        rows_A, cols_A = self.shape
-        rows_B, cols_B = other.shape
-        if cols_A != rows_B:
-            raise ValueError("matrix A' col and matrix B' row doesnt have same length")
-
-        result = []
-        for i in range(rows_A):
-            new_row = []
-            for j in range(cols_B):
-                total = 0.0
-                for k in range(cols_A):
-                    total += A[i][k] * B[k][j]
-                new_row.append(total)
-            result.append(new_row)
-        return CSCMatrix.from_dense(result)
+        self = self._to_coo()
+        result = self._matmul_impl(other)
+        return result._to_csc()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
