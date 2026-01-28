@@ -63,6 +63,9 @@ class CSRMatrix(Matrix):
         return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
+        if abs(scalar) < 1e-14:
+            # Нулевая матрица
+            return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
         new_data = [val * scalar for val in self.data]
         return CSRMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
 
@@ -89,7 +92,7 @@ class CSRMatrix(Matrix):
         csc_data = [0.0] * nnz
         csc_indices = [0] * nnz
 
-        current_pos = list(csc_indptr)
+        current_pos = csc_indptr.copy()
 
         for i in range(rows):
             start, end = self.indptr[i], self.indptr[i + 1]
@@ -97,9 +100,9 @@ class CSRMatrix(Matrix):
                 j = self.indices[pos]
                 val = self.data[pos]
 
-                csc_pos = current_pos[j]
-                csc_data[csc_pos] = val
-                csc_indices[csc_pos] = i
+                pos_in_csc = current_pos[j]
+                csc_data[pos_in_csc] = val
+                csc_indices[pos_in_csc] = i
                 current_pos[j] += 1
 
         return CSCMatrix(csc_data, csc_indices, csc_indptr, (cols, rows))

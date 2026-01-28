@@ -2,6 +2,7 @@ from base import Matrix
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
 from collections import defaultdict
 
+
 class COOMatrix(Matrix):
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
         super().__init__(shape)
@@ -52,22 +53,16 @@ class COOMatrix(Matrix):
         return COOMatrix(data, row_indices, col_indices, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
+        if abs(scalar) < 1e-14:
+            return COOMatrix([], [], [], self.shape)
         new_data = [val * scalar for val in self.data]
         return COOMatrix(new_data, self.row.copy(), self.col.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
-        indices = list(range(len(self.data)))
-        indices.sort(key=lambda i: (self.col[i], self.row[i]))
-
-        new_data = [self.data[i] for i in indices]
-        new_rows = [self.col[i] for i in indices]
-        new_cols = [self.row[i] for i in indices]
-
-        return COOMatrix(new_data, new_rows, new_cols, (self.shape[1], self.shape[0]))
+        return COOMatrix(self.data.copy(), self.col.copy(), self.row.copy(),
+                         (self.shape[1], self.shape[0]))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        from CSR import CSRMatrix
-
         csr_self = self._to_csr()
         result = csr_self._matmul_impl(other)
 
