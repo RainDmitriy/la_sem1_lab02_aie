@@ -121,23 +121,8 @@ class CSRMatrix(Matrix):
         scalar = float(scalar)
         n_rows, n_cols = self.shape
 
-        if scalar == 0.0 or len(self.data) == 0:
-            return CSRMatrix([], [], [0] * (n_rows + 1), (n_rows, n_cols))
-
-        data_out: CSRData = []
-        indices_out: CSRIndices = []
-        indptr_out: CSRIndptr = [0]
-
-        for i in range(n_rows):
-            start, end = self.indptr[i], self.indptr[i + 1]
-            for p in range(start, end):
-                v = float(self.data[p]) * scalar
-                if v != 0.0:
-                    data_out.append(v)
-                    indices_out.append(self.indices[p])
-            indptr_out.append(len(data_out))
-
-        return CSRMatrix(data_out, indices_out, indptr_out, (n_rows, n_cols))
+        data_out: CSRData = [float(v) * scalar for v in self.data]
+        return CSRMatrix(data_out, list(self.indices), list(self.indptr), (n_rows, n_cols))
     
 
     def transpose(self) -> 'Matrix':
@@ -162,9 +147,6 @@ class CSRMatrix(Matrix):
         indptr_out: list[int] = [0]
 
         if isinstance(other, CSRMatrix):
-            b_csc = other._to_csc()
-
-            # Для каждого i-ой строки A и каждого столбца j в B считаем скалярное произведение
             for i in range(n_rows):
                 acc: dict[int, float] = {}
 
@@ -175,10 +157,10 @@ class CSRMatrix(Matrix):
                     if a_it == 0.0:
                         continue
 
-                    b0, b1 = b_csc.indptr[t], b_csc.indptr[t + 1]
+                    b0, b1 = other.indptr[t], other.indptr[t + 1]
                     for q in range(b0, b1):
-                        j = b_csc.indices[q]
-                        acc[j] = acc.get(j, 0.0) + a_it * float(b_csc.data[q])
+                        j = other.indices[q]
+                        acc[j] = acc.get(j, 0.0) + a_it * float(other.data[q])
 
                 items = [(j, v) for j, v in acc.items() if v != 0.0]
                 items.sort(key=lambda t: t[0])
@@ -190,32 +172,35 @@ class CSRMatrix(Matrix):
                 indptr_out.append(len(data_out))
 
             return CSRMatrix(data_out, indices_out, indptr_out, (n_rows, n_cols_out))
-
+        
         b = other.to_dense()
         for i in range(n_rows):
             acc: dict[int, float] = {}
             a0, a1 = self.indptr[i], self.indptr[i + 1]
+
             for p in range(a0, a1):
                 t = self.indices[p]
                 a_it = float(self.data[p])
                 if a_it == 0.0:
                     continue
+
                 bt = b[t]
                 for j in range(n_cols_out):
                     b_tj = float(bt[j])
                     if b_tj != 0.0:
                         acc[j] = acc.get(j, 0.0) + a_it * b_tj
 
-            items = [(j, v) for j, v in acc.items() if v != 0.0]
-            items.sort(key=lambda t: t[0])
+                items = [(j, v) for j, v in acc.items() if v != 0.0]
+                items.sort(key=lambda t: t[0])
 
-            for j, v in items:
-                indices_out.append(j)
-                data_out.append(v)
+                for j, v in items:
+                    indices_out.append(j)
+                    data_out.append(v)
 
-            indptr_out.append(len(data_out))
+                indptr_out.append(len(data_out))
 
         return CSRMatrix(data_out, indices_out, indptr_out, (n_rows, n_cols_out))
+
     
 
     @classmethod

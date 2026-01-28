@@ -121,23 +121,8 @@ class CSCMatrix(Matrix):
         scalar = float(scalar)
         n_rows, n_cols = self.shape
 
-        if scalar == 0.0 or len(self.data) == 0:
-            return CSCMatrix([], [], [0] * (n_cols + 1), (n_rows, n_cols))
-
-        data_out: CSCData = []
-        indices_out: CSCIndices = []
-        indptr_out: CSCIndptr = [0]
-
-        for j in range(n_cols):
-            start, end = self.indptr[j], self.indptr[j + 1]
-            for p in range(start, end):
-                v = float(self.data[p]) * scalar
-                if v != 0.0:
-                    data_out.append(v)
-                    indices_out.append(self.indices[p])
-            indptr_out.append(len(data_out))
-
-        return CSCMatrix(data_out, indices_out, indptr_out, (n_rows, n_cols))
+        data_out: CSCData = [float(v) * scalar for v in self.data]
+        return CSCMatrix(data_out, list(self.indices), list(self.indptr), (n_rows, n_cols))
 
     def transpose(self) -> 'Matrix':
         """

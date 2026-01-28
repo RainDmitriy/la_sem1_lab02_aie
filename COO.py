@@ -82,20 +82,8 @@ class COOMatrix(Matrix):
         r, c = self.shape
         scalar = float(scalar)
 
-        if scalar == 0.0 or len(self.data) == 0:
-            return COOMatrix([], [], [], (r, c))
-
-        data: COOData = []
-        row: COORows = []
-        col: COOCols = []
-        for v, i, j in zip(self.data, self.row, self.col):
-            nv = float(v) * scalar
-            if nv != 0.0:
-                data.append(nv)
-                row.append(i)
-                col.append(j)
-
-        return COOMatrix(data, row, col, (r, c))
+        data_out: COOData = [float(v) * scalar for v in self.data]
+        return COOMatrix(data_out, list(self.row), list(self.col), (r, c))
     
 
     def transpose(self) -> 'Matrix':
@@ -190,65 +178,40 @@ class COOMatrix(Matrix):
     
     
     def _to_csc(self) -> 'CSCMatrix':
-        
-        from CSC import CSCMatrix as CSCMatrix
+        from CSC import CSCMatrix
 
         r, c = self.shape
 
-        acc: dict[tuple[int, int], float] = {}
-        for v, i, j in zip(self.data, self.row, self.col):
-            fv = float(v)
-            if fv != 0.0:
-                key = (i, j)
-                acc[key] = acc.get(key, 0.0) + fv
+        items = list(zip(self.col, self.row, self.data)) 
+        items.sort(key=lambda t: (t[0], t[1]))            
 
-        items = [(i, j, v) for (i, j), v in acc.items() if v != 0.0]
-        items.sort(key=lambda t: (t[1], t[0])) 
+        data_out = [float(v) for _, _, v in items]
+        row_ind  = [i for _, i, _ in items]
 
-        data_out = [v for _, _, v in items]
-        row_ind = [i for i, _, _ in items]
         col_ptr = [0] * (c + 1)
-
-        for _, j, _ in items:
+        for j, _, _ in items:
             col_ptr[j + 1] += 1
         for j in range(c):
             col_ptr[j + 1] += col_ptr[j]
 
-        try:
-            return CSCMatrix(data_out, row_ind, col_ptr, (r, c))
-        except TypeError:
-            if hasattr(CSCMatrix, "from_dense"):
-                return CSCMatrix.from_dense(self.to_dense())
-            raise
+        return CSCMatrix(data_out, row_ind, col_ptr, (r, c))
 
     def _to_csr(self) -> 'CSRMatrix':
         
-        from CSR import CSRMatrix as CSRMatrix
+        from CSR import CSRMatrix
 
         r, c = self.shape
 
-        acc: dict[tuple[int, int], float] = {}
-        for v, i, j in zip(self.data, self.row, self.col):
-            fv = float(v)
-            if fv != 0.0:
-                key = (i, j)
-                acc[key] = acc.get(key, 0.0) + fv
-
-        items = [(i, j, v) for (i, j), v in acc.items() if v != 0.0]
+        items = list(zip(self.row, self.col, self.data))
         items.sort(key=lambda t: (t[0], t[1]))
 
-        data_out = [v for _, _, v in items]
-        col_ind = [j for _, j, _ in items]
-        row_ptr = [0] * (r + 1)
+        data_out = [float(v) for _, _, v in items]
+        col_ind  = [j for _, j, _ in items]
 
+        row_ptr = [0] * (r + 1)
         for i, _, _ in items:
             row_ptr[i + 1] += 1
         for i in range(r):
             row_ptr[i + 1] += row_ptr[i]
 
-        try:
-            return CSRMatrix(data_out, col_ind, row_ptr, (r, c))
-        except TypeError:
-            if hasattr(CSRMatrix, "from_dense"):
-                return CSRMatrix.from_dense(self.to_dense())
-            raise
+        return CSRMatrix(data_out, col_ind, row_ptr, (r, c))
