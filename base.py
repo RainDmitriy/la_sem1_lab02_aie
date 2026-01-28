@@ -50,3 +50,18 @@ class Matrix(ABC):
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Реализация умножения матриц."""
         pass
+    
+    def _to_csr(self) -> 'CSRMatrix':
+        """Преобразование в CSR."""
+        from CSR import CSRMatrix
+        return CSRMatrix.from_dense(self.to_dense())
+    
+    def _to_csc(self) -> 'CSCMatrix':
+        """Преобразование в CSC."""
+        from CSC import CSCMatrix
+        return CSCMatrix.from_dense(self.to_dense())
+    
+    def _to_coo(self) -> 'COOMatrix':
+        """Преобразование в COO."""
+        from COO import COOMatrix
+        return COOMatrix.from_dense(self.to_dense())

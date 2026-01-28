@@ -22,14 +22,13 @@ class CSRMatrix(Matrix):
     def to_dense(self) -> DenseMatrix:
         """Преобразует CSR в плотную матрицу."""
         rows, cols = self.shape
-        dense = [[0 for _ in range(cols)] for _ in range(rows)]
+        dense = [[0.0] * cols for _ in range(rows)]
 
         for i in range(rows):
-            start = self.indptr[i]
-            end = self.indptr[i + 1]
-            for k in range(start, end):
+            row = dense[i]
+            for k in range(self.indptr[i], self.indptr[i + 1]):
                 j = self.indices[k]
-                dense[i][j] += self.data[k]   
+                row[j] += self.data[k]
 
         return dense
 
@@ -39,20 +38,28 @@ class CSRMatrix(Matrix):
             other = other._to_csr()
 
         plus_data, plus_indices, plus_indptr = [], [], [0]
-        rows, __ = self.shape
+        rows, cols = self.shape
+
+        self_indptr = self.indptr
+        self_indices = self.indices
+        self_data = self.data
+        other_indptr = other.indptr
+        other_indices = other.indices
+        other_data = other.data
 
         for i in range(rows):
             row_sum = {}
 
-            for k in range(self.indptr[i], self.indptr[i + 1]):
-                j = self.indices[k]
-                row_sum[j] = row_sum.get(j, 0) + self.data[k]
+            for k in range(self_indptr[i], self_indptr[i + 1]):
+                j = self_indices[k]
+                row_sum[j] = row_sum.get(j, 0) + self_data[k]
 
-            for k in range(other.indptr[i], other.indptr[i + 1]):
-                j = other.indices[k]
-                row_sum[j] = row_sum.get(j, 0) + other.data[k]
+            for k in range(other_indptr[i], other_indptr[i + 1]):
+                j = other_indices[k]
+                row_sum[j] = row_sum.get(j, 0) + other_data[k]
 
-            for j in sorted(row_sum):
+            # Добавляем в порядке ключей для сохранения отсортированности
+            for j in sorted(row_sum.keys()):
                 v = row_sum[j]
                 if v != 0:
                     plus_indices.append(j)
@@ -65,7 +72,7 @@ class CSRMatrix(Matrix):
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
         new_data = [v * scalar for v in self.data]
-        return CSRMatrix(new_data, list(self.indices), list(self.indptr), self.shape)
+        return CSRMatrix(new_data, self.indices[:], self.indptr[:], self.shape)
 
     def transpose(self) -> 'Matrix':
         """
@@ -92,22 +99,30 @@ class CSRMatrix(Matrix):
 
         rows, cols = self.shape[0], other.shape[1]
         data, indices, indptr = [], [], [0]
+        
+        other_indptr = other.indptr
+        other_indices = other.indices
+        other_data = other.data
+        self_indptr = self.indptr
+        self_indices = self.indices
+        self_data = self.data
 
         for i in range(rows):
             row = {}
 
-            for k in range(self.indptr[i], self.indptr[i + 1]):
-                j = self.indices[k]
-                a = self.data[k]
+            for k in range(self_indptr[i], self_indptr[i + 1]):
+                j = self_indices[k]
+                a = self_data[k]
 
-                for t in range(other.indptr[j], other.indptr[j + 1]):
-                    col = other.indices[t]
-                    row[col] = row.get(col, 0) + a * other.data[t]
+                for t in range(other_indptr[j], other_indptr[j + 1]):
+                    col = other_indices[t]
+                    row[col] = row.get(col, 0) + a * other_data[t]
 
-            for j in sorted(row):
-                if row[j] != 0:
+            for j in sorted(row.keys()):
+                v = row[j]
+                if v != 0:
                     indices.append(j)
-                    data.append(row[j])
+                    data.append(v)
 
             indptr.append(len(data))
 
@@ -122,8 +137,9 @@ class CSRMatrix(Matrix):
         cols = len(dense_matrix[0]) if rows > 0 else 0
 
         for i in range(rows):
+            row_data = dense_matrix[i]
             for j in range(cols):
-                v = dense_matrix[i][j]
+                v = row_data[j]
                 if v != 0:
                     data.append(v)
                     indices.append(j)
@@ -140,22 +156,27 @@ class CSRMatrix(Matrix):
         nnz = len(self.data)
 
         col_count = [0] * cols
-        for j in self.indices:
+        indices_data = self.indices
+        
+        for j in indices_data:
             col_count[j] += 1
 
         indptr = [0] * (cols + 1)
         for i in range(cols):
             indptr[i + 1] = indptr[i] + col_count[i]
 
-        data = [0] * nnz
+        data = [0.0] * nnz
         indices = [0] * nnz
-        current = indptr.copy()
+        current = indptr[:]
+        
+        self_indptr = self.indptr
+        self_data = self.data
 
         for i in range(rows):
-            for k in range(self.indptr[i], self.indptr[i + 1]):
-                j = self.indices[k]
+            for k in range(self_indptr[i], self_indptr[i + 1]):
+                j = indices_data[k]
                 pos = current[j]
-                data[pos] = self.data[k]
+                data[pos] = self_data[k]
                 indices[pos] = i
                 current[j] += 1
 

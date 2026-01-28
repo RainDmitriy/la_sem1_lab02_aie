@@ -23,14 +23,12 @@ class CSCMatrix(Matrix):
     def to_dense(self) -> DenseMatrix:
         """Преобразует CSC в плотную матрицу."""
         rows, cols = self.shape
-        dense = [[0 for _ in range(cols)] for _ in range(rows)]
+        dense = [[0.0] * cols for _ in range(rows)]
 
         for j in range(cols):
-            start = self.indptr[j]
-            end = self.indptr[j + 1]
-            for k in range(start, end):
+            for k in range(self.indptr[j], self.indptr[j + 1]):
                 i = self.indices[k]
-                dense[i][j] += self.data[k]   
+                dense[i][j] += self.data[k]
 
         return dense
 
@@ -40,20 +38,27 @@ class CSCMatrix(Matrix):
             other = other._to_csc()
 
         plus_data, plus_indices, plus_indptr = [], [], [0]
-        cols = self.shape[1]
+        rows, cols = self.shape
+
+        self_indptr = self.indptr
+        self_indices = self.indices
+        self_data = self.data
+        other_indptr = other.indptr
+        other_indices = other.indices
+        other_data = other.data
 
         for j in range(cols):
             col_sum = {}
 
-            for k in range(self.indptr[j], self.indptr[j + 1]):
-                i = self.indices[k]
-                col_sum[i] = col_sum.get(i, 0) + self.data[k]
+            for k in range(self_indptr[j], self_indptr[j + 1]):
+                i = self_indices[k]
+                col_sum[i] = col_sum.get(i, 0) + self_data[k]
 
-            for k in range(other.indptr[j], other.indptr[j + 1]):
-                i = other.indices[k]
-                col_sum[i] = col_sum.get(i, 0) + other.data[k]
+            for k in range(other_indptr[j], other_indptr[j + 1]):
+                i = other_indices[k]
+                col_sum[i] = col_sum.get(i, 0) + other_data[k]
 
-            for i in sorted(col_sum):
+            for i in sorted(col_sum.keys()):
                 v = col_sum[i]
                 if v != 0:
                     plus_indices.append(i)
@@ -66,7 +71,7 @@ class CSCMatrix(Matrix):
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
         new_data = [v * scalar for v in self.data]
-        return CSCMatrix(new_data, list(self.indices), list(self.indptr), self.shape)
+        return CSCMatrix(new_data, self.indices[:], self.indptr[:], self.shape)
 
     def transpose(self) -> 'Matrix':
         """
@@ -117,22 +122,27 @@ class CSCMatrix(Matrix):
         nnz = len(self.data)
 
         row_count = [0] * rows
-        for i in self.indices:
+        indices_data = self.indices
+        
+        for i in indices_data:
             row_count[i] += 1
 
         indptr = [0] * (rows + 1)
         for i in range(rows):
             indptr[i + 1] = indptr[i] + row_count[i]
 
-        data = [0] * nnz
+        data = [0.0] * nnz
         indices = [0] * nnz
-        current = indptr.copy()
+        current = indptr[:]
+        
+        self_indptr = self.indptr
+        self_data = self.data
 
         for j in range(cols):
-            for k in range(self.indptr[j], self.indptr[j + 1]):
-                i = self.indices[k]
+            for k in range(self_indptr[j], self_indptr[j + 1]):
+                i = indices_data[k]
                 pos = current[i]
-                data[pos] = self.data[k]
+                data[pos] = self_data[k]
                 indices[pos] = j
                 current[i] += 1
 

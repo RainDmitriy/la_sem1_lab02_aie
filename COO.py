@@ -21,7 +21,7 @@ class COOMatrix(Matrix):
         rows, cols = self.shape
         if rows * cols > 10000:
             raise ValueError("Матрица слишком большая для плотного представления")
-        dense = [[0 for _ in range(cols)] for _ in range(rows)]
+        dense = [[0.0] * cols for _ in range(rows)]
         for i, j, value in self.iter_nonzero():
             dense[i][j] += value
         return dense
@@ -40,7 +40,7 @@ class COOMatrix(Matrix):
             plus_res[(i, j)] = plus_res.get((i, j), 0) + v
 
         data, row, col = [], [], []
-        for (i, j), v in plus_res.items():
+        for (i, j), v in sorted(plus_res.items()):
             if v != 0:
                 data.append(v)
                 row.append(i)
@@ -50,30 +50,19 @@ class COOMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
-        data, row, col = [], [], []
-
-        for idx, v in enumerate(self.data):
-            new_v = v * scalar
-            if abs(new_v) > 1e-10:
-                data.append(new_v)
-                row.append(self.row[idx])
-                col.append(self.col[idx])
-
-        return COOMatrix(data, row, col, self.shape)
+        if scalar == 0:
+            return COOMatrix([], [], [], self.shape)
+        
+        new_data = [v * scalar for v in self.data]
+        return COOMatrix(new_data, self.row[:], self.col[:], self.shape)
 
     def transpose(self) -> 'Matrix':
         """Транспонирование COO матрицы."""
-        data, row, col = [], [], []
-
-        for i, j, v in self.iter_nonzero():
-            data.append(v)
-            row.append(j)
-            col.append(i)
-
         rows, cols = self.shape
         new_shape = (cols, rows)
-
-        return COOMatrix(data, row, col, new_shape)
+        
+        # Просто переставляем row и col, транспонируя координаты
+        return COOMatrix(self.data[:], self.col[:], self.row[:], new_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение COO матриц."""
@@ -81,7 +70,7 @@ class COOMatrix(Matrix):
             raise ValueError("Несовместимые размеры")
     
         csr_self = self._to_csr()
-        csr_other = other._to_csr() if not isinstance(other, COOMatrix) else other._to_csr()
+        csr_other = other._to_csr()
         result_csr = csr_self._matmul_impl(csr_other)
         return result_csr._to_coo()
 
@@ -94,8 +83,9 @@ class COOMatrix(Matrix):
         cols = len(dense_matrix[0]) if rows > 0 else 0
 
         for i in range(rows):
+            row_data = dense_matrix[i]
             for j in range(cols):
-                value = dense_matrix[i][j]
+                value = row_data[j]
                 if value != 0:
                     data.append(value)
                     row.append(i)
@@ -111,8 +101,14 @@ class COOMatrix(Matrix):
         _, num_cols = self.shape
 
         cols_elements = [[] for _ in range(num_cols)]
-        for v, r, c in zip(self.data, self.row, self.col):
-            cols_elements[c].append((r, v))
+        
+        # Группируем по столбцам
+        data_iter = self.data
+        row_iter = self.row
+        col_iter = self.col
+        
+        for idx, c in enumerate(col_iter):
+            cols_elements[c].append((row_iter[idx], data_iter[idx]))
 
         data, row, indptr = [], [], [0]
 
@@ -132,8 +128,14 @@ class COOMatrix(Matrix):
         num_rows, _ = self.shape
 
         rows_elements = [[] for _ in range(num_rows)]
-        for v, r, c in zip(self.data, self.row, self.col):
-            rows_elements[r].append((c, v))
+        
+        # Группируем по строкам
+        data_iter = self.data
+        row_iter = self.row
+        col_iter = self.col
+        
+        for idx, r in enumerate(row_iter):
+            rows_elements[r].append((col_iter[idx], data_iter[idx]))
 
         data, indices, indptr = [], [], [0]
 
