@@ -5,18 +5,16 @@ from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
         super().__init__(shape)
-        self.data = data
-        self.indices = indices
-        self.indptr = indptr
-        self.nnz = len(data)
+        self.data = data.copy()
+        self.indices = indices.copy()
+        self.indptr = indptr.copy()
 
     def to_dense(self) -> DenseMatrix:
         '''Преобразует CSR в плотную матрицу.'''
         rows, cols = self.shape
         dense = [[0.0] * cols for _ in range(rows)]
         for i in range(rows):
-            start, end = self.indptr[i], self.indptr[i + 1]
-            for idx in range(start, end):
+            for idx in range(self.indptr[i], self.indptr[i + 1]):
                 j = self.indices[idx]
                 dense[i][j] = self.data[idx]
         return dense
@@ -76,7 +74,7 @@ class CSRMatrix(Matrix):
         if abs(scalar) < 1e-12:
             return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
         new_data = [val * scalar for val in self.data]
-        return CSRMatrix(new_data, self.indices, self.indptr, self.shape)
+        return CSRMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
         '''
@@ -85,31 +83,7 @@ class CSRMatrix(Matrix):
         Результат - в CSC формате (с теми же данными, но с интерпретацией столбцов как строк).
         '''
         from CSC import CSCMatrix
-
-        rows, cols = self.shape
-
-        col_counts = [0] * cols
-        for col in self.indices:
-            col_counts[col] += 1
-
-        indptr = [0] * (cols + 1)
-        for j in range(cols):
-            indptr[j + 1] = indptr[j] + col_counts[j]
-
-        data = [0.0] * self.nnz
-        indices = [0] * self.nnz
-        col_positions = indptr[:]
-
-        for i in range(rows):
-            start, end = self.indptr[i], self.indptr[i + 1]
-            for idx in range(start, end):
-                j = self.indices[idx]
-                pos = col_positions[j]
-                data[pos] = self.data[idx]
-                indices[pos] = i
-                col_positions[j] += 1
-
-        return CSCMatrix(data, indices, indptr, (cols, rows))
+        return self._to_coo().transpose()._to_csc()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         '''Умножение CSR матриц.'''
@@ -125,16 +99,20 @@ class CSRMatrix(Matrix):
 
             for i in range(A_rows):
                 row_result = {}
-                start, end = self.indptr[i], self.indptr[i + 1]
+                row_start = self.indptr[i]
+                row_end = self.indptr[i + 1]
 
-                for a_idx in range(start, end):
+                for a_idx in range(row_start, row_end):
                     k = self.indices[a_idx]
                     a_val = self.data[a_idx]
 
-                    b_start, b_end = other.indptr[k], other.indptr[k + 1]
-                    for b_idx in range(b_start, b_end):
+                    b_row_start = other.indptr[k]
+                    b_row_end = other.indptr[k + 1]
+
+                    for b_idx in range(b_row_start, b_row_end):
                         j = other.indices[b_idx]
                         b_val = other.data[b_idx]
+
                         row_result[j] = row_result.get(j, 0.0) + a_val * b_val
 
                 sorted_cols = sorted(row_result.keys())
@@ -162,13 +140,18 @@ class CSRMatrix(Matrix):
         data, indices = [], []
         indptr = [0]
 
+        row_counts = [0] * rows
+
         for i in range(rows):
             for j in range(cols):
                 val = dense_matrix[i][j]
                 if abs(val) > 1e-12:
                     data.append(val)
                     indices.append(j)
-            indptr.append(len(data))
+                    row_counts[i] += 1
+
+        for i in range(rows):
+            indptr.append(indptr[i] + row_counts[i])
 
         return cls(data, indices, indptr, (rows, cols))
 
@@ -181,17 +164,19 @@ class CSRMatrix(Matrix):
         m, n = self.shape
 
         col_counts = [0] * n
+
         for col_idx in self.indices:
             col_counts[col_idx] += 1
 
         indptr = [0] * (n + 1)
+
         for j in range(n):
             indptr[j + 1] = indptr[j] + col_counts[j]
 
-        data = [0.0] * self.nnz
-        indices = [0] * self.nnz
+        data = [0] * len(self.data)
+        indices = [0] * len(self.indices)
 
-        current_pos = indptr[:]
+        current_pos = indptr.copy()
 
         for i in range(m):
             row_start = self.indptr[i]
@@ -202,8 +187,10 @@ class CSRMatrix(Matrix):
                 val = self.data[k]
 
                 pos = current_pos[j]
+
                 data[pos] = val
                 indices[pos] = i
+
                 current_pos[j] += 1
 
         return CSCMatrix(data, indices, indptr, (m, n))
@@ -218,8 +205,7 @@ class CSRMatrix(Matrix):
         data, row_indices, col_indices = [], [], []
 
         for i in range(rows):
-            start, end = self.indptr[i], self.indptr[i + 1]
-            for idx in range(start, end):
+            for idx in range(self.indptr[i], self.indptr[i + 1]):
                 data.append(self.data[idx])
                 row_indices.append(i)
                 col_indices.append(self.indices[idx])
