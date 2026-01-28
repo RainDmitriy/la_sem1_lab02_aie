@@ -61,4 +61,3 @@ def TransposeDense(dense_matrix: DenseMatrix) -> DenseMatrix:
             transposed[c][r] = dense_matrix[r][c]
 
     return transposed
-

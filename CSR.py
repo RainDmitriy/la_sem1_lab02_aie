@@ -11,11 +11,14 @@ class CSRMatrix(Matrix):
 
     def to_dense(self) -> DenseMatrix:
         """Преобразует CSR в плотную матрицу."""
-        matrix: DenseMatrix = [[0] * self.shape[1] for i in range(self.shape[0])]
-        for i in range(len(self.indptr) - 1):
-            for j in range(self.indptr[i], self.indptr[i+1]):
-                matrix[i][self.indices[j]] = self.data[j]
-        return matrix
+        dense: DenseMatrix = [[0] * self.shape[1] for i in range(self.shape[0])]
+
+        for i in range(self.shape[0]):
+            for k in range(self.indptr[i], self.indptr[i + 1]):
+                col_idx = self.indices[k]
+                val = self.data[k]
+                dense[i][col_idx] = val
+        return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSR матриц."""
@@ -128,3 +131,17 @@ class CSRMatrix(Matrix):
                 col.append(self.indices[j])
         return COOMatrix(data, row, col, self.shape)
     
+
+
+if __name__ == "__main__":
+    csr1 = CSRMatrix([3, 4, 5, 6, 7], [2, 3, 2, 1, 2], [0, 2, 3, 5], (3, 4))
+    csr1_in_coo = csr1._to_coo()
+    print(csr1_in_coo.data, csr1_in_coo.row, csr1_in_coo.col, csr1_in_coo.shape)
+
+    csr2 = CSRMatrix([1, 7, 2, 4, 1, 3, 5], [0, 1, 1, 3, 1, 2, 3], [0, 2, 4, 7], (3, 4))
+
+    print(csr1.to_dense())
+    print(csr2.to_dense())
+
+    csr_sum = csr1 + csr2
+    print(csr_sum.data, csr_sum.indices, csr_sum.indptr, csr_sum.shape)

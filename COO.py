@@ -102,3 +102,4 @@ class COOMatrix(Matrix):
             indptr.append(indptr[-1] + count)
 
         return CSRMatrix(data, indices, indptr, self.shape)
+

@@ -11,12 +11,15 @@ class CSCMatrix(Matrix):
 
     def to_dense(self) -> DenseMatrix:
         """Преобразует CSC в плотную матрицу."""
-        matrix: DenseMatrix = [[0] * self.shape[1] for i in range(self.shape[0])]
-        for i in range(len(self.indptr) - 1):
-            for j in range(self.indptr[i], self.indptr[i+1]):
-                matrix[self.indptr[j]][i] = self.data[j]
-        return matrix
+        dense: DenseMatrix = [[0] * self.shape[1] for i in range(self.shape[0])]
 
+        for j in range(self.shape[1]):
+            for k in range(self.indptr[j], self.indptr[j + 1]):
+                row_idx = self.indices[k]
+                val = self.data[k]
+                dense[row_idx][j] = val
+        return dense
+    
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSC матриц."""
         data, indices, indptr = [], [], [0]
@@ -24,7 +27,7 @@ class CSCMatrix(Matrix):
             indices_col = self.indices[self.indptr[c]:self.indptr[c+1]]
             data_col = self.data[self.indptr[c]:self.indptr[c+1]]
             for j in range(other.indptr[c], other.indptr[c+1]):
-                if other.indices[j] in indices_row:
+                if other.indices[j] in indices_col:
                     index = indices_col.index(other.indices[j])
                     data_col[index] += other.data[j]
                 else:
