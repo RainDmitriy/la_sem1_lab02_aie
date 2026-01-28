@@ -110,34 +110,31 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
         return None
     L, U = lu
     sr = A.shape[0]
-    # Прямой ход Ly = b
     y = [0.0] * sr
     for i in range(sr):
         s = b[i]
         col_start = L.indptr[i]
         col_end = L.indptr[i + 1]
         for k in range(col_start, col_end):
-            row_idx = L.indices[k]
-            if row_idx < i:  # поддиагональ
-                s -= L.data[k] * y[row_idx]
+            if L.indices[k] < i:
+                s -= L.data[k] * y[L.indices[k]]
         y[i] = s
     x = [0.0] * sr
     for i in range(sr - 1, -1, -1):
         s = y[i]
         col_start = U.indptr[i]
         col_end = U.indptr[i + 1]
-        diag_pos = col_start
-        while diag_pos < col_end and U.indices[diag_pos] != i:
-            diag_pos += 1
-        u_ii = U.data[diag_pos] if diag_pos < col_end else 0.0
-        for k in range(col_start, col_end):
-            col_idx = U.indices[k]
-            if col_idx > i:
-                s -= U.data[k] * x[col_idx]
-        if abs(u_ii) < 1e-10:
+        diag_pos = -1
+        for pos in range(col_start, col_end):
+            if U.indices[pos] == i:
+                diag_pos = pos
+                break
+        if diag_pos == -1 or abs(U.data[diag_pos]) < 1e-10:
             return None
-        x[i] = s / u_ii
-
+        for pos in range(diag_pos + 1, col_end):
+            col_idx = U.indices[pos]
+            s -= U.data[pos] * x[col_idx]
+        x[i] = s / U.data[diag_pos]
     return x
 
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
@@ -145,29 +142,21 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     Нахождение определителя через LU-разложение.
     det(A) = det(L) * det(U)
     """
-    LU = lu_decomposition(A)
-    if LU is None:
-        raise ValueError("LU-разложение не удалось, матрица вырождена ")
-
-    L, U = LU
+    lu = lu_decomposition(A)
+    if lu is None:
+        return None
+    L, U = lu
+    sr = U.shape[0]
     det = 1.0
-    n = U.shape[0]
-    found_diag = True
-
-    for i in range(n):
-        row_start = U.indptr[i]
-        row_end = U.indptr[i + 1]
-        diag_found = False
-        for k in range(row_start, row_end):
-            if U.indices[k] == i:
-                det *= U.data[k]
-                diag_found = True
+    for i in range(sr):
+        col_start = U.indptr[i]
+        col_end = U.indptr[i + 1]
+        diag_pos = -1
+        for pos in range(col_start, col_end):
+            if U.indices[pos] == i:
+                diag_pos = pos
                 break
-        if not diag_found:
-            found_diag = False
-            break
-    if not found_diag:
-        raise ValueError(f"Диагональный элемент U[{i},{i}] отсутствует")
-
+        if diag_pos == -1 or abs(U.data[diag_pos]) < 1e-10:
+            return 0.0
+        det *= U.data[diag_pos]
     return det
-
