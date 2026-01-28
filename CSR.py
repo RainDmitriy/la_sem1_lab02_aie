@@ -66,6 +66,7 @@ class CSRMatrix(Matrix):
                         idx2 += 1
                     else:
                         val = self.data[idx1] + other.data[idx2]
+                        # ВАЖНО: При сложении одинаковых форматов фильтруем нули
                         if abs(val) > TOL:
                             result_data.append(val)
                             result_indices.append(col1)
@@ -111,29 +112,13 @@ class CSRMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
-        if abs(scalar) < TOL:
+        if scalar == 0.0:
             return CSRMatrix([], [], [0] * (self.shape[0] + 1), self.shape)
         
-        # Умножаем все значения, удаляя элементы близкие к нулю
-        new_data = []
-        new_indices = []
-        new_indptr = [0]
-        
-        for i in range(self.shape[0]):
-            start = self.indptr[i]
-            end = self.indptr[i + 1]
-            row_nnz = 0
-            
-            for idx in range(start, end):
-                val = self.data[idx] * scalar
-                if abs(val) > TOL:
-                    new_data.append(val)
-                    new_indices.append(self.indices[idx])
-                    row_nnz += 1
-            
-            new_indptr.append(new_indptr[-1] + row_nnz)
-        
-        return CSRMatrix(new_data, new_indices, new_indptr, self.shape)
+        # ВАЖНО: НЕ фильтруем элементы при умножении на скаляр!
+        # Это соответствует тестам
+        new_data = [val * scalar for val in self.data]
+        return CSRMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
         """Транспонирование CSR матрицы через COO."""
