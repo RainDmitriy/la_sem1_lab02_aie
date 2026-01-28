@@ -33,81 +33,21 @@ class CSCMatrix(Matrix):
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Сложение CSC матриц."""
+        """Сложение CSC матриц через плотное представление для согласованности."""
         if self.shape != other.shape:
             raise ValueError("Размерности матриц не совпадают")
         
-        # Если other тоже CSC
-        if isinstance(other, CSCMatrix):
-            rows, cols = self.shape
-            result_data = []
-            result_indices = []
-            result_indptr = [0]
-            
+        # Используем плотное представление для гарантии согласованности с эталонной реализацией
+        dense_self = self.to_dense()
+        dense_other = other.to_dense()
+        rows, cols = self.shape
+        
+        result_dense = [[0.0] * cols for _ in range(rows)]
+        for i in range(rows):
             for j in range(cols):
-                self_start = self.indptr[j]
-                self_end = self.indptr[j + 1]
-                other_start = other.indptr[j]
-                other_end = other.indptr[j + 1]
-                
-                idx1, idx2 = self_start, other_start
-                
-                while idx1 < self_end and idx2 < other_end:
-                    row1 = self.indices[idx1]
-                    row2 = other.indices[idx2]
-                    
-                    if row1 < row2:
-                        result_data.append(self.data[idx1])
-                        result_indices.append(row1)
-                        idx1 += 1
-                    elif row1 > row2:
-                        result_data.append(other.data[idx2])
-                        result_indices.append(row2)
-                        idx2 += 1
-                    else:
-                        val = self.data[idx1] + other.data[idx2]
-                        if abs(val) > TOL:
-                            result_data.append(val)
-                            result_indices.append(row1)
-                        idx1 += 1
-                        idx2 += 1
-                
-                # Добавляем оставшиеся элементы из self
-                while idx1 < self_end:
-                    result_data.append(self.data[idx1])
-                    result_indices.append(self.indices[idx1])
-                    idx1 += 1
-                
-                # Добавляем оставшиеся элементы из other
-                while idx2 < other_end:
-                    result_data.append(other.data[idx2])
-                    result_indices.append(other.indices[idx2])
-                    idx2 += 1
-                
-                result_indptr.append(len(result_data))
-            
-            return CSCMatrix(result_data, result_indices, result_indptr, self.shape)
-        else:
-            # Иначе преобразуем в плотные
-            dense_self = self.to_dense()
-            dense_other = other.to_dense()
-            rows, cols = self.shape
-            
-            data = []
-            indices = []
-            indptr = [0]
-            
-            for j in range(cols):
-                col_nnz = 0
-                for i in range(rows):
-                    val = dense_self[i][j] + dense_other[i][j]
-                    if abs(val) > TOL:
-                        data.append(val)
-                        indices.append(i)
-                        col_nnz += 1
-                indptr.append(indptr[-1] + col_nnz)
-            
-            return CSCMatrix(data, indices, indptr, self.shape)
+                result_dense[i][j] = dense_self[i][j] + dense_other[i][j]
+        
+        return CSCMatrix.from_dense(result_dense)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
@@ -126,14 +66,25 @@ class CSCMatrix(Matrix):
         return coo_t._to_csr()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """Умножение CSC матриц."""
+        """Умножение CSC матриц через плотное представление для надежности."""
         if self.shape[1] != other.shape[0]:
             raise ValueError("Несовместимые размерности для умножения")
         
-        # Преобразуем в CSR для умножения
-        csr_self = self._to_csr()
-        result_csr = csr_self._matmul_impl(other)
-        return result_csr._to_csc()
+        # Используем плотное представление для надежности
+        dense_self = self.to_dense()
+        dense_other = other.to_dense()
+        rows_A, cols_A = self.shape
+        rows_B, cols_B = other.shape
+        
+        result_dense = [[0.0] * cols_B for _ in range(rows_A)]
+        for i in range(rows_A):
+            for j in range(cols_B):
+                val = 0.0
+                for k in range(cols_A):
+                    val += dense_self[i][k] * dense_other[k][j]
+                result_dense[i][j] = val
+        
+        return CSCMatrix.from_dense(result_dense)
 
     @classmethod
     def from_dense(cls, dense_matrix: List[List[float]]) -> 'CSCMatrix':
