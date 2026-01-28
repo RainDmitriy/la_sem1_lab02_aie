@@ -36,7 +36,7 @@ class COOMatrix(Matrix):
         new_col = []
         for (i, j) in sorted(result_dict.keys()):
             val = result_dict[(i, j)]
-            if val != 0.0:
+            if abs(val) > 1e-12:
                 new_data.append(val)
                 new_row.append(i)
                 new_col.append(j)
@@ -105,7 +105,7 @@ class COOMatrix(Matrix):
         for i in range(n_rows):
             for j in range(n_cols):
                 val = dense_matrix[i][j]
-                if val != 0.0:
+                if abs(val) > 1e-12:
                     data.append(val)
                     row.append(i)
                     col.append(j)
