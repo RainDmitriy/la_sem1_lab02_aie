@@ -52,96 +52,106 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     if n == 0:
         return []
 
-    rows: list[dict[int, float]] = [dict() for _ in range(n)]
+    csr = A._to_csr()
+
+    rows: list[dict[int, float]] = []
     col_rows: list[set[int]] = [set() for _ in range(n)]
 
-    for j in range(n):
-        start, end = A.indptr[j], A.indptr[j + 1]
-        for p in range(start, end):
-            i = A.indices[p]
-            v = float(A.data[p])
-            if abs(v) < _EPS:
-                continue
-            rows[i][j] = rows[i].get(j, 0.0) + v
-            col_rows[j].add(i)
+    for i in range(n):
+        d: dict[int, float] = {}
+        for p in range(csr.indptr[i], csr.indptr[i + 1]):
+            j = csr.indices[p]
+            v = float(csr.data[p])
+            if abs(v) > _EPS:
+                d[j] = d.get(j, 0.0) + v
 
-    rhs = [float(bi) for bi in b]
+        for j in list(d.keys()):
+            if abs(d[j]) < _EPS:
+                del d[j]
+            else:
+                col_rows[j].add(i)
+
+        rows.append(d)
+
+    rhs = [float(x) for x in b]
 
     for i in range(n):
-        pivot_row = -1
-        best = 0.0
-        for r in col_rows[i]:
-            if r >= i:
-                v = abs(rows[r].get(i, 0.0))
-                if v > best:
-                    best = v
-                    pivot_row = r
-        if pivot_row == -1 or best < _EPS:
+        cand = [r for r in col_rows[i] if r >= i]
+        if not cand:
+            return None
+
+        pivot_row = cand[0]
+        best = abs(rows[pivot_row].get(i, 0.0))
+        for r in cand[1:]:
+            v = abs(rows[r].get(i, 0.0))
+            if v > best:
+                best = v
+                pivot_row = r
+
+        if best < _EPS:
             return None
 
         if pivot_row != i:
-            ri = rows[i]
-            rp = rows[pivot_row]
-            cols_i = set(ri.keys())
-            cols_p = set(rp.keys())
+            row_i = rows[i]
+            row_p = rows[pivot_row]
 
-            only_i = cols_i - cols_p
-            only_p = cols_p - cols_i
-
-            for c in only_i:
-                col_rows[c].discard(i)
-                col_rows[c].add(pivot_row)
-            for c in only_p:
-                col_rows[c].discard(pivot_row)
-                col_rows[c].add(i)
+            for j in row_i.keys():
+                col_rows[j].discard(i)
+            for j in row_p.keys():
+                col_rows[j].discard(pivot_row)
 
             rows[i], rows[pivot_row] = rows[pivot_row], rows[i]
             rhs[i], rhs[pivot_row] = rhs[pivot_row], rhs[i]
 
-        row_i = rows[i]
-        pivot = row_i.get(i, 0.0)
+            row_i = rows[i]
+            row_p = rows[pivot_row]
+            for j in row_i.keys():
+                col_rows[j].add(i)
+            for j in row_p.keys():
+                col_rows[j].add(pivot_row)
+
+        pivot = rows[i].get(i, 0.0)
         if abs(pivot) < _EPS:
             return None
 
-        rhs_i = rhs[i]
-        u_items = [(j, v) for j, v in row_i.items() if j > i]
+        pivot_items = list(rows[i].items())
 
-        affected = [r for r in col_rows[i] if r > i]
-        for r in affected:
-            row_r = rows[r]
-            a_ri = row_r.get(i, 0.0)
+        elim = [r for r in col_rows[i] if r > i]
+        for r in elim:
+            a_ri = rows[r].get(i, 0.0)
             if abs(a_ri) < _EPS:
-                col_rows[i].discard(r)
-                row_r.pop(i, None)
                 continue
-
             factor = a_ri / pivot
 
-            row_r.pop(i, None)
-            col_rows[i].discard(r)
+            if i in rows[r]:
+                del rows[r][i]
+                col_rows[i].discard(r)
 
-            for j, u_ij in u_items:
-                newv = row_r.get(j, 0.0) - factor * u_ij
+            rr = rows[r]
+            for j, a_ij in pivot_items:
+                if j <= i:
+                    continue
+                newv = rr.get(j, 0.0) - factor * a_ij
+
                 if abs(newv) < _EPS:
-                    if j in row_r:
-                        del row_r[j]
+                    if j in rr:
+                        del rr[j]
                         col_rows[j].discard(r)
                 else:
-                    if j not in row_r:
+                    if j not in rr:
                         col_rows[j].add(r)
-                    row_r[j] = newv
+                    rr[j] = newv
 
-            rhs[r] -= factor * rhs_i
+            rhs[r] -= factor * rhs[i]
 
     x = [0.0] * n
     for i in range(n - 1, -1, -1):
-        row_i = rows[i]
-        pivot = row_i.get(i, 0.0)
+        row = rows[i]
+        pivot = row.get(i, 0.0)
         if abs(pivot) < _EPS:
             return None
-
         s = rhs[i]
-        for j, v in row_i.items():
+        for j, v in row.items():
             if j > i:
                 s -= v * x[j]
         x[i] = s / pivot
@@ -158,85 +168,95 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     if n == 0:
         return 1.0
 
-    rows: list[dict[int, float]] = [dict() for _ in range(n)]
+    csr = A._to_csr()
+
+    rows: list[dict[int, float]] = []
     col_rows: list[set[int]] = [set() for _ in range(n)]
 
-    for j in range(n):
-        start, end = A.indptr[j], A.indptr[j + 1]
-        for p in range(start, end):
-            i = A.indices[p]
-            v = float(A.data[p])
-            if abs(v) < _EPS:
-                continue
-            rows[i][j] = rows[i].get(j, 0.0) + v
-            col_rows[j].add(i)
+    for i in range(n):
+        d: dict[int, float] = {}
+        for p in range(csr.indptr[i], csr.indptr[i + 1]):
+            j = csr.indices[p]
+            v = float(csr.data[p])
+            if abs(v) > _EPS:
+                d[j] = d.get(j, 0.0) + v
+
+        for j in list(d.keys()):
+            if abs(d[j]) < _EPS:
+                del d[j]
+            else:
+                col_rows[j].add(i)
+
+        rows.append(d)
 
     sign = 1.0
+    det = 1.0
 
     for i in range(n):
-        pivot_row = -1
-        best = 0.0
-        for r in col_rows[i]:
-            if r >= i:
-                v = abs(rows[r].get(i, 0.0))
-                if v > best:
-                    best = v
-                    pivot_row = r
-        if pivot_row == -1 or best < _EPS:
-            return None
+        cand = [r for r in col_rows[i] if r >= i]
+        if not cand:
+            return 0.0
+
+        pivot_row = cand[0]
+        best = abs(rows[pivot_row].get(i, 0.0))
+        for r in cand[1:]:
+            v = abs(rows[r].get(i, 0.0))
+            if v > best:
+                best = v
+                pivot_row = r
+
+        if best < _EPS:
+            return 0.0
 
         if pivot_row != i:
-            ri = rows[i]
-            rp = rows[pivot_row]
-            cols_i = set(ri.keys())
-            cols_p = set(rp.keys())
+            row_i = rows[i]
+            row_p = rows[pivot_row]
 
-            only_i = cols_i - cols_p
-            only_p = cols_p - cols_i
-
-            for c in only_i:
-                col_rows[c].discard(i)
-                col_rows[c].add(pivot_row)
-            for c in only_p:
-                col_rows[c].discard(pivot_row)
-                col_rows[c].add(i)
+            for j in row_i.keys():
+                col_rows[j].discard(i)
+            for j in row_p.keys():
+                col_rows[j].discard(pivot_row)
 
             rows[i], rows[pivot_row] = rows[pivot_row], rows[i]
             sign = -sign
 
-        row_i = rows[i]
-        pivot = row_i.get(i, 0.0)
+            row_i = rows[i]
+            row_p = rows[pivot_row]
+            for j in row_i.keys():
+                col_rows[j].add(i)
+            for j in row_p.keys():
+                col_rows[j].add(pivot_row)
+
+        pivot = rows[i].get(i, 0.0)
         if abs(pivot) < _EPS:
-            return None
+            return 0.0
 
-        u_items = [(j, v) for j, v in row_i.items() if j > i]
+        det *= pivot
+        pivot_items = list(rows[i].items())
 
-        affected = [r for r in col_rows[i] if r > i]
-        for r in affected:
-            row_r = rows[r]
-            a_ri = row_r.get(i, 0.0)
+        elim = [r for r in col_rows[i] if r > i]
+        for r in elim:
+            a_ri = rows[r].get(i, 0.0)
             if abs(a_ri) < _EPS:
-                col_rows[i].discard(r)
-                row_r.pop(i, None)
                 continue
-
             factor = a_ri / pivot
 
-            row_r.pop(i, None)
-            col_rows[i].discard(r)
+            if i in rows[r]:
+                del rows[r][i]
+                col_rows[i].discard(r)
 
-            for j, u_ij in u_items:
-                newv = row_r.get(j, 0.0) - factor * u_ij
+            rr = rows[r]
+            for j, a_ij in pivot_items:
+                if j <= i:
+                    continue
+                newv = rr.get(j, 0.0) - factor * a_ij
                 if abs(newv) < _EPS:
-                    if j in row_r:
-                        del row_r[j]
+                    if j in rr:
+                        del rr[j]
                         col_rows[j].discard(r)
                 else:
-                    if j not in row_r:
+                    if j not in rr:
                         col_rows[j].add(r)
-                    row_r[j] = newv
+                    rr[j] = newv
 
-    det = sign
-    for i in range(n):
-        det *= rows[i].get(i, 0.0)
-    return det
+    return sign * det
