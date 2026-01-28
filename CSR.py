@@ -22,22 +22,14 @@ class CSRMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSR матриц."""
-        data, indices, indptr = [], [], [0]
-        for r in range(self.shape[0]):
-            indices_row = self.indices[self.indptr[r]:self.indptr[r+1]]
-            data_row = self.data[self.indptr[r]:self.indptr[r+1]]
-            for j in range(other.indptr[r], other.indptr[r+1]):
-                if other.indices[j] in indices_row:
-                    index = indices_row.index(other.indices[j])
-                    data_row[index] += other.data[j]
-                else:
-                    data_row.append(other.data[j])
-                    indices_row.append(other.indices[j])
-            indptr.append(indptr[-1] + len(indices_row))
-            data += data_row
-            indices += indices_row
-        
-        return CSRMatrix(data, indices, indptr, self.shape)
+        from COO import COOMatrix
+
+        self_coo: COOMatrix = self._to_coo()
+        other_coo:COOMatrix = other._to_coo()
+
+        ans: COOMatrix = self_coo._add_impl(other_coo)
+
+        return ans._to_csr
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""

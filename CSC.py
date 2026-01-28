@@ -22,22 +22,14 @@ class CSCMatrix(Matrix):
     
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSC матриц."""
-        data, indices, indptr = [], [], [0]
-        for c in range(self.shape[1]):
-            indices_col = self.indices[self.indptr[c]:self.indptr[c+1]]
-            data_col = self.data[self.indptr[c]:self.indptr[c+1]]
-            for j in range(other.indptr[c], other.indptr[c+1]):
-                if other.indices[j] in indices_col:
-                    index = indices_col.index(other.indices[j])
-                    data_col[index] += other.data[j]
-                else:
-                    data_col.append(other.data[j])
-                    indices_col.append(other.indices[j])
-            indptr.append(indptr[-1] + len(indices_col))
-            data += data_col
-            indices += indices_col
+        from COO import COOMatrix
 
-        return CSCMatrix(data, indices, indptr, self.shape)
+        self_coo: COOMatrix = self._to_coo()
+        other_coo:COOMatrix = other._to_coo()
+
+        ans: COOMatrix = self_coo._add_impl(other_coo)
+
+        return ans._to_csc
 
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
