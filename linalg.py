@@ -33,12 +33,12 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
 
             pivot = u[i][i]
 
-            if abs(pivot) < 1e-8:
+            if abs(pivot) < 1e-12:
                 return None
 
             l[m][i] = (dense_a[m][i]-summa)/pivot
 
-    if abs(u[rows - 1][rows - 1]) < 1e-8:
+    if abs(u[rows - 1][rows - 1]) < 1e-12:
         return None
     csc_l = CSCMatrix.from_dense(l)
     csc_u = CSCMatrix.from_dense(u)
@@ -91,7 +91,7 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     """
     lu = lu_decomposition(A)
     if lu is None:
-        return 0.0
+        return None
 
     det = 1
     n = A.shape[0]
