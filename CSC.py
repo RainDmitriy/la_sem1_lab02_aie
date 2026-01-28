@@ -1,7 +1,10 @@
 from base import Matrix
-from matrix_types import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
+from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 
 class CSCMatrix(Matrix):
+    def _to_csc(self) -> 'CSCMatrix':
+        """CSC -> CSC (просто возвращаем себя)"""
+        return self
     def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
         super().__init__(shape)
         self.data = data
@@ -49,51 +52,24 @@ class CSCMatrix(Matrix):
         return result_coo._to_csc()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        """умножение на скаляр"""
-        if scalar == 0:
-            return self.__class__.from_dense([[0] * self.shape[1] for _ in range(self.shape[0])])
-        new_data = [value * scalar for value in self.data]
-        # ...
+        if abs(scalar) < 1e-14:
+            return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
+        data = [float(d) * float(scalar) for d in self.data]
+        return CSCMatrix(data, self.indices[:], self.indptr[:], self.shape)
 
     def transpose(self) -> 'Matrix':
         """транспонирование матрицы"""
         return self._to_csr()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """умножение матриц """
-        if self.shape[1] != other.shape[0]:
-            raise ValueError("несовместимые размерности")
-        return self._matmul_general(other)
+        """Умножение CSC матриц"""
+        a = self._to_csr()
+        c = a._matmul_impl(other)
+        if hasattr(c, "_to_csc"):
+            return c._to_csc()
+        from COO import COOMatrix
+        return COOMatrix.from_dense(c.to_dense())._to_csc()
 
-    def _matmul_general(self, other: 'Matrix') -> 'CSCMatrix':
-        """Общее умножение через оптимизированный алгоритм"""
-        from CSR import CSRMatrix
-        result_rows = self.shape[0]
-        result_cols = other.shape[1]
-        k_dim = self.shape[1]
-        temp_result = [[0.0] * result_cols for _ in range(result_rows)]
-        for j in range(result_cols):
-            for k in range(k_dim):
-                for idx1 in range(self.indptr[k], self.indptr[k + 1]):
-                    i = self.indices[idx1]
-                    val_self = self.data[idx1]
-                    if isinstance(other, CSRMatrix):
-                        val_other = 0.0
-                        for idx2 in range(other.indptr[k], other.indptr[k + 1]):
-                            if other.indices[idx2] == j:
-                                val_other = other.data[idx2]
-                                break
-                    elif isinstance(other, CSCMatrix):
-                        val_other = 0.0
-                        for idx2 in range(other.indptr[j], other.indptr[j + 1]):
-                            if other.indices[idx2] == k:
-                                val_other = other.data[idx2]
-                                break
-                    else:
-                        other_dense = other.to_dense()
-                        val_other = other_dense[k][j]
-                    temp_result[i][j] += val_self * val_other
-        return CSCMatrix.from_dense(temp_result)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':

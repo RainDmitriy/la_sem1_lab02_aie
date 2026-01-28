@@ -1,19 +1,44 @@
 from base import Matrix
-from matrix_types import COOData, COORows, COOCols, Shape, DenseMatrix
+from typing import Dict, Tuple, List
+from type import COOData, COORows, COOCols, Shape, DenseMatrix
 
 class COOMatrix(Matrix):
+    def _to_coo(self) -> 'COOMatrix':
+        """COO -> COO (просто возвращаем копию)"""
+        return COOMatrix(self.data.copy(), self.row.copy(), self.col.copy(), self.shape)
+
+    def _normalize(self) -> None:
+        """Нормализует COO матрицу"""
+        mp = {}
+        for d, r, c in zip(self.data, self.row, self.col):
+            d = float(d)
+            if d == 0.0:
+                continue
+            mp[(int(r), int(c))] = mp.get((int(r), int(c)), 0.0) + d
+        items = [((r, c), d) for (r, c), d in mp.items() if d != 0.0]
+        items.sort(key=lambda x: (x[0][0], x[0][1]))
+        self.row = [r for (r, _), _ in items]
+        self.col = [c for (_, c), _ in items]
+        self.data = [d for _, d in items]
+        self.nnz = len(self.data)
+        self.row = [r for (r, _), _ in items]
+        self.col = [c for (_, c), _ in items]
+        self.data = [d for _, d in items]
+
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
         super().__init__(shape)
         self.data = data
         self.row = row
         self.col = col
-        self.nnz = len(data) #колво ненулевых элементов
+        self.nnz = len(data)
 
         if len(data) != len(row) or len(data) != len(col):
             raise ValueError("data, row и col не совпадают")
+
         for r, c in zip(row, col):
             if r < 0 or r >= shape[0] or c < 0 or c >= shape[1]:
                 raise ValueError("индекс за границой матрицы")
+        self._normalize()
 
     def to_dense(self) -> DenseMatrix:
         """из COO в плотную матрицу"""
@@ -24,49 +49,29 @@ class COOMatrix(Matrix):
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """сложение матриц"""
-        if isinstance(other, COOMatrix):
-            data = []
-            rows = []
-            cols = []
-            values = {}
-            for idx in range(self.nnz):
-                key = (self.row[idx], self.col[idx])
-                values[key] = self.data[idx]
-
-            for idx in range(other.nnz):
-                key = (other.row[idx], other.col[idx])
-                if key in values:
-                    values[key] += other.data[idx]
-                else:
-                    values[key] = other.data[idx]
-
-            for (r, c), val in values.items():
-                if abs(val) > 1e-10:
-                    data.append(val)
-                    rows.append(r)
-                    cols.append(c)
-
-            return COOMatrix(data, rows, cols, self.shape)
+        """Сложение COO матриц"""
+        if hasattr(other, "_to_coo"):
+            b = other._to_coo()
         else:
-            dense_self = self.to_dense()
-            dense_other = other.to_dense()
+            b = COOMatrix.from_dense(other.to_dense())
+        mp: Dict[Tuple[int, int], float] = {}
+        for d, r, c in zip(self.data, self.row, self.col):
+            mp[(r, c)] = mp.get((r, c), 0.0) + float(d)
+        for d, r, c in zip(b.data, b.row, b.col):
+            mp[(r, c)] = mp.get((r, c), 0.0) + float(d)
+        data, row, col = [], [], []
+        for (r, c), d in mp.items():
+            if abs(d) > 1e-14:
+                data.append(d)
+                row.append(r)
+                col.append(c)
 
-            rows, cols = self.shape
-            result_dense = []
-            for i in range(rows):
-                row = []
-                for j in range(cols):
-                    row.append(dense_self[i][j] + dense_other[i][j])
-                result_dense.append(row)
-
-            return COOMatrix.from_dense(result_dense)
-
+        return COOMatrix(data, row, col, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        """умножение на скаляр"""
-        new_data = [value * scalar for value in self.data]
-        return COOMatrix(new_data, self.row.copy(), self.col.copy(), self.shape)
+        """Умножение матрицы на число."""
+        data = [float(d) * float(scalar) for d in self.data]
+        return COOMatrix(data, self.row[:], self.col[:], self.shape)
 
     def transpose(self) -> 'Matrix':
         """транспонирование"""
@@ -74,70 +79,35 @@ class COOMatrix(Matrix):
         return COOMatrix(self.data.copy(), self.col.copy(), self.row.copy(), new_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """умножение матриц """
-        from CSC import CSCMatrix
-        from CSR import CSRMatrix
+        """реализация умножения матриц."""
         if self.shape[1] != other.shape[0]:
-            raise ValueError("несовместимые размерности")
-        result_rows = self.shape[0]
-        result_cols = other.shape[1]
-        result_dict = {}
-        for idx in range(self.nnz):
-            i = self.row[idx]
-            k = self.col[idx]
-            val_self = self.data[idx]
-            if isinstance(other, CSRMatrix):
-                for idx2 in range(other.indptr[k], other.indptr[k + 1]):
-                    j = other.indices[idx2]
-                    product = val_self * other.data[idx2]
-                    key = (i, j)
-                    if key in result_dict:
-                        result_dict[key] += product
-                    else:
-                        result_dict[key] = product
+            raise ValueError("несовместимые размеры матриц")
+        sr, sc = self.shape[0], other.shape[1]
+        mp = {}
+        if hasattr(other, "_to_csr"):
+            b = other._to_csr()
+        else:
+            b = COOMatrix.from_dense(other.to_dense())._to_csr()
 
-            elif isinstance(other, CSCMatrix):
-                for idx2 in range(other.indptr[k], other.indptr[k + 1]):
-                    j_other = other.indices[idx2]
-                    other_dense = other.to_dense()
-                    for j in range(result_cols):
-                        product = val_self * other_dense[k][j]
-                        key = (i, j)
-                        if key in result_dict:
-                            result_dict[key] += product
-                        else:
-                            result_dict[key] = product
+        for p in range(len(self.data)):
+            r = self.row[p]
+            c = self.col[p]
+            da = float(self.data[p])
+            s = b.indptr[c]
+            e = b.indptr[c + 1]
+            for p2 in range(s, e):
+                c2 = b.indices[p2]
+                db = float(b.data[p2])
+                key = (r, c2)
+                mp[key] = mp.get(key, 0.0) + da * db
+        data, row, col = [], [], []
+        for (r, c), d in mp.items():
+            if abs(d) > 1e-14:
+                data.append(d)
+                row.append(r)
+                col.append(c)
 
-            elif isinstance(other, COOMatrix):
-                for idx2 in range(other.nnz):
-                    if other.row[idx2] == k:
-                        j = other.col[idx2]
-                        product = val_self * other.data[idx2]
-                        key = (i, j)
-                        if key in result_dict:
-                            result_dict[key] += product
-                        else:
-                            result_dict[key] = product
-            else:
-                other_dense = other.to_dense()
-                for j in range(result_cols):
-                    product = val_self * other_dense[k][j]
-                    key = (i, j)
-                    if key in result_dict:
-                        result_dict[key] += product
-                    else:
-                        result_dict[key] = product
-        data = []
-        rows = []
-        cols = []
-        for (i, j), val in result_dict.items():
-            if abs(val) > 1e-10:
-                data.append(val)
-                rows.append(i)
-                cols.append(j)
-
-        return COOMatrix(data, rows, cols, (result_rows, result_cols))
-
+        return COOMatrix(data, row, col, (sr, sc))
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
