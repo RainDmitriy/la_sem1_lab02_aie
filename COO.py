@@ -1,5 +1,5 @@
 from base import Matrix
-from mtypes import COOData, COORows, COOCols, Shape, DenseMatrix
+from types import COOData, COORows, COOCols, Shape, DenseMatrix
 
 
 class COOMatrix(Matrix):
