@@ -41,11 +41,67 @@ class CSRMatrix(Matrix):
         Hint:
         Результат - в CSC формате (с теми же данными, но с интерпретацией столбцов как строк).
         """
-        return self._to_coo()._to_csc().transpose()
+        from CSC import CSCMatrix
+
+        rows, cols = self.shape
+        data, row, col = [], [], []
+
+        for r in range(rows):
+            for idx in range(self.indptr[r], self.indptr[r + 1]):
+                c = self.indices[idx]
+                v = self.data[idx]
+                row.append(c)  #менянм row и col
+                col.append(r)
+                data.append(v)
+
+        elements = list(zip(row, col, data))
+        elements.sort(key=lambda x: (x[0], x[1]))
+
+        sorted_col = [e[0] for e in elements]
+        sorted_row = [e[1] for e in elements]
+        sorted_data = [e[2] for e in elements]
+
+        new_shape = (cols, rows)
+        new_cols = cols
+        indptr = [0] * (new_cols + 1)
+        for c in sorted_col:
+            indptr[c + 1] += 1
+        for i in range(1, new_cols + 1):
+            indptr[i] += indptr[i - 1]
+
+        return CSCMatrix(sorted_data, sorted_row, indptr, new_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSR матриц."""
-        return self._to_coo()._matmul_impl(other._to_coo())._to_csr()
+        from COO import COOMatrix
+        from CSC import CSCMatrix
+
+        a_coo = self._to_coo()
+        if isinstance(other, CSCMatrix):
+            b_coo = other._to_coo()
+        else:
+            b_coo = other._to_coo()
+
+        result_dict = {}
+        for v1, r1, c1 in zip(a_coo.data, a_coo.row, a_coo.col):
+            for v2, r2, c2 in zip(b_coo.data, b_coo.row, b_coo.col):
+                if c1 == r2:
+                    result_dict[(r1, c2)] = result_dict.get((r1, c2), 0) + v1 * v2
+
+        #собираем COO
+        data, row, col = [], [], []
+        for r, c in sorted(result_dict.keys(), key=lambda x: (x[0], x[1])):  # сорт
+            v = result_dict[(r, c)]
+            if v != 0:
+                data.append(v)
+                row.append(r)
+                col.append(c)
+
+        shape = (self.shape[0], other.shape[1])
+        coo_result = COOMatrix(data, row, col, shape)
+
+        # в томже формате ретерн
+        return coo_result._to_csr()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
@@ -57,7 +113,24 @@ class CSRMatrix(Matrix):
         """
         Преобразование CSRMatrix в CSCMatrix.
         """
-        return self._to_coo()._to_csc()
+        from CSC import CSCMatrix
+
+        coo = self._to_coo()
+        elements = list(zip(coo.col, coo.row, coo.data))
+        elements.sort(key=lambda x: (x[0], x[1]))  # сортировка по col, затем row
+
+        sorted_col = [e[0] for e in elements]
+        sorted_row = [e[1] for e in elements]
+        sorted_data = [e[2] for e in elements]
+
+        cols = self.shape[1]
+        indptr = [0] * (cols + 1)
+        for c in sorted_col:
+            indptr[c + 1] += 1
+        for i in range(1, cols + 1):
+            indptr[i] += indptr[i - 1]
+
+        return CSCMatrix(sorted_data, sorted_row, indptr, self.shape)
 
     def _to_coo(self) -> 'COOMatrix':
         """

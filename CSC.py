@@ -45,58 +45,57 @@ class CSCMatrix(Matrix):
         Результат - в CSR формате (с теми же данными, но с интерпретацией строк как столбцов).
         """
         from CSR import CSRMatrix
-        rows, cols = self.shape
-        nnz = len(self.data)
 
-        indptr = [0] * (cols + 1)
-        for row_idx in self.indices:
-            indptr[row_idx + 1] += 1
-        for i in range(1, cols + 1):
+        rows, cols = self.shape
+        data, row, col = [], [], []
+
+        for c in range(cols):
+            for idx in range(self.indptr[c], self.indptr[c + 1]):
+                r = self.indices[idx]
+                v = self.data[idx]
+                row.append(c)  # меняем row и col
+                col.append(r)
+                data.append(v)
+
+        elements = list(zip(row, col, data))
+        elements.sort(key=lambda x: (x[0], x[1]))  # сортировка по row, потом col
+
+        sorted_row = [e[0] for e in elements]
+        sorted_col = [e[1] for e in elements]
+        sorted_data = [e[2] for e in elements]
+
+        new_shape = (cols, rows)
+        new_rows = cols
+        indptr = [0] * (new_rows + 1)
+        for r in sorted_row:
+            indptr[r + 1] += 1
+        for i in range(1, new_rows + 1):
             indptr[i] += indptr[i - 1]
 
-        data = [0.0] * nnz
-        indices = [0] * nnz
-        counter = indptr[:]
-
-        for col in range(cols):
-            for idx in range(self.indptr[col], self.indptr[col + 1]):
-                row = self.indices[idx]
-                val = self.data[idx]
-                pos = counter[row]
-                data[pos] = val
-                indices[pos] = col
-                counter[row] += 1
-
-        return CSRMatrix(data, indices, indptr, (cols, rows))
+        return CSRMatrix(sorted_data, sorted_col, indptr, new_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
         from COO import COOMatrix
-        if self.shape[1] != other.shape[0]:
-            raise ValueError("Несовместимые размеры для умножения")
+        a_coo = self._to_coo()
+        b_coo = other._to_coo()
 
-        other_cols = defaultdict(list)
-        rows_b, cols_b = other.shape
-        for col in range(cols_b):
-            for idx in range(other.indptr[col], other.indptr[col + 1]):
-                row = other.indices[idx]
-                val = other.data[idx]
-                other_cols[row].append((col, val))
+        result_dict = {}
+        for v1, r1, c1 in zip(a_coo.data, a_coo.row, a_coo.col):
+            for v2, r2, c2 in zip(b_coo.data, b_coo.row, b_coo.col):
+                if c1 == r2:
+                    result_dict[(r1, c2)] = result_dict.get((r1, c2), 0) + v1 * v2
 
         data, row, col = [], [], []
+        for r, c in sorted(result_dict.keys(), key=lambda x: (x[1], x[0])):  # сортировка по col, затем row
+            v = result_dict[(r, c)]
+            if v != 0:
+                data.append(v)
+                row.append(r)
+                col.append(c)
 
-        for col_a in range(self.shape[1]):
-            for idx_a in range(self.indptr[col_a], self.indptr[col_a + 1]):
-                row_a = self.indices[idx_a]
-                val_a = self.data[idx_a]
-                for col_b, val_b in other_cols.get(row_a, []):
-                    # добавляем результат
-                    key = (row_a, col_b)
-                    data.append(val_a * val_b)
-                    row.append(self.indices[idx_a])
-                    col.append(col_b)
-
-        return COOMatrix(data, row, col, (self.shape[0], other.shape[1]))._to_csc()
+        shape = (self.shape[0], other.shape[1])
+        return COOMatrix(data, row, col, shape)._to_csc()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
@@ -125,7 +124,23 @@ class CSCMatrix(Matrix):
         Преобразование CSCMatrix в CSRMatrix.
         """
         from CSR import CSRMatrix
-        return CSRMatrix.from_dense(self.to_dense())
+
+        coo = self._to_coo()
+        elements = list(zip(coo.row, coo.col, coo.data))
+        elements.sort(key=lambda x: (x[0], x[1]))
+
+        sorted_row = [e[0] for e in elements]
+        sorted_col = [e[1] for e in elements]
+        sorted_data = [e[2] for e in elements]
+
+        rows = self.shape[0]
+        indptr = [0] * (rows + 1)
+        for r in sorted_row:
+            indptr[r + 1] += 1
+        for i in range(1, rows + 1):
+            indptr[i] += indptr[i - 1]
+
+        return CSRMatrix(sorted_data, sorted_col, indptr, self.shape)
 
     def _to_coo(self) -> 'COOMatrix':
         """
