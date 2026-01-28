@@ -4,7 +4,7 @@ from CSR import CSRMatrix
 from type import Vector
 from typing import Tuple, Optional
 
-TOLERANCE = 1e-8
+TOLERANCE = 1e-12
 
 
 def value(csc: CSCMatrix, row: int, col: int) -> float:

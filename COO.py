@@ -1,7 +1,7 @@
 from base import Matrix
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
 
-TOLERANCE = 1e-8
+TOLERANCE = 1e-12
 
 class COOMatrix(Matrix):
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
@@ -64,7 +64,7 @@ class COOMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
-        if scalar == 0.0:
+        if abs(scalar) < TOLERANCE:
             return COOMatrix([], [], [], self.shape)
         new_data = []
         new_row = []
