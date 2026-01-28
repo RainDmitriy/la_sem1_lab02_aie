@@ -161,9 +161,19 @@ class CSCMatrix(Matrix):
         """
         Преобразование CSCMatrix в CSRMatrix.
         """
-        CSRClass = getattr(sys.modules['CSR'], 'CSRMatrix')
+        from CSR import CSRMatrix
         coo = self._to_coo()
-        return CSRClass(coo.data, coo.col, coo.row, (self.shape[1], self.shape[0]))
+        temp_rows = [[] for _ in range(self.shape[0])]
+        for i in range(len(coo.data)):
+            temp_rows[coo.row[i]].append((coo.col[i], coo.data[i]))
+        csr_data, csr_indices, csr_indptr = [], [], [0]
+        for r in range(self.shape[0]):
+            temp_rows[r].sort()
+            for c, val in temp_rows[r]:
+                csr_indices.append(c)
+                csr_data.append(val)
+            csr_indptr.append(len(csr_data))
+        return CSRMatrix(csr_data, csr_indices, csr_indptr, self.shape)
 
     def _to_coo(self) -> 'COOMatrix':
         """

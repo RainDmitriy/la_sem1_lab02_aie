@@ -140,27 +140,35 @@ class CSRMatrix(Matrix):
         """Создание CSR из плотной матрицы."""
         rows = len(dense_matrix)
         cols = len(dense_matrix[0]) if rows > 0 else 0
-
-        r, c, v, p = [], [], [0], [0]
+        csr_data, csr_indices, csr_indptr = [], [], [0]
         for i in range(rows):
             row_nz = 0
             for j in range(cols):
                 val = dense_matrix[i][j]
                 if abs(val) > 1e-10:
-                    r.append(j)
-                    v.append(val)
+                    csr_indices.append(j)
+                    csr_data.append(val)
                     row_nz += 1
-            p.append(p[-1] + row_nz)
-
-        return cls(v, r, p, (rows, cols))
+            csr_indptr.append(csr_indptr[-1] + row_nz)
+        return cls(csr_data, csr_indices, csr_indptr, (rows, cols))
 
     def _to_csc(self) -> 'CSCMatrix':
         """
         Преобразование CSRMatrix в CSCMatrix.
         """
-        CSCClass = getattr(sys.modules['CSC'], 'CSCMatrix')
+        from CSC import CSCMatrix
         coo = self._to_coo()
-        return CSCClass(coo.data, coo.row, coo.col, coo.shape)
+        temp_cols = [[] for _ in range(self.shape[1])]
+        for i in range(len(coo.data)):
+            temp_cols[coo.col[i]].append((coo.row[i], coo.data[i]))
+        csc_data, csc_indices, csc_indptr = [], [], [0]
+        for c in range(self.shape[1]):
+            temp_cols[c].sort()
+            for r, val in temp_cols[c]:
+                csc_indices.append(r)
+                csc_data.append(val)
+            csc_indptr.append(len(csc_data))
+        return CSCMatrix(csc_data, csc_indices, csc_indptr, self.shape)
     
     def _to_coo(self) -> 'COOMatrix':
         """

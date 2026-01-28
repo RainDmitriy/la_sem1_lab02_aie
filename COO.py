@@ -119,6 +119,7 @@ class COOMatrix(Matrix):
         """
         Преобразование COOMatrix в CSCMatrix.
         """
+        from CSC import CSCMatrix
         entries = list(zip(self.col, self.row, range(len(self.row))))
         entries.sort()
 
@@ -130,37 +131,27 @@ class COOMatrix(Matrix):
         for i in range(1, self.shape[1] + 1):
             indptr[i] += indptr[i - 1]
 
-        CSCClass = getattr(sys.modules['CSC'], 'CSCMatrix')
-        return CSCClass(sorted_data, sorted_rows, indptr, self.shape)
+        return CSCMatrix(sorted_data, sorted_rows, indptr, self.shape)
 
     def _to_csr(self) -> 'CSRMatrix':
         """
         Преобразование COOMatrix в CSRMatrix.
         """
-        elements = []
-        for i in range(len(self.row)):
-            elements.append((self.col[i], self.row[i], self.data[i]))
+        from CSR import CSRMatrix
+        temp_rows = [[] for _ in range(self.shape[0])]
+        for i in range(len(self.data)):
+            temp_rows[self.row[i]].append((self.col[i], self.data[i]))
 
-        elements.sort()
-        csc_data = []
-        csc_rows = []
-        for element in elements:
-            csc_data.append(element[2])
-            csc_rows.append(element[1])
+        csr_data, csr_indices, csr_indptr = [], [], [0]
+        for r in range(self.shape[0]):
+            temp_rows[r].sort()
+            for c, val in temp_rows[r]:
+                csr_indices.append(c)
+                csr_data.append(val)
+            csr_indptr.append(len(csr_data))
 
-        indptr = [0]
-        cols_count = self.shape[1]
-        current_col_nnz = 0
-        prev_col = -1
+        return CSRMatrix(csr_data, csr_indices, csr_indptr, self.shape)
 
-        for element in elements:
-            this_col = element[0]
-            if this_col != prev_col:
-                indptr.append(indptr[-1] + current_col_nnz)
-                current_col_nnz = 0
-                prev_col = this_col
-            current_col_nnz += 1
-
-        indptr.append(indptr[-1] + current_col_nnz)
-        CSRClass = getattr(sys.modules['CSR'], 'CSRMatrix')
-        return CSRClass(csc_data, csc_rows, indptr, self.shape)
+    def _to_coo(self) -> 'COOMatrix':
+        """COO возвращает сам себя."""
+        return self
