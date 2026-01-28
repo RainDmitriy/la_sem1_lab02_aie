@@ -1,5 +1,5 @@
 from base import Matrix
-from type import COOData, COORows, COOCols, Shape, DenseMatrix
+from type1 import COOData, COORows, COOCols, Shape, DenseMatrix
 
 
 class COOMatrix(Matrix):
@@ -39,9 +39,8 @@ class COOMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> "Matrix":
         """Умножение COO на скаляр."""
-        for i in range(len(self.data)):
-            self.data[i] *= scalar
-        return self
+        new_data = [val * scalar for val in self.data]
+        return COOMatrix(new_data, self.row, self.col, self.shape)
 
     def transpose(self) -> "Matrix":
         """Транспонирование COO матрицы."""

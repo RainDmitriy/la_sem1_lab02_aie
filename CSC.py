@@ -1,5 +1,5 @@
 from base import Matrix
-from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
+from type1 import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 from base import TransposeDense
 
 
@@ -14,18 +14,18 @@ class CSCMatrix(Matrix):
 
     def to_dense(self) -> DenseMatrix:
         """Преобразует CSC в плотную матрицу."""
-        self.denseMatrix: DenseMatrix = []
+        dense: DenseMatrix = []
         for i in range(self.shape[1]):
-            self.denseMatrix.append([0] * self.shape[0])
+            dense.append([0] * self.shape[0])
 
         cur_data = 0
         for i in range(1, len(self.indptr)):
             for j in self.indices[self.indptr[i - 1] : self.indptr[i]]:
-                self.denseMatrix[i - 1][j] = self.data[cur_data]
+                dense[i - 1][j] = self.data[cur_data]
                 cur_data += 1
 
-        self.denseMatrix = TransposeDense(self.denseMatrix)
-        return self.denseMatrix
+        dense = TransposeDense(dense)
+        return dense
 
     def _add_impl(self, other: "Matrix") -> "Matrix":
         """Сложение CSC матриц."""
@@ -44,9 +44,8 @@ class CSCMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> "Matrix":
         """Умножение CSC на скаляр."""
-        for i in range(len(self.data)):
-            self.data[i] *= scalar
-        return self
+        new_data = [val * scalar for val in self.data]
+        return CSCMatrix(new_data, self.indices, self.indptr, self.shape)
 
     def transpose(self) -> "Matrix":
         """

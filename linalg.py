@@ -1,6 +1,6 @@
 from CSC import CSCMatrix
 from CSR import CSRMatrix
-from type import Vector, DenseMatrix
+from type1 import Vector, DenseMatrix
 from typing import Tuple, Optional
 
 
@@ -92,4 +92,3 @@ def elem_from_csc(csc_format: CSCMatrix, row: int, col: int) -> float:
         return 0
 
     return my_data[data_index]
-
