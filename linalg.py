@@ -55,43 +55,51 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     rows, cols = A.shape
     if rows != cols:
         raise ValueError("Матрица должна быть квадратной")
-    a = A.to_dense()
+
+    a_dense = A.to_dense()
     n = rows
-    l = [[0.0] * n for _ in range(n)]
-    u = [[0.0] * n for _ in range(n)]
+
+    l = [0.0] * (n * n)
+    u = [0.0] * (n * n)
+    a = [0.0] * (n * n)
+
+    for i in range(n):
+        for j in range(n):
+            a[i * n + j] = a_dense[i][j]
 
     for i in range(n):
         for j in range(i, n):
             s = 0.0
             for k in range(i):
-                s += l[i][k] * u[k][j]
-            u[i][j] = a[i][j] - s
-        if abs(u[i][i]) < 1e-12:
+                s += l[i * n + k] * u[k * n + j]
+            u[i * n + j] = a[i * n + j] - s
+
+        if abs(u[i * n + i]) < 1e-12:
             return None
+
         for j in range(i + 1, n):
             s = 0.0
             for k in range(i):
-                s += l[j][k] * u[k][i]
-            l[j][i] = (a[j][i] - s) / u[i][i]
-        l[i][i] = 1.0
+                s += l[j * n + k] * u[k * n + i]
+            l[j * n + i] = (a[j * n + i] - s) / u[i * n + i]
+
+        l[i * n + i] = 1.0
 
     y = [0.0] * n
     for i in range(n):
         s = 0.0
-        l_i = l[i]
         for j in range(i):
-            s += l_i[j] * y[j]
+            s += l[i * n + j] * y[j]
         y[i] = b[i] - s
 
     x = [0.0] * n
     for i in range(n - 1, -1, -1):
-        diag = u[i][i]
+        diag = u[i * n + i]
         if abs(diag) < 1e-12:
             return None
         s = 0.0
-        u_i = u[i]
         for j in range(i + 1, n):
-            s += u_i[j] * x[j]
+            s += u[i * n + j] * x[j]
         x[i] = (y[i] - s) / diag
 
     return x
