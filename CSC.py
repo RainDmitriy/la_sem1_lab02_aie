@@ -27,13 +27,7 @@ class CSCMatrix(Matrix):
         if self.shape != other.shape:
             raise ValueError("матрицы разного размера")
 
-        A = self.to_dense()
-        B = other.to_dense()
-
-        rows, cols = self.shape
-        res = [[A[i][j] + B[i][j] for j in range(cols)] for i in range(rows)]
-
-        return CSCMatrix.from_dense(res)
+        return self._to_coo()._add_impl(other._to_coo())._to_csc()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
@@ -138,4 +132,11 @@ class CSCMatrix(Matrix):
         Преобразование CSCMatrix в COOMatrix.
         """
         from COO import COOMatrix
-        return COOMatrix.from_dense(self.to_dense())
+        data, row, col = [], [], []
+        cols = self.shape[1]
+        for j in range(cols):
+            for idx in range(self.indptr[j], self.indptr[j + 1]):
+                row.append(self.indices[idx])
+                col.append(j)
+                data.append(self.data[idx])
+        return COOMatrix(data, row, col, self.shape)

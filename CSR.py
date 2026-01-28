@@ -25,13 +25,7 @@ class CSRMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSR матриц."""
-        dense = self.to_dense()
-        other_dense = other.to_dense()
-
-        rows, cols = self.shape
-        result = [[dense[i][j] + other_dense[i][j] for j in range(cols)] for i in range(rows)]
-
-        return CSRMatrix.from_dense(result)
+        return self._to_coo()._add_impl(other._to_coo())._to_csr()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
@@ -47,69 +41,34 @@ class CSRMatrix(Matrix):
         Hint:
         Результат - в CSC формате (с теми же данными, но с интерпретацией столбцов как строк).
         """
-        from CSC import CSCMatrix
-        return CSCMatrix.from_dense(self.to_dense())
+        return self._to_coo()._to_csc().transpose()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSR матриц."""
-        from COO import COOMatrix
-        if self.shape[1] != other.shape[0]:
-            raise ValueError("Несовместимые размеры для умножения")
-
-            # Строим COO-подобное представление другой CSR
-        other_rows = defaultdict(list)
-        rows_b, cols_b = other.shape
-        for row in range(rows_b):
-            for idx in range(other.indptr[row], other.indptr[row + 1]):
-                col = other.indices[idx]
-                val = other.data[idx]
-                other_rows[row].append((col, val))
-
-        data, row, col = [], [], []
-
-        for row_a in range(self.shape[0]):
-            for idx_a in range(self.indptr[row_a], self.indptr[row_a + 1]):
-                col_a = self.indices[idx_a]
-                val_a = self.data[idx_a]
-                for col_b, val_b in other_rows.get(col_a, []):
-                    data.append(val_a * val_b)
-                    row.append(row_a)
-                    col.append(col_b)
-
-        return COOMatrix(data, row, col, (self.shape[0], other.shape[1]))._to_csr()
+        return self._to_coo()._matmul_impl(other._to_coo())._to_csr()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
         """Создание CSR из плотной матрицы."""
-        rows = len(dense_matrix)
-        cols = len(dense_matrix[0]) if rows > 0 else 0
-
-        data = []
-        indices = []
-        indptr = [0]
-
-        for i in range(rows):
-            count = 0
-            for j in range(cols):
-                val = dense_matrix[i][j]
-                if val != 0:
-                    data.append(val)
-                    indices.append(j)
-                    count += 1
-            indptr.append(indptr[-1] + count)
-
-        return cls(data, indices, indptr, (rows, cols))
+        from COO import COOMatrix
+        return COOMatrix.from_dense(dense_matrix)._to_csr()
 
     def _to_csc(self) -> 'CSCMatrix':
         """
         Преобразование CSRMatrix в CSCMatrix.
         """
-        from CSC import CSCMatrix
-        return CSCMatrix.from_dense(self.to_dense())
+        return self._to_coo()._to_csc()
 
     def _to_coo(self) -> 'COOMatrix':
         """
         Преобразование CSRMatrix в COOMatrix.
         """
         from COO import COOMatrix
-        return COOMatrix.from_dense(self.to_dense())
+        data, row, col = [], [], []
+        rows = self.shape[0]
+        for i in range(rows):
+            for idx in range(self.indptr[i], self.indptr[i + 1]):
+                row.append(i)
+                col.append(self.indices[idx])
+                data.append(self.data[idx])
+        return COOMatrix(data, row, col, self.shape)

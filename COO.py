@@ -21,22 +21,17 @@ class COOMatrix(Matrix):
         return dense
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        data = []
-        row = []
-        col = []
-
-        temp = {}
+        result = defaultdict(float)
         for v, r, c in zip(self.data, self.row, self.col):
-            temp[(r, c)] = v
+            result[(r, c)] += v
         for v, r, c in zip(other.data, other.row, other.col):
-            temp[(r, c)] = temp.get((r, c), 0) + v
-
-        for (r, c), v in temp.items():
+            result[(r, c)] += v
+        data, row, col = [], [], []
+        for (r, c), v in result.items():
             if v != 0:
                 data.append(v)
                 row.append(r)
                 col.append(c)
-
         return COOMatrix(data, row, col, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
@@ -103,11 +98,31 @@ class COOMatrix(Matrix):
         Преобразование COOMatrix в CSCMatrix.
         """
         from CSC import CSCMatrix
-        return CSCMatrix.from_dense(self.to_dense())
+        elements = sorted(zip(self.col, self.row, self.data))
+        sorted_col = [e[0] for e in elements]
+        sorted_row = [e[1] for e in elements]
+        sorted_data = [e[2] for e in elements]
+        cols = self.shape[1]
+        indptr = [0] * (cols + 1)
+        for c in sorted_col:
+            indptr[c + 1] += 1
+        for i in range(1, len(indptr)):
+            indptr[i] += indptr[i - 1]
+        return CSCMatrix(sorted_data, sorted_row, indptr, self.shape)
 
     def _to_csr(self) -> 'CSRMatrix':
         """
         Преобразование COOMatrix в CSRMatrix.
         """
         from CSR import CSRMatrix
-        return CSRMatrix.from_dense(self.to_dense())
+        elements = sorted(zip(self.row, self.col, self.data))
+        sorted_row = [e[0] for e in elements]
+        sorted_col = [e[1] for e in elements]
+        sorted_data = [e[2] for e in elements]
+        rows = self.shape[0]
+        indptr = [0] * (rows + 1)
+        for r in sorted_row:
+            indptr[r + 1] += 1
+        for i in range(1, len(indptr)):
+            indptr[i] += indptr[i - 1]
+        return CSRMatrix(sorted_data, sorted_col, indptr, self.shape)
