@@ -34,7 +34,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
             U_k[j] = a_k[j] - s
 
         pivot = U_k[k]
-        if pivot == 0.0:
+        if abs(pivot) < 1e-10:
             return None
 
         for i in range(k + 1, n):
@@ -72,7 +72,7 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
         U_i = U[i]
         for j in range(i + 1, n):
             s += U_i[j] * x[j]
-        if U_i[i] == 0.0:
+        if abs(U_i[i]) < 1e-10:
             return None
         x[i] = (y[i] - s) / U_i[i]
 
