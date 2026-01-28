@@ -47,4 +47,3 @@ class Matrix(ABC):
     def _matmul_impl(self, other: "Matrix") -> "Matrix":
         """Реализация умножения матриц."""
         pass
-

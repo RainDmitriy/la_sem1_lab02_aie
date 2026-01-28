@@ -10,8 +10,6 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     Возвращает (L, U) - нижнюю и верхнюю треугольные матрицы.
     Ожидается, что матрица L хранит единицы на главной диагонали.
     """
-    A.shape[0] = A.shape[0]
-    
     l_data, l_indices, l_indptr = [], [], [0]
     u_data, u_indices, u_indptr = [], [], [0]
 

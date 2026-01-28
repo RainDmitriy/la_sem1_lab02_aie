@@ -156,4 +156,3 @@ class CSRMatrix(Matrix):
                 row.append(r)
                 col.append(self.indices[j])
         return COOMatrix(data, row, col, self.shape)
-

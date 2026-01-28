@@ -122,3 +122,4 @@ class COOMatrix(Matrix):
             indptr[i + 1] += indptr[i]
             
         return CSRMatrix(new_data, new_indices, indptr, self.shape)
+
