@@ -2,7 +2,7 @@ from CSC import CSCMatrix
 from CSR import CSRMatrix
 from type import Vector
 from typing import Tuple, Optional
-
+EPS = 1e-10
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     """
     LU-разложение для CSC матрицы.
@@ -79,8 +79,6 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                 new_indices.append(U_indices[p2])
                 p2 += 1
 
-            assert len(new_data) == len(
-                new_indices), f"len(new_data)={len(new_data)}, len(new_indices)={len(new_indices)}"
             old_nnz = U_indptr[j + 1] - U_indptr[j]
             for pos in range(min(len(new_data), old_nnz)):
                 U_data[col_j_start + pos] = new_data[pos]
@@ -129,7 +127,7 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
             if U.indices[pos] == i:
                 diag_pos = pos
                 break
-        if diag_pos == -1 or abs(U.data[diag_pos]) < 1e-10:
+        if diag_pos == -1 or abs(U.data[diag_pos]) < EPS:
             return None
         for pos in range(diag_pos + 1, col_end):
             col_idx = U.indices[pos]
@@ -156,7 +154,7 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
             if U.indices[pos] == i:
                 diag_pos = pos
                 break
-        if diag_pos == -1 or abs(U.data[diag_pos]) < 1e-10:
+        if diag_pos == -1 or abs(U.data[diag_pos]) < EPS:
             return 0.0
         det *= U.data[diag_pos]
     return det
