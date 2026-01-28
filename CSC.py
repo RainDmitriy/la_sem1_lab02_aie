@@ -76,26 +76,68 @@ class CSCMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
-        from COO import COOMatrix
-        a_coo = self._to_coo()
-        b_coo = other._to_coo()
+        from CSC import CSCMatrix
 
-        result_dict = {}
-        for v1, r1, c1 in zip(a_coo.data, a_coo.row, a_coo.col):
-            for v2, r2, c2 in zip(b_coo.data, b_coo.row, b_coo.col):
-                if c1 == r2:
-                    result_dict[(r1, c2)] = result_dict.get((r1, c2), 0) + v1 * v2
+        if isinstance(other, CSCMatrix):
+            rows_a, cols_a = self.shape
+            rows_b, cols_b = other.shape
 
-        data, row, col = [], [], []
-        for r, c in sorted(result_dict.keys(), key=lambda x: (x[1], x[0])):  # сортировка по col, затем row
-            v = result_dict[(r, c)]
-            if v != 0:
-                data.append(v)
-                row.append(r)
-                col.append(c)
+            data_res = []
+            indices_res = []
+            indptr_res = [0]
 
-        shape = (self.shape[0], other.shape[1])
-        return COOMatrix(data, row, col, shape)._to_csc()
+            for col_b in range(cols_b):
+                col_vals = {}
+                start_b = other.indptr[col_b]
+                end_b = other.indptr[col_b + 1]
+
+                for idx_b in range(start_b, end_b):
+                    row_b = other.indices[idx_b]
+                    val_b = other.data[idx_b]
+
+                    start_a = self.indptr[row_b]
+                    end_a = self.indptr[row_b + 1]
+                    for idx_a in range(start_a, end_a):
+                        row_a = self.indices[idx_a]
+                        val_a = self.data[idx_a]
+                        col_vals[row_a] = col_vals.get(row_a, 0) + val_a * val_b
+
+                # добавляемзначения в result
+                rows_in_col = sorted(col_vals.keys())
+                for r in rows_in_col:
+                    v = col_vals[r]
+                    if v != 0:
+                        data_res.append(v)
+                        indices_res.append(r)
+                indptr_res.append(len(data_res))
+
+            return CSCMatrix(data_res, indices_res, indptr_res, (rows_a, cols_b))
+
+        elif 'CSRMatrix' in str(type(other)):
+            other_csc = other._to_csc()
+            return self._matmul_impl(other_csc)
+
+        elif 'COOMatrix' in str(type(other)):
+            other_csc = other._to_csc()
+            return self._matmul_impl(other_csc)
+
+        #через плотную матрицу
+        else:
+            dense_self = self.to_dense()
+            dense_other = other.to_dense()
+
+            rows_a, cols_a = self.shape
+            rows_b, cols_b = other.shape
+
+            result = [[0.0] * cols_b for _ in range(rows_a)]
+            for i in range(rows_a):
+                for j in range(cols_a):
+                    if dense_self[i][j] != 0:
+                        for k in range(cols_b):
+                            if dense_other[j][k] != 0:
+                                result[i][k] += dense_self[i][j] * dense_other[j][k]
+
+            return self.__class__.from_dense(result)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
