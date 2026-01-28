@@ -1,4 +1,3 @@
-# file: linalg.py
 from CSC import CSCMatrix
 from type import Vector
 from typing import Tuple, Optional

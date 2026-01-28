@@ -1,4 +1,3 @@
-# file: COO.py
 from base import Matrix
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
 from typing import Dict, Tuple, List

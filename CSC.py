@@ -1,4 +1,3 @@
-# file: CSC.py
 from base import Matrix
 from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 

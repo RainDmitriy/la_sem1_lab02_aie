@@ -1,4 +1,3 @@
-# file: CSR.py
 from base import Matrix
 from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 
