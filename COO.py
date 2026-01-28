@@ -30,30 +30,44 @@ class COOMatrix(Matrix):
             # Конвертируем other в COO
             other_coo = COOMatrix.from_dense(other.to_dense())
             return self._add_impl(other_coo)
-        
-        # Эффективное сложение двух COO матриц
-        # Создаем словарь для быстрого доступа: (row, col) -> индекс
-        index_map = {}
-        for idx, (r, c) in enumerate(zip(self.row, self.col)):
-            index_map[(r, c)] = idx
-        
-        new_data = self.data.copy()
-        new_row = self.row.copy()
-        new_col = self.col.copy()
-        
-        for val, r, c in zip(other.data, other.row, other.col):
-            key = (r, c)
-            if key in index_map:
-                idx = index_map[key]
-                new_data[idx] += val
-            else:
-                new_data.append(val)
-                new_row.append(r)
-                new_col.append(c)
-                index_map[key] = len(new_data) - 1
-        
-        return COOMatrix(new_data, new_row, new_col, self.shape)
 
+        # Создаем словарь для результата: (row, col) -> value
+        result_dict = {}
+
+        # Добавляем элементы из текущей матрицы
+        for i in range(len(self.data)):
+            key = (self.row[i], self.col[i])
+            result_dict[key] = self.data[i]
+
+        # Добавляем элементы из другой матрицы
+        for i in range(len(other.data)):
+            key = (other.row[i], other.col[i])
+            if key in result_dict:
+                result_dict[key] += other.data[i]
+            else:
+                result_dict[key] = other.data[i]
+
+        # Удаляем элементы, близкие к нулю
+        to_remove = []
+        for key, value in result_dict.items():
+            if abs(value) < 1e-12:
+                to_remove.append(key)
+
+        for key in to_remove:
+            del result_dict[key]
+
+        # Преобразуем словарь обратно в COO формат
+        data = []
+        row = []
+        col = []
+
+        for (r, c), val in result_dict.items():
+            data.append(val)
+            row.append(r)
+            col.append(c)
+
+        return COOMatrix(data, row, col, self.shape)
+    
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
         new_data = [value * scalar for value in self.data]
