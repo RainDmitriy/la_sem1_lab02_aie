@@ -47,13 +47,15 @@ class CSCMatrix(Matrix):
                 merged_row[key] = merged_row.get(key, 0) + other.data[counter_row2]
                 counter_row2 += 1
 
+            added_counter = 0
             if merged_row:
-                indices_col, data_col = zip(*sorted(merged_row.items()))
+                for r, val in sorted(merged_row.items()):
+                    if val != 0:
+                        indices.append(r)
+                        data.append(val)
+                        added_counter += 1
 
-                indices.extend(indices_col)
-                data.extend(data_col)
-
-            indptr.append(indptr[-1] + len(merged_row))
+            indptr.append(indptr[-1] + added_counter)
 
             col += 1
 
@@ -80,7 +82,9 @@ class CSCMatrix(Matrix):
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
         csr_self = self._to_csr()
-        return csr_self._matmul_impl(other)
+        csr_other = other._to_csr()
+
+        return csr_self._matmul_impl(csr_other)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':

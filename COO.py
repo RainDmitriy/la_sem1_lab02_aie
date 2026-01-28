@@ -34,7 +34,7 @@ class COOMatrix(Matrix):
             merged_coords[key] = merged_coords.get(key, 0) + v
 
         sum_row, sum_col, sum_val = list(), list(), list()
-        for (row, col), val in merged_coords.items():
+        for (row, col), val in sorted(merged_coords.items()):
             if val != 0:
                 sum_row.append(row)
                 sum_col.append(col)

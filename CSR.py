@@ -47,13 +47,15 @@ class CSRMatrix(Matrix):
                 merged_row[key] = merged_row.get(key, 0) + other.data[counter_col2]
                 counter_col2 += 1
 
+            added_counter = 0
             if merged_row:
-                indices_row, data_row = zip(*sorted(merged_row.items()))
+                for c, val in sorted(merged_row.items()):
+                    if val != 0:
+                        indices.append(c)
+                        data.append(val)
+                        added_counter += 1
 
-                indices.extend(indices_row)
-                data.extend(data_row)
-
-            indptr.append(indptr[-1] + len(merged_row))
+            indptr.append(indptr[-1] + added_counter)
 
             row += 1
 
