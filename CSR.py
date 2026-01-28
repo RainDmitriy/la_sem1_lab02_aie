@@ -66,8 +66,9 @@ class CSRMatrix(Matrix):
                         idx2 += 1
                     else:
                         val = self.data[idx1] + other.data[idx2]
-                        result_data.append(val)
-                        result_indices.append(col1)
+                        if abs(val) > TOL:
+                            result_data.append(val)
+                            result_indices.append(col1)
                         idx1 += 1
                         idx2 += 1
                 
