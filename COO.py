@@ -1,5 +1,5 @@
 from base import Matrix
-from types import COOData, COORows, COOCols, Shape, DenseMatrix
+from type import COOData, COORows, COOCols, Shape, DenseMatrix
 from typing import Dict, List, Tuple
 import bisect
 
