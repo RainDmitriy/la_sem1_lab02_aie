@@ -205,26 +205,25 @@ class CSCMatrix(Matrix):
                 if fabs(dot) >= self.ZERO_TOLERANCE:
                     result_data[i][j] = dot
 
-        return DenseMatrix(result_data)
+        return result_data
 
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
         """Создание CSC из плотной матрицы."""
-        n_rows, n_cols = dense_matrix.shape
-        dense_data = dense_matrix.data
+        n_rows, n_cols = len(dense_matrix), len(dense_matrix[0])
 
         data, indices, indptr = [], [], [0]
 
         for col in range(n_cols):
             for row in range(n_rows):
-                val = dense_data[row][col]
+                val = dense_matrix[row][col]
                 if fabs(val) >= cls.ZERO_TOLERANCE:
                     data.append(val)
                     indices.append(row)
             indptr.append(len(data))
 
-        return cls(data, indices, indptr, dense_matrix.shape)
+        return cls(data, indices, indptr, (n_rows, n_cols))
 
     def _to_csr(self) -> 'CSRMatrix':
         """

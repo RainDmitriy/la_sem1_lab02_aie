@@ -5,13 +5,14 @@ DenseMatrix = List[List[float]]  # Плотная матрица: [[row1], [row2
 Shape = Tuple[int, int]  # Размерность: (rows, cols)
 
 # Для COO
-COOData = List[float]      # Ненулевые значения
-COORows = List[int]        # Индексы строк
-COOCols = List[int]        # Индексы столбцов
+COOData = List[float]  # Ненулевые значения
+COORows = List[int]  # Индексы строк
+COOCols = List[int]  # Индексы столбцов
 
 
 class COOMatrix(Matrix):
     ZERO_TOLERANCE = 1e-15
+
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
         super().__init__(shape)
         self.data = data
@@ -158,7 +159,7 @@ class COOMatrix(Matrix):
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
         """Создание COO из плотной матрицы."""
         data, rows, cols = [], [], []
-        dense_data = dense_matrix.data
+        dense_data = dense_matrix
 
         for i in range(len(dense_data)):
             for j in range(len(dense_data[0])):
@@ -168,7 +169,7 @@ class COOMatrix(Matrix):
                     rows.append(i)
                     cols.append(j)
 
-        return cls(data, rows, cols, dense_matrix.shape)
+        return cls(data, rows, cols, (len(dense_matrix), len(dense_matrix[0])))
 
     def _to_csc(self) -> 'CSCMatrix':
         """
@@ -176,14 +177,12 @@ class COOMatrix(Matrix):
         """
         from CSC import CSCMatrix
 
-        # Сортируем по столбцам, затем по строкам
         sorted_indices = sorted(zip(self.col, self.row, self.data))
 
         if not sorted_indices:
             return CSCMatrix([], [], [0] * (self.shape[1] + 1), self.shape)
 
         sorted_cols, sorted_rows, sorted_data = zip(*sorted_indices)
-
 
         n_cols = self.shape[1]
         col_ptr = [0] * (n_cols + 1)
@@ -195,12 +194,7 @@ class COOMatrix(Matrix):
         for i in range(1, n_cols + 1):
             col_ptr[i] += col_ptr[i - 1]
 
-        return CSCMatrix(
-            data=list(sorted_data),
-            row_indices=list(sorted_rows),
-            col_ptr=col_ptr,
-            shape=self.shape
-        )
+        return CSCMatrix(list(sorted_data), list(sorted_rows), col_ptr, self.shape)
 
     def _to_csr(self) -> 'CSRMatrix':
         """
@@ -224,9 +218,4 @@ class COOMatrix(Matrix):
         for i in range(1, n_rows + 1):
             row_ptr[i] += row_ptr[i - 1]
 
-        return CSRMatrix(
-            data=list(sorted_data),
-            col_indices=list(sorted_cols),
-            row_ptr=row_ptr,
-            shape=self.shape
-        )
+        return CSRMatrix(list(sorted_data), list(sorted_cols), row_ptr, self.shape)
