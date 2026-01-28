@@ -87,7 +87,8 @@ class CSCMatrix(Matrix):
         if self.shape[1] != other.shape[0]:
             raise ValueError("Несовместимые размеры матриц")
 
-        return self._to_csr()._matmul_impl(other._to_csr())
+        result_csr = self._to_csr()._matmul_impl(other._to_csr())
+        return result_csr._to_csc()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':

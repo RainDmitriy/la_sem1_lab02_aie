@@ -153,7 +153,7 @@ class COOMatrix(Matrix):
 
         for i in range(num_rows):
             row_items = sorted(rows_elements[i])
-            for c, v in rows_elements[i]:
+            for c, v in row_items:
                 data.append(v)
                 indices.append(c)
             indptr.append(len(data))
