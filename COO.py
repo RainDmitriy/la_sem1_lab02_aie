@@ -120,6 +120,7 @@ class COOMatrix(Matrix):
         data = []
         row_indices = []
         col_indices = []
+
         for i in range(rows):
             for j in range(cols):
                 value = dense_matrix[i][j]

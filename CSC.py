@@ -6,6 +6,7 @@ class CSCMatrix(Matrix):
         super().__init__(shape)
         if indptr[0] != 0:
             raise ValueError("Первый элемент indptr должен быть равен 0")
+
         self.data = data
 
 
