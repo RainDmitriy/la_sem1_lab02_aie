@@ -65,6 +65,7 @@ class CSCMatrix(Matrix):
         """Умножение CSC матриц"""
         a = self._to_csr()
         c = a._matmul_impl(other)
+
         if hasattr(c, "_to_csc"):
             return c._to_csc()
         from COO import COOMatrix

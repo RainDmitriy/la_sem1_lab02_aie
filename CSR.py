@@ -8,6 +8,7 @@ class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
         super().__init__(shape)
         self.data = data
+
         self.indices = indices
         self.indptr = indptr
         self.nnz = len(data)

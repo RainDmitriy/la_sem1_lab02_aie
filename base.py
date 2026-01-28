@@ -5,6 +5,7 @@ class Matrix(ABC):
     def __init__(self, shape: Shape):
         self.shape = shape
 
+
     @abstractmethod
     def to_dense(self) -> DenseMatrix:
         """Преобразует разреженную матрицу в плотную."""
