@@ -67,22 +67,14 @@ class COOMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
-        if abs(scalar) < TOL:
+        # ВАЖНО: НЕ фильтруем элементы при умножении на скаляр!
+        # Это соответствует тестам
+        if scalar == 0.0:
             return COOMatrix([], [], [], self.shape)
         
-        # Умножаем все значения, удаляя элементы близкие к нулю
-        new_data = []
-        new_row = []
-        new_col = []
-        
-        for i in range(self.nnz):
-            val = self.data[i] * scalar
-            if abs(val) > TOL:
-                new_data.append(val)
-                new_row.append(self.row[i])
-                new_col.append(self.col[i])
-        
-        return COOMatrix(new_data, new_row, new_col, self.shape)
+        # Умножаем все значения, НЕ удаляя элементы
+        new_data = [val * scalar for val in self.data]
+        return COOMatrix(new_data, self.row.copy(), self.col.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
         """Транспонирование COO матрицы."""
