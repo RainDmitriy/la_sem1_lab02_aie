@@ -2,95 +2,150 @@ from CSC import CSCMatrix
 from type import Vector
 from typing import Tuple, Optional
 
-def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
-    """
-    LU разложение для CSC матрицы
-    """
-    sr, sc = A.shape
-    if sr != sc:
-        return None
+EPS = 1e-10
 
-    dm = A.to_dense()
-    e = 1e-12
 
-    L = [[0.0 for _ in range(sr)] for _ in range(sr)]
-    U = [[0.0 for _ in range(sr)] for _ in range(sr)]
+def lu_decomposition(mat: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
+    """
+    Выполняет LU‑разложение матрицы в формате CSC.
+    Возвращает пару (L, U), где L – нижняя треугольная с единицами на диагонали,
+    U – верхняя треугольная матрица.
+    """
+    sr = mat.shape[0]
+
+    Lc = [{} for _ in range(sr)]
+    Ur = [{} for _ in range(sr)]
+
+    # преобразуем входную матрицу в словарь строк для быстрого доступа
+    rows = [{} for _ in range(sr)]
+    for c in range(sr):
+        for p in range(mat.indptr[c], mat.indptr[c + 1]):
+            r = mat.indices[p]
+            rows[r][c] = float(mat.data[p])
+
+    # массив для накопления обновлений
+    upd = [{} for _ in range(sr)]
 
     for r in range(sr):
-        # считаем U
-        for c in range(r, sr):
-            s = 0.0
-            for k in range(r):
-                s += L[r][k] * U[k][c]
-            U[r][c] = dm[r][c] - s
+        row = {}
 
-        p = U[r][r]
-        if abs(p) < e:
+        # собираем элементы из исходной матрицы
+        for c, d in rows[r].items():
+            if c >= r:
+                row[c] = float(d)
+
+        # добавляем накопленные обновления
+        for c, d in upd[r].items():
+            if c >= r:
+                row[c] = row.get(c, 0.0) + float(d)
+
+        p = row.get(r, 0.0)
+        if abs(p) < EPS:
             return None
 
-        L[r][r] = 1.0
+        Ur[r] = {}
+        for c, d in row.items():
+            if c >= r and abs(d) > EPS:
+                Ur[r][c] = d
 
-        # считаем L
-        for i in range(r + 1, sr):
-            s = 0.0
-            for k in range(r):
-                s += L[i][k] * U[k][r]
-            L[i][r] = (dm[i][r] - s) / p
+        Ur[r][r] = p
+        Lc[r][r] = 1.0
 
-    return CSCMatrix.from_dense(L), CSCMatrix.from_dense(U)
+        for r2 in range(r + 1, sr):
+            elem = 0.0
+            if r in rows[r2]:
+                elem += float(rows[r2][r])
+            if r in upd[r2]:
+                elem += float(upd[r2][r])
+
+            if abs(elem) > EPS:
+                f = elem / p
+                Lc[r][r2] = f
+
+                for c, du in Ur[r].items():
+                    if c > r:
+                        d = -f * du
+                        if abs(d) > EPS:
+                            upd[r2][c] = upd[r2].get(c, 0.0) + d
+
+    # преобразуем L в CSC
+    L_data, L_indices, L_indptr = [], [], [0]
+    for c in range(sr):
+        rr = sorted(Lc[c].keys())
+        for r in rr:
+            L_data.append(Lc[c][r])
+            L_indices.append(r)
+        L_indptr.append(len(L_data))
+
+    # преобразуем U в CSC (транспонируем словарь строк)
+    Uc = [{} for _ in range(sr)]
+    for r in range(sr):
+        for c, d in Ur[r].items():
+            Uc[c][r] = d
+
+    U_data, U_indices, U_indptr = [], [], [0]
+    for c in range(sr):
+        rr = sorted(Uc[c].keys())
+        for r in rr:
+            U_data.append(Uc[c][r])
+            U_indices.append(r)
+        U_indptr.append(len(U_data))
+
+    return (CSCMatrix(L_data, L_indices, L_indptr, (sr, sr)),
+            CSCMatrix(U_data, U_indices, U_indptr, (sr, sr)))
+
 
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     """
-    Решение Ax=b через LU
+    Решает систему линейных уравнений Ax = b с использованием LU‑разложения.
     """
-    lu_d = lu_decomposition(A)
-    if lu_d is None:
-        return None
-    l, u = lu_d
-
-    sr, sc = A.shape
-    if sr != sc or len(b) != sr:
+    lu = lu_decomposition(A)
+    if lu is None:
         return None
 
-    ld = l.to_dense()
-    ud = u.to_dense()
+    L, U = lu
+    sr = A.shape[0]
 
-    y = [0.0 for _ in range(sr)]
+    ld = L.to_dense()
+    ud = U.to_dense()
+
+    # прямой ход: Ly = b
+    y = [0.0] * sr
     for r in range(sr):
         s = 0.0
         for c in range(r):
             s += ld[r][c] * y[c]
-            
-        y[r] = float(b[r]) - s
+        y[r] = b[r] - s
 
-    x = [0.0 for _ in range(sr)]
-    e = 1e-12
+    # обратный ход: Ux = y
+    x = [0.0] * sr
     for r in range(sr - 1, -1, -1):
         s = 0.0
         for c in range(r + 1, sr):
             s += ud[r][c] * x[c]
-        if abs(ud[r][r]) < e:
+
+        if abs(ud[r][r]) < EPS:
             return None
+
         x[r] = (y[r] - s) / ud[r][r]
 
     return x
 
+
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     """
-    Вычисление определителя через LU
+    Вычисляет определитель матрицы с помощью LU‑разложения.
     """
-    lu_d = lu_decomposition(A)
-    if lu_d is None:
-        return None
-    l, u = lu_d
-
-    sr, sc = A.shape
-    if sr != sc:
+    lu = lu_decomposition(A)
+    if lu is None:
         return None
 
-    ud = u.to_dense()
+    _, U = lu
+    sr = A.shape[0]
+
+    ud = U.to_dense()
     det = 1.0
     for r in range(sr):
         det *= ud[r][r]
-    return det
 
+    return det
