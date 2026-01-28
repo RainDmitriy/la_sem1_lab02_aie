@@ -25,11 +25,11 @@ class CSRMatrix(Matrix):
         from COO import COOMatrix
 
         self_coo: COOMatrix = self._to_coo()
-        other_coo:COOMatrix = other._to_coo()
+        other_coo: COOMatrix = other._to_coo()
 
         ans: COOMatrix = self_coo._add_impl(other_coo)
 
-        return ans._to_csr
+        return ans._to_csr()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""

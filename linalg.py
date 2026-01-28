@@ -48,15 +48,15 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     for i in range(l.shape[0]):
         val_y = b[i]
         for k in range(i):
-            val_y -= elem_from_csc(l, i, k) * y[k]
+            val_y -= l[i][k] * y[k]
         y[i] = val_y
 
     for i in range(u.shape[0] - 1, -1, -1):
         val_x = y[i]
         for k in range(i + 1, u.shape[0]):
-            val_x -= elem_from_csc(u, i, k) * x[k]
+            val_x -= u[i][k] * x[k]
         
-        elem_to_devide = elem_from_csc(u, i, i)
+        elem_to_devide = u[i][i]
         if elem_to_devide == 0:
             raise ValueError
 
@@ -75,7 +75,7 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     det_l = 1
     det_u = 1
     for i in range(u.shape[0]):
-        det_u *= elem_from_csc(u, i, i)
+        det_u *= u[i][i]
 
     return det_u * det_l
 
@@ -97,4 +97,3 @@ def elem_from_csc(csc_format: CSCMatrix, row: int, col: int) -> float:
         return 0
 
     return my_data[data_index]
-

@@ -47,18 +47,3 @@ class Matrix(ABC):
     def _matmul_impl(self, other: "Matrix") -> "Matrix":
         """Реализация умножения матриц."""
         pass
-
-
-def TransposeDense(dense_matrix: DenseMatrix) -> DenseMatrix:
-    n = len(dense_matrix)
-    m = len(dense_matrix[0])
-    transposed: DenseMatrix = []
-    for i in range(m):
-        transposed.append([0] * n)
-
-    for r in range(n):
-        for c in range(m):
-            transposed[c][r] = dense_matrix[r][c]
-
-    return transposed
-
