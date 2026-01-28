@@ -8,7 +8,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     if n != A.shape[1]:
         raise ValueError("Matrix must be square")
 
-    # Локализация списков для ускорения доступа
+    # Локализация
     A_data = A.data
     A_indices = A.indices
     A_indptr = A.indptr
@@ -16,46 +16,54 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     L_data, L_indices, L_indptr = [], [], [0]
     U_data, U_indices, U_indptr = [], [], [0]
     
-    # SPA (Sparse Accumulator)
+    # Плотный вектор
     x = [0.0] * n
-    # Кэш нулей
-    zeros = [0.0] * n
     
-    # Кэш столбцов L: хранит (indices_list, values_list)
+    # Кэш столбцов L
     L_cols_cache = [] 
 
     for j in range(n):
         start_ptr = A_indptr[j]
         end_ptr = A_indptr[j+1]
-
+        
+        # Список индексов, которые нужно обнулить в конце шага
+        touched = []
+        
+        # Skyline Optimization
+        first_row = 0
         if start_ptr < end_ptr:
             first_row = A_indices[start_ptr]
         else:
-            first_row = j  # Столбец пуст (или только диагональ будет заполнена позже)
+            first_row = j 
 
-        # 1. Загрузка столбца A (Scatter)
+        # 1. Scatter
         for k in range(start_ptr, end_ptr):
-            x[A_indices[k]] += A_data[k]
+            r = A_indices[k]
+            if x[r] == 0:
+                touched.append(r)
+            x[r] += A_data[k]
 
-        # 2. Исключение (Elimination)
-        # Начинаем цикл с first_row вместо 0! Огромное ускорение для ленточных матриц.
+        # 2. Elimination
         for k in range(first_row, j):
             ukj = x[k]
             if ukj == 0:
                 continue
             
-            # Достаем закэшированный столбец L
             l_rows, l_vals = L_cols_cache[k]
             
-            # Inner loop
             for r, val in zip(l_rows, l_vals):
+                if x[r] == 0:
+                    touched.append(r)
                 x[r] -= val * ukj
 
-        # 3. Формирование U (Gather U)
+        # 3. Gather U
         u_col_data = []
         u_col_ind = []
         
-        # Сбор начинаем тоже с first_row, раньше там нули
+        # Сбор U (идем по touched, но нужно в порядке индексов)
+        # Для скорости идем циклом, так как диапазон ограничен Skyline
+        # Если диапазон огромный, можно фильтровать touched, но sorted(touched) тоже накладно.
+        # Обычно Skyline дает узкий диапазон.
         for i in range(first_row, j + 1):
             val = x[i]
             if val != 0:
@@ -66,19 +74,19 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         U_indices.extend(u_col_ind)
         U_indptr.append(len(U_data))
 
-        # 4. Пивот
+        # 4. Pivot
         ujj = x[j]
         if abs(ujj) < 1e-15:
             return None 
 
-        # 5. Формирование L (Gather L)
+        # 5. Gather L
         l_col_data_cache = []
         l_col_ind_cache = []
         
         L_data.append(1.0)
         L_indices.append(j)
         
-        # Хвост L собираем
+        # Хвост L
         for i in range(j + 1, n):
             val = x[i]
             if val != 0:
@@ -91,8 +99,9 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
         L_indptr.append(len(L_data))
         L_cols_cache.append((l_col_ind_cache, l_col_data_cache))
 
-        # 6. Очистка
-        x[:] = zeros
+        # 6. Sparse Clean
+        for idx in touched:
+            x[idx] = 0.0
 
     return (
         CSCMatrix(L_data, L_indices, L_indptr, A.shape),
@@ -106,13 +115,12 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     L, U = lu
     n = A.shape[0]
     
-    # Локализация для скорости
     L_data, L_indices, L_indptr = L.data, L.indices, L.indptr
     U_data, U_indices, U_indptr = U.data, U.indices, U.indptr
     
     y = list(b)
     
-    # Прямой ход (L y = b)
+    # L y = b
     for j in range(n):
         yj = y[j]
         if yj == 0:
@@ -120,29 +128,19 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
         
         start = L_indptr[j]
         end = L_indptr[j+1]
-        # В L диагональ - первый элемент или не хранится (тут хранится 1.0)
-        # Нам нужны элементы строго ниже диагонали
         for k in range(start, end):
             row = L_indices[k]
             if row > j:
                 y[row] -= L_data[k] * yj
 
-    # Обратный ход (U x = y)
+    # U x = y
     x = y
     for j in range(n - 1, -1, -1):
         start = U_indptr[j]
         end = U_indptr[j+1]
         
-        # Поиск диагонали в U.
-        # Т.к. U верхнетреугольная CSC, диагональный элемент - последний в столбце.
-        # (если сортировка соблюдена). Проверим это предположение.
-        # Если сортировка есть, indices[end-1] == j.
-        # Это короткий цикл.
-        
         ujj = 0.0
-        diag_idx = -1
-        
-        # Оптимизация: идем с конца, диагональ обычно внизу столбца U
+        # Ищем диагональ с конца (обычно она там)
         for k in range(end - 1, start - 1, -1):
             if U_indices[k] == j:
                 ujj = U_data[k]
@@ -154,7 +152,6 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
         x[j] /= ujj
         xj = x[j]
         
-        # Вычитаем из верхних строк
         for k in range(start, end):
             row = U_indices[k]
             if row < j:
@@ -177,7 +174,6 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
         start = U_indptr[j]
         end = U_indptr[j+1]
         diag_found = False
-        # Диагональ в U обычно последняя
         if end > start and U_indices[end-1] == j:
              det *= U_data[end-1]
              diag_found = True
