@@ -21,16 +21,7 @@ class CSRMatrix(Matrix):
     def _add_impl(self, other: 'CSRMatrix') -> 'CSRMatrix':
         """Сложение CSR матриц."""
         res_coo = self._to_coo() + other._to_coo()
-
-        from COO import COOMatrix
-        clean_data, clean_row, clean_col = [], [], []
-        for d, r, c in zip(res_coo.data, res_coo.row, res_coo.col):
-            if abs(d) > TOLERANCE:
-                clean_data.append(d)
-                clean_row.append(r)
-                clean_col.append(c)
-
-        return COOMatrix(clean_data, clean_row, clean_col, self.shape)._to_csr()
+        return res_coo._to_csr()
 
     def _mul_impl(self, scalar: float) -> 'CSRMatrix':
         """Умножение CSR на скаляр."""
