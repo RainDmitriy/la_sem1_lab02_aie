@@ -14,25 +14,16 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     u_data, u_indices, u_indptr = [], [], [0]
 
     spa = [0] * A.shape[0]
-    occupied = [False] * A.shape[0]
-
     for j in range(A.shape[0]):
-        curr_occupied = []
-        for k in range(A.indptr[j], A.indptr[j+1]):
-            row = A.indices[k]
-            spa[row] = A.data[k]
-            occupied[row] = True
-            curr_occupied.append(row)
+        for k in range(A.indptr[j], A.indptr[j + 1]):
+            spa[A.indices[k]] = A.data[k]
 
         for i in range(j):
             if spa[i] != 0:
                 pivot = spa[i]
-                for k in range(l_indptr[i], l_indptr[i+1]):
+                for k in range(l_indptr[i], l_indptr[i + 1]):
                     row_l = l_indices[k]
                     spa[row_l] -= pivot * l_data[k]
-
-        if spa[j] == 0:
-            return None
 
         for i in range(j + 1):
             if spa[i] != 0:
@@ -41,19 +32,21 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                 spa[i] = 0
 
         u_diag = u_data[-1]
+        if u_diag == 0:
+            return None
 
-        for i in range(j + 1, A.shape[0]):
+        for i in range(j + 1, n):
             if spa[i] != 0:
                 l_data.append(spa[i] / u_diag)
                 l_indices.append(i)
                 spa[i] = 0
-        
+
         u_indptr.append(len(u_data))
         l_indptr.append(len(l_data))
 
     return (
         CSCMatrix(l_data, l_indices, l_indptr, A.shape),
-        CSCMatrix(u_data, u_indices, u_indptr, A.shape)
+        CSCMatrix(u_data, u_indices, u_indptr, A.shape),
     )
 
 
@@ -81,7 +74,7 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
 
         if elem_to_devide == 0:
             return None
-        
+
         x[i] /= elem_to_devide
 
         for k in range(u.indptr[i], u.indptr[i + 1]):

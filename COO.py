@@ -16,7 +16,7 @@ class COOMatrix(Matrix):
             matrix[self.row[i]][self.col[i]] = self.data[i]
         return matrix
 
-    def _add_impl(self, other: 'Matrix') -> 'Matrix':
+    def _add_impl(self, other: "Matrix") -> "Matrix":
         """Сложение COO матриц."""
         coords = {}
 
@@ -37,25 +37,25 @@ class COOMatrix(Matrix):
 
         return COOMatrix(ans_data, ans_row, ans_col, self.shape)
 
-    def _mul_impl(self, scalar: float) -> 'Matrix':
+    def _mul_impl(self, scalar: float) -> "Matrix":
         """Умножение COO на скаляр."""
         for i in range(len(self.data)):
             self.data[i] *= scalar
         return self
 
-    def transpose(self) -> 'Matrix':
+    def transpose(self) -> "Matrix":
         """Транспонирование COO матрицы."""
         self.row, self.col = self.col, self.row
         return self
 
-    def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
+    def _matmul_impl(self, other: "Matrix") -> "Matrix":
         """Умножение COO матриц."""
         ans: DenseMatrix = []
         for i in range(self.shape[0]):
             ans.append([0] * other.shape[1])
         self_dense = self.to_dense()
         other_dense = other.to_dense()
-        
+
         for m in range(self.shape[0]):
             for k in range(other.shape[1]):
                 x = 0
@@ -66,7 +66,7 @@ class COOMatrix(Matrix):
         return COOMatrix.from_dense(ans)
 
     @classmethod
-    def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
+    def from_dense(cls, dense_matrix: DenseMatrix) -> "COOMatrix":
         """Создание COO из плотной матрицы."""
         data, row, col = [], [], []
         shape = (len(dense_matrix), len(dense_matrix[0]))
@@ -79,46 +79,46 @@ class COOMatrix(Matrix):
                     col.append(c)
         return cls(data, row, col, shape)
 
-    def _to_csc(self) -> 'CSCMatrix':
+    def _to_csc(self) -> "CSCMatrix":
         """
         Преобразование COOMatrix в CSCMatrix.
         """
         from CSC import CSCMatrix
+
         items = sorted(zip(self.row, self.col, self.data), key=lambda x: (x[1], x[0]))
-        
+
         new_data = []
         new_indices = []
         indptr = [0] * (self.shape[1] + 1)
-        
+
         for r, c, v in items:
             new_data.append(v)
             new_indices.append(r)
             indptr[c + 1] += 1
-            
+
         for j in range(self.shape[1]):
             indptr[j + 1] += indptr[j]
-            
+
         return CSCMatrix(new_data, new_indices, indptr, self.shape)
 
-
-    def _to_csr(self) -> 'CSRMatrix':
+    def _to_csr(self) -> "CSRMatrix":
         """
         Преобразование COOMatrix в CSRMatrix.
         """
         from CSR import CSRMatrix
 
         items = sorted(zip(self.row, self.col, self.data))
-        
+
         new_data = []
         new_indices = []
         indptr = [0] * (self.shape[0] + 1)
-        
+
         for r, c, v in items:
             new_data.append(v)
             new_indices.append(c)
             indptr[r + 1] += 1
-        
+
         for i in range(self.shape[0]):
             indptr[i + 1] += indptr[i]
-            
+
         return CSRMatrix(new_data, new_indices, indptr, self.shape)

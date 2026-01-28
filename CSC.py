@@ -3,7 +3,9 @@ from type1 import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 
 
 class CSCMatrix(Matrix):
-    def __init__(self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape):
+    def __init__(
+        self, data: CSCData, indices: CSCIndices, indptr: CSCIndptr, shape: Shape
+    ):
         self.shape = shape
         self.data = data
         self.indices = indices
@@ -19,8 +21,8 @@ class CSCMatrix(Matrix):
                 val = self.data[k]
                 dense[row_idx][j] = val
         return dense
-    
-    def _add_impl(self, other: 'Matrix') -> 'Matrix':
+
+    def _add_impl(self, other: "Matrix") -> "Matrix":
         """Сложение CSC матриц."""
         from COO import COOMatrix
 
@@ -31,28 +33,28 @@ class CSCMatrix(Matrix):
 
         return ans._to_csc()
 
-
-    def _mul_impl(self, scalar: float) -> 'Matrix':
+    def _mul_impl(self, scalar: float) -> "Matrix":
         """Умножение CSC на скаляр."""
         for i in range(len(self.data)):
             self.data[i] *= scalar
         return self
-    
-    def transpose(self) -> 'Matrix':
+
+    def transpose(self) -> "Matrix":
         """
         Транспонирование CSC матрицы.
         Hint:
         Результат - в CSR формате (с теми же данными, но с интерпретацией строк как столбцов).
         """
         from CSR import CSRMatrix
+
         transposed = CSRMatrix(self.data, self.indices, self.indptr, self.shape[::-1])
         return transposed
 
-    def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
+    def _matmul_impl(self, other: "Matrix") -> "Matrix":
         """Умножение CSC матриц."""
         rows_A, cols_A = self.shape
         cols_B = other.shape[1]
-        
+
         res_data = []
         res_indices = []
         res_indptr = [0]
@@ -61,11 +63,11 @@ class CSCMatrix(Matrix):
         occupied = []
 
         for j in range(cols_B):
-            for k_idx in range(other.indptr[j], other.indptr[j+1]):
+            for k_idx in range(other.indptr[j], other.indptr[j + 1]):
                 k = other.indices[k_idx]
                 val_B = other.data[k_idx]
 
-                for a_idx in range(self.indptr[k], self.indptr[k+1]):
+                for a_idx in range(self.indptr[k], self.indptr[k + 1]):
                     row_A = self.indices[a_idx]
                     if spa[row_A] == 0:
                         occupied.append(row_A)
@@ -77,25 +79,25 @@ class CSCMatrix(Matrix):
                     res_data.append(spa[row])
                     res_indices.append(row)
                     spa[row] = 0
-            
+
             res_indptr.append(len(res_data))
             occupied = []
 
         return CSCMatrix(res_data, res_indices, res_indptr, (rows_A, cols_B))
 
     @classmethod
-    def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':
+    def from_dense(cls, dense_matrix: DenseMatrix) -> "CSCMatrix":
         """Создание CSC из плотной матрицы."""
         rows = len(dense_matrix)
         if rows > 0:
             cols = len(dense_matrix[0])
         else:
             cols = 0
-        
+
         data = []
         indices = []
         indptr = [0]
-        
+
         cumulative_count = 0
         for c in range(cols):
             for r in range(rows):
@@ -105,14 +107,15 @@ class CSCMatrix(Matrix):
                     indices.append(r)
                     cumulative_count += 1
             indptr.append(cumulative_count)
-            
+
         return cls(data, indices, indptr, (rows, cols))
 
-    def _to_csr(self) -> 'CSRMatrix':
+    def _to_csr(self) -> "CSRMatrix":
         """
         Преобразование CSCMatrix в CSRMatrix.
         """
         from CSR import CSRMatrix
+
         ans_data = []
         ans_indices = []
         ans_indptr = [0]
@@ -143,16 +146,16 @@ class CSCMatrix(Matrix):
         ans = CSRMatrix(ans_data, ans_indices, ans_indptr, self.shape)
         return ans
 
-    def _to_coo(self) -> 'COOMatrix':
+    def _to_coo(self) -> "COOMatrix":
         """
         Преобразование CSCMatrix в COOMatrix.
         """
         from COO import COOMatrix
+
         data, row, col = [], [], []
         for c in range(self.shape[1]):
-            for j in range(self.indptr[c], self.indptr[c+1]):
+            for j in range(self.indptr[c], self.indptr[c + 1]):
                 data.append(self.data[j])
                 col.append(c)
                 row.append(self.indices[j])
         return COOMatrix(data, row, col, self.shape)
-
