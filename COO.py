@@ -129,11 +129,25 @@ class COOMatrix(Matrix):
         from CSR import CSRMatrix
 
         s = sorted(zip(self.row, self.col, self.data))
-        d = [x[2] for x in s]
-        ind = [x[1] for x in s]
+        
+        merged = []
+        if s:
+            curr_r, curr_c, curr_v = s[0]
+            for r, c, v in s[1:]:
+                if r == curr_r and c == curr_c:
+                    curr_v += v
+                else:
+                    if curr_v != 0:
+                        merged.append((curr_r, curr_c, curr_v))
+                    curr_r, curr_c, curr_v = r, c, v
+            if curr_v != 0:
+                merged.append((curr_r, curr_c, curr_v))
+
+        d = [x[2] for x in merged]
+        ind = [x[1] for x in merged]
         ptr = [0] * (self.shape[0] + 1)
 
-        for r, _, _ in s:
+        for r, _, _ in merged:
             ptr[r + 1] += 1
 
         for i in range(self.shape[0]):
