@@ -65,14 +65,16 @@ class CSCMatrix(Matrix):
         sorted_data = [e[2] for e in elements]
 
         new_shape = (cols, rows)
-        new_rows = cols
-        indptr = [0] * (new_rows + 1)
-        for r in sorted_row:
-            indptr[r + 1] += 1
-        for i in range(1, new_rows + 1):
+        new_cols = rows
+
+        indptr = [0] * (new_cols + 1)
+        for c in sorted_col:
+            indptr[c + 1] += 1
+
+        for i in range(1, new_cols + 1):
             indptr[i] += indptr[i - 1]
 
-        return CSRMatrix(sorted_data, sorted_col, indptr, new_shape)
+        return CSCMatrix(sorted_data, sorted_row, indptr, new_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""

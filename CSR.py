@@ -72,7 +72,7 @@ class CSRMatrix(Matrix):
         for i in range(1, cols + 1):
             indptr[i] += indptr[i - 1]
 
-        return CSCMatrix(sorted_data, sorted_row, indptr, (cols, rows))
+        return CSRMatrix(sorted_data, sorted_row, indptr, (cols, rows))
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSR матриц."""
