@@ -4,7 +4,6 @@ from CSR import CSRMatrix
 from my_types import Vector
 from typing import Tuple, Optional
 
-
 def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     # Decompose A into L and U
     matrix = A.to_dense()
@@ -24,7 +23,6 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
 
     return CSCMatrix.from_dense(L), CSCMatrix.from_dense(U)
 
-
 def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     # Solve Ax = b via LU
     res = lu_decomposition(A)
@@ -42,7 +40,6 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
         if U[i][i] == 0: return None
         x[i] = (y[i] - sum(U[i][k] * x[k] for k in range(i + 1, n))) / U[i][i]
     return x
-
 
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
     # det(A) = det(L) * det(U)
