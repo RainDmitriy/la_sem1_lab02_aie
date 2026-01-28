@@ -26,7 +26,7 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
 
         for j in range(i + 1, A.shape[0]):
             if u[i][i] == 0:
-                raise ValueError("нулевой главный минор")
+                return None
             val_l = A_dense[j][i]
             for k in range(i):
                 val_l -= l[j][k] * u[k][i]
@@ -59,7 +59,7 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
         
         elem_to_devide = elem_from_csc(u, i, i)
         if elem_to_devide == 0:
-            raise ValueError("нулевой главный минор")
+            return None
 
         x[i] = val_x / elem_to_devide
 
@@ -82,19 +82,11 @@ def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
 
 
 def elem_from_csc(csc_format: CSCMatrix, row: int, col: int) -> float:
-    if row > csc_format.shape[0] - 1 or col > csc_format.shape[1] - 1:
-        raise ValueError("no elem")
-
-    my_data = csc_format.data[csc_format.indptr[col] : csc_format.indptr[col + 1]]
-    my_col = csc_format.indices[csc_format.indptr[col] : csc_format.indptr[col + 1]]
-
-    data_index = -1
-    for index in range(len(my_col)):
-        if my_col[index] == row:
-            data_index = index
-            break
-
-    if data_index == -1:
-        return 0
-
-    return my_data[data_index]
+    start = csc_format.indptr[col]
+    end = csc_format.indptr[col + 1]
+    
+    for i in range(start, end):
+        if csc_format.indices[i] == row:
+            return csc_format.data[i]
+            
+    return 0
