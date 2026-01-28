@@ -19,6 +19,8 @@ class COOMatrix(Matrix):
     def to_dense(self) -> DenseMatrix:
         """Преобразует COO в плотную матрицу."""
         rows, cols = self.shape
+        if rows * cols > 10000:
+            raise ValueError("Матрица слишком большая для плотного представления")
         dense = [[0 for _ in range(cols)] for _ in range(rows)]
         for i, j, value in self.iter_nonzero():
             dense[i][j] += value
@@ -50,12 +52,12 @@ class COOMatrix(Matrix):
         """Умножение COO на скаляр."""
         data, row, col = [], [], []
 
-        for i, j, v in self.iter_nonzero():
+        for idx, v in enumerate(self.data):
             new_v = v * scalar
             if abs(new_v) > 1e-10:
                 data.append(new_v)
-                row.append(i)
-                col.append(j)
+                row.append(self.row[idx])
+                col.append(self.col[idx])
 
         return COOMatrix(data, row, col, self.shape)
 
@@ -75,29 +77,13 @@ class COOMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение COO матриц."""
-        if not isinstance(other, COOMatrix):
-            other = COOMatrix.from_dense(other.to_dense())
-
-        first_rows, first_cols = self.shape
-        second_rows, second_cols = other.shape
-
-        mult_res = {}
-
-        for i1, j1, v1 in self.iter_nonzero():
-            for i2, j2, v2 in other.iter_nonzero():
-                if j1 == i2:
-                    key = (i1, j2)
-                    mult_res[key] = mult_res.get(key, 0) + v1 * v2
-
-        data, row, col = [], [], []
-        for (i, j), v in mult_res.items():
-            if v != 0:
-                data.append(v)
-                row.append(i)
-                col.append(j)
-
-        new_shape = (first_rows, second_cols)
-        return COOMatrix(data, row, col, new_shape)
+        if self.shape[1] != other.shape[0]:
+            raise ValueError("Несовместимые размеры")
+    
+        csr_self = self._to_csr()
+        csr_other = other._to_csr() if not isinstance(other, COOMatrix) else other._to_csr()
+        result_csr = csr_self._matmul_impl(csr_other)
+        return result_csr._to_coo()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
