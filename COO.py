@@ -51,17 +51,19 @@ class COOMatrix(Matrix):
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение COO матриц."""
         ans: DenseMatrix = []
-        for i in range(other.shape[1]):
-            ans.append([0] * self.shape[0])
-        self.to_dense()
-        other.to_dense()
+        for i in range(self.shape[0]):
+            ans.append([0] * other.shape[1])
+        self_dense = self.to_dense()
+        other_dense = other.to_dense()
+        
         for m in range(self.shape[0]):
             for k in range(other.shape[1]):
                 x = 0
                 for n in range(self.shape[1]):
-                    x += self.denseMatrix[m][n] * other.denseMatrix[n][k]
+                    x += self_dense[m][n] * other_dense[n][k]
                 ans[m][k] = x
-        return self.from_dense(ans)
+
+        return COOMatrix.from_dense(ans)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':

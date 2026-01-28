@@ -145,4 +145,3 @@ if __name__ == "__main__":
 
     csr_sum = csr1 + csr2
     print(csr_sum.data, csr_sum.indices, csr_sum.indptr, csr_sum.shape)
-

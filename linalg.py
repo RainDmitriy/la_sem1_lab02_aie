@@ -55,7 +55,12 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
         val_x = y[i]
         for k in range(i + 1, u.shape[0]):
             val_x -= elem_from_csc(u, i, k) * x[k]
-        x[i] = val_x / elem_from_csc(u, i, i)
+        
+        elem_to_devide = elem_from_csc(u, i, i)
+        if elem_to_devide == 0:
+            raise ValueError
+
+        x[i] = val_x / elem_to_devide
 
     return x
 
