@@ -126,10 +126,7 @@ class CSRMatrix(Matrix):
     
 
     def transpose(self) -> 'Matrix':
-        from CSC import CSCMatrix
-        csc = self._to_csc()
-        n_rows, n_cols = self.shape
-        return CSCMatrix(list(csc.data), list(csc.indices), list(csc.indptr), (n_cols, n_rows))
+        return self._to_coo().transpose()._to_csc()
         
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
