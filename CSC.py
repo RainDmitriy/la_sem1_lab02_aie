@@ -1,4 +1,5 @@
 from base import Matrix
+from collections import defaultdict
 from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 
 class CSCMatrix(Matrix):
@@ -76,22 +77,32 @@ class CSCMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
-        dense_self = self.to_dense()
-        dense_other = other.to_dense()
+        from COO import COOMatrix
+        if self.shape[1] != other.shape[0]:
+            raise ValueError("Несовместимые размеры для умножения")
 
-        rows_a, cols_a = self.shape
+        other_cols = defaultdict(list)
         rows_b, cols_b = other.shape
+        for col in range(cols_b):
+            for idx in range(other.indptr[col], other.indptr[col + 1]):
+                row = other.indices[idx]
+                val = other.data[idx]
+                other_cols[row].append((col, val))
 
-        result = [[0.0] * cols_b for _ in range(rows_a)]
+        data, row, col = [], [], []
 
-        for i in range(rows_a):
-            for j in range(cols_a):
-                if dense_self[i][j] != 0:
-                    for k in range(cols_b):
-                        if dense_other[j][k] != 0:
-                            result[i][k] += dense_self[i][j] * dense_other[j][k]
+        for col_a in range(self.shape[1]):
+            for idx_a in range(self.indptr[col_a], self.indptr[col_a + 1]):
+                row_a = self.indices[idx_a]
+                val_a = self.data[idx_a]
+                for col_b, val_b in other_cols.get(row_a, []):
+                    # добавляем результат
+                    key = (row_a, col_b)
+                    data.append(val_a * val_b)
+                    row.append(self.indices[idx_a])
+                    col.append(col_b)
 
-        return CSCMatrix.from_dense(result)
+        return COOMatrix(data, row, col, (self.shape[0], other.shape[1]))._to_csc()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':

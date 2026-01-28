@@ -1,5 +1,6 @@
 from base import Matrix
 from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
+from collections import defaultdict
 
 class CSRMatrix(Matrix):
     def __init__(self, data: CSRData, indices: CSRIndices, indptr: CSRIndptr, shape: Shape):
@@ -51,22 +52,31 @@ class CSRMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSR матриц."""
-        dense_self = self.to_dense()
-        dense_other = other.to_dense()
+        from COO import COOMatrix
+        if self.shape[1] != other.shape[0]:
+            raise ValueError("Несовместимые размеры для умножения")
 
-        rows_a, cols_a = self.shape
+            # Строим COO-подобное представление другой CSR
+        other_rows = defaultdict(list)
         rows_b, cols_b = other.shape
+        for row in range(rows_b):
+            for idx in range(other.indptr[row], other.indptr[row + 1]):
+                col = other.indices[idx]
+                val = other.data[idx]
+                other_rows[row].append((col, val))
 
-        result = [[0.0] * cols_b for _ in range(rows_a)]
+        data, row, col = [], [], []
 
-        for i in range(rows_a):
-            for j in range(cols_a):
-                if dense_self[i][j] != 0:
-                    for k in range(cols_b):
-                        if dense_other[j][k] != 0:
-                            result[i][k] += dense_self[i][j] * dense_other[j][k]
+        for row_a in range(self.shape[0]):
+            for idx_a in range(self.indptr[row_a], self.indptr[row_a + 1]):
+                col_a = self.indices[idx_a]
+                val_a = self.data[idx_a]
+                for col_b, val_b in other_rows.get(col_a, []):
+                    data.append(val_a * val_b)
+                    row.append(row_a)
+                    col.append(col_b)
 
-        return CSRMatrix.from_dense(result)
+        return COOMatrix(data, row, col, (self.shape[0], other.shape[1]))._to_csr()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':

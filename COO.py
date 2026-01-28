@@ -1,4 +1,5 @@
 from base import Matrix
+from collections import defaultdict
 from type import COOData, COORows, COOCols, Shape, DenseMatrix
 
 class COOMatrix(Matrix):
@@ -57,15 +58,20 @@ class COOMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение COO матриц."""
-        result = {}
-        for v1, r1, c1 in zip(self.data, self.row, self.col):
-            for v2, r2, c2 in zip(other.data, other.row, other.col):
-                if c1 == r2:
-                    result[(r1, c2)] = result.get((r1, c2), 0) + v1 * v2
+        if self.shape[1] != other.shape[0]:
+            raise ValueError("Несовместимые размеры для умножения")
 
-        data = []
-        row = []
-        col = []
+        other_row_dict = defaultdict(list)
+        for v, r, c in zip(other.data, other.row, other.col):
+            other_row_dict[r].append((c, v))
+
+        result = defaultdict(float)
+
+        for v1, r1, c1 in zip(self.data, self.row, self.col):
+            for c2, v2 in other_row_dict.get(c1, []):
+                result[(r1, c2)] += v1 * v2
+
+        data, row, col = [], [], []
         for (r, c), v in result.items():
             if v != 0:
                 data.append(v)
