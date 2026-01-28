@@ -79,9 +79,13 @@ def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
                 new_indices.append(U_indices[p2])
                 p2 += 1
 
-            for pos in range(len(new_data)):
-                U_data[col_j_start + pos] = new_data[pos]
-                U_indices[col_j_start + pos] = new_indices[pos]
+            if len(new_data) > U_indptr[j + 1] - col_j_start:
+                U_data[col_j_start: col_j_start + len(new_data)] = new_data
+                U_indices[col_j_start: col_j_start + len(new_data)] = new_indices
+            else:
+                for pos in range(len(new_data)):
+                    U_data[col_j_start + pos] = new_data[pos]
+                    U_indices[col_j_start + pos] = new_indices[pos]
 
     L_data_full = []
     L_indices_full = []
