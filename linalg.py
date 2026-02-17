@@ -1,5 +1,5 @@
-from lab2_linal.la_sem1_lab02_aie.CSC import CSCMatrix
-from lab2_linal.la_sem1_lab02_aie.CSR import CSRMatrix
+from CSC import CSCMatrix
+from CSR import CSRMatrix
 from type import Vector
 from typing import Tuple, Optional
 

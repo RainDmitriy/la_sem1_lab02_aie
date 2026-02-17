@@ -234,6 +234,6 @@ class CSRMatrix(Matrix):
             end = self.indptr[i + 1]
             for p in range(start, end):
                 data_list.append(self.data[p])
-                row_list.append(i
+                row_list.append(i)
                 col_list.append(self.indices[p])
         return COOMatrix(data_list, row_list, col_list, (m, n))
