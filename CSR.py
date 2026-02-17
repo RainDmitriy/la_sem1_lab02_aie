@@ -4,8 +4,8 @@ from base import Matrix
 from type import CSRData, CSRIndices, CSRIndptr, Shape, DenseMatrix
 
 if TYPE_CHECKING:
-    from lab2_linal.la_sem1_lab02_aie.COO import COOMatrix
-    from lab2_linal.la_sem1_lab02_aie.CSC import CSCMatrix
+    from COO import COOMatrix
+    from CSC import CSCMatrix
 
 
 class CSRMatrix(Matrix):
@@ -109,7 +109,7 @@ class CSRMatrix(Matrix):
         Hint:
         Результат - в CSC формате (с теми же данными, но с интерпретацией столбцов как строк).
         """
-        from lab2_linal.la_sem1_lab02_aie.CSC import CSCMatrix
+        from CSC import CSCMatrix
         m, n = self.shape
         new_rows, new_cols = n, m
         col_counts: list[int] = [0] * new_cols
@@ -193,7 +193,7 @@ class CSRMatrix(Matrix):
         """
         Преобразование CSRMatrix в CSCMatrix.
         """
-        from lab2_linal.la_sem1_lab02_aie.CSC import CSCMatrix
+        from CSC import CSCMatrix
         m, n = self.shape
         col_counts: List[int] = [0] * n
         for i in range(m):
@@ -224,7 +224,7 @@ class CSRMatrix(Matrix):
         """
         Преобразование CSRMatrix в COOMatrix.
         """
-        from lab2_linal.la_sem1_lab02_aie.COO import COOMatrix
+        from COO import COOMatrix
         m, n = self.shape
         data_list: List[float] = []
         row_list: List[int] = []

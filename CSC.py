@@ -3,7 +3,7 @@ from type import CSCData, CSCIndices, CSCIndptr, Shape, DenseMatrix
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from lab2_linal.la_sem1_lab02_aie.COO import COOMatrix
+    from COO import COOMatrix
     from CSR import CSRMatrix
 
 
@@ -220,7 +220,7 @@ class CSCMatrix(Matrix):
         """
         Преобразование CSCMatrix в COOMatrix.
         """
-        from lab2_linal.la_sem1_lab02_aie.COO import COOMatrix
+        from COO import COOMatrix
         rows, cols = self.shape
         data_list: list[float] = []
         row_indices: list[int] = []
