@@ -5,156 +5,169 @@ from type import COOData, COORows, COOCols, Shape, DenseMatrix
 class COOMatrix(Matrix):
     def __init__(self, data: COOData, row: COORows, col: COOCols, shape: Shape):
         super().__init__(shape)
-        self.data = data
-        self.row = row
-        self.col = col
-        self.shape = shape
+        self.values = data
+        self.row_indices = row
+        self.col_indices = col
+        self.matrix_shape = shape
 
     def to_dense(self) -> DenseMatrix:
-        """Преобразует COO в плотную матрицу."""
-        n, m = self.shape
-        dense_matrix = [[0] * m for _ in range(n)]
-
-        k = len(self.row)
-        for i in range(k):
-            col, row, val = self.col[i], self.row[i], self.data[i]
-            dense_matrix[row][col] = val
-
+        """Преобразует COO в плотную матрицу"""
+        rows_count, cols_count = self.matrix_shape
+        dense_matrix = [[0] * cols_count for _ in range(rows_count)]
+        
+        elements_count = len(self.row_indices)
+        for position in range(elements_count):
+            column = self.col_indices[position]
+            row = self.row_indices[position]
+            value = self.values[position]
+            dense_matrix[row][column] = value
+            
         return dense_matrix
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
-        """Сложение COO матриц."""
-        all_row = self.row + other.row
-        all_col = self.col + other.col
-        all_val = self.data + other.data
-
-        merged_coords = dict()
-        for r, c, v in zip(all_row, all_col, all_val):
-            key = (r, c)
-            merged_coords[key] = merged_coords.get(key, 0) + v
-            sum_row, sum_col, sum_val = list(), list(), list()
-            for (row, col), val in sorted(merged_coords.items()):
-                if val != 0:
-                    sum_row.append(row)
-                    sum_col.append(col)
-                    sum_val.append(val)
-
-        return COOMatrix(sum_val, sum_row, sum_col, self.shape)
+        """Сложение COO матриц"""
+        all_rows = self.row_indices + other.row_indices
+        all_columns = self.col_indices + other.col_indices
+        all_values = self.values + other.values
+        
+        merged_elements = dict()
+        
+        for row, column, value in zip(all_rows, all_columns, all_values):
+            key = (row, column)
+            merged_elements[key] = merged_elements.get(key, 0) + value
+            
+        result_rows, result_columns, result_values = [], [], []
+        
+        for (row, column), value in sorted(merged_elements.items()):
+            if value != 0:
+                result_rows.append(row)
+                result_columns.append(column)
+                result_values.append(value)
+                
+        return COOMatrix(result_values, result_rows, result_columns, self.matrix_shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
-        """Умножение COO на скаляр."""
+        """Умножение COO на скаляр"""
         if scalar == 0:
-            return COOMatrix(list(), list(), list(), self.shape)
-
-        new_data = [x * scalar for x in self.data]
-
-        return COOMatrix(new_data, self.row, self.col, self.shape)
+            return COOMatrix([], [], [], self.matrix_shape)
+            
+        scaled_values = [element * scalar for element in self.values]
+        return COOMatrix(scaled_values, self.row_indices, self.col_indices, self.matrix_shape)
 
     def transpose(self) -> 'Matrix':
-        """Транспонирование COO матрицы."""
-        data = list()
-        for r, c, v in zip(self.row, self.col, self.data):
-            data.append([c, r, v])
-
-        data.sort(key=lambda x: x[0])
-
-        new_row, new_col, new_val = list(), list(), list()
-        new_shape = (self.shape[1], self.shape[0])
-        for r, c, v in data:
-            new_row.append(r)
-            new_col.append(c)
-            new_val.append(v)
-
-        return COOMatrix(new_val, new_row, new_col, new_shape)
+        """Транспонирование COO"""
+        triplets = []
+        
+        for row, column, value in zip(self.row_indices, self.col_indices, self.values):
+            triplets.append([column, row, value])
+            
+        triplets.sort(key=lambda element: element[0])
+        
+        transposed_rows, transposed_columns, transposed_values = [], [], []
+        transposed_shape = (self.matrix_shape[1], self.matrix_shape[0])
+        
+        for row, column, value in triplets:
+            transposed_rows.append(row)
+            transposed_columns.append(column)
+            transposed_values.append(value)
+            
+        return COOMatrix(transposed_values, transposed_rows, transposed_columns, transposed_shape)
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
-        """Умножение COO матриц."""
-        n = self.shape[0]
-        k = other.shape[1]
-        new_row, new_col, new_val = list(), list(), list()
-        new_shape = (n, k)
-
-        merged_coords = dict()
-        for r_1, c_1, v_1 in zip(self.row, self.col, self.data):
-            for r_2, c_2, v_2 in zip(other.row, other.col, other.data):
-                if c_1 == r_2:
-                    key = (r_1, c_2)
-                    merged_coords[key] = merged_coords.get(key, 0) + v_1 * v_2
-
-        for (r, c), v in merged_coords.items():
-            if v != 0:
-                new_row.append(r)
-                new_col.append(c)
-                new_val.append(v)
-
-        return COOMatrix(new_val, new_row, new_col, new_shape)
+        """Умножение COO матриц"""
+        result_rows_count = self.matrix_shape[0]
+        result_columns_count = other.matrix_shape[1]
+        
+        result_rows, result_columns, result_values = [], [], []
+        result_shape = (result_rows_count, result_columns_count)
+        
+        product_elements = dict()
+        
+        for row_self, column_self, value_self in zip(self.row_indices, self.col_indices, self.values):
+            for row_other, column_other, value_other in zip(other.row_indices, other.col_indices, other.values):
+                if column_self == row_other:
+                    key = (row_self, column_other)
+                    product_elements[key] = product_elements.get(key, 0) + value_self * value_other
+                    
+        for (row, column), value in product_elements.items():
+            if value != 0:
+                result_rows.append(row)
+                result_columns.append(column)
+                result_values.append(value)
+                
+        return COOMatrix(result_values, result_rows, result_columns, result_shape)
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'COOMatrix':
-        """Создание COO из плотной матрицы."""
-        n, m = len(dense_matrix), len(dense_matrix[0])
-        shape = (n, m)
-        rows, cols, val = list(), list(), list()
-
-        for i in range(n):
-            for j in range(m):
-                if dense_matrix[i][j] != 0:
-                    rows.append(i)
-                    cols.append(j)
-                    val.append(dense_matrix[i][j])
-
-        return COOMatrix(val, rows, cols, shape)
+        """Создание COO из плотной матрицы"""
+        rows_count = len(dense_matrix)
+        columns_count = len(dense_matrix[0])
+        matrix_shape = (rows_count, columns_count)
+        
+        rows, columns, values = [], [], []
+        
+        for row_index in range(rows_count):
+            for column_index in range(columns_count):
+                current_value = dense_matrix[row_index][column_index]
+                if current_value != 0:
+                    rows.append(row_index)
+                    columns.append(column_index)
+                    values.append(current_value)
+                    
+        return COOMatrix(values, rows, columns, matrix_shape)
 
     def _to_csc(self) -> 'CSCMatrix':
         """
-        Преобразование COOMatrix в CSCMatrix.
+        Преобразование COO в CSC
         """
         from CSC import CSCMatrix
-
-        all_to_sort = list(zip(self.row, self.col, self.data))
-        all_to_sort.sort(key=lambda x: x[1])
-
-        if all_to_sort:
-            sorted_rows, sorted_cols, sorted_data = zip(*all_to_sort)
+        
+        elements_to_sort = list(zip(self.row_indices, self.col_indices, self.values))
+        elements_to_sort.sort(key=lambda element: element[1])
+        
+        if elements_to_sort:
+            sorted_rows, sorted_columns, sorted_values = zip(*elements_to_sort)
         else:
-            sorted_rows, sorted_cols, sorted_data = [], [], []
-
-        data = list(sorted_data)
-        indices = list(sorted_rows)
-        n = self.shape[1]
-        indptr = [0] * (n + 1)
-
-        for i in sorted_cols:
-            indptr[i + 1] += 1
-
-        for i in range(n):
-            indptr[i + 1] += indptr[i]
-
-        return CSCMatrix(data, indices, indptr, self.shape)
+            sorted_rows, sorted_columns, sorted_values = [], [], []
+            
+        csc_data = list(sorted_values)
+        csc_indices = list(sorted_rows)
+        
+        columns_count = self.matrix_shape[1]
+        csc_indptr = [0] * (columns_count + 1)
+        
+        for column_index in sorted_columns:
+            csc_indptr[column_index + 1] += 1
+            
+        for column_position in range(columns_count):
+            csc_indptr[column_position + 1] += csc_indptr[column_position]
+            
+        return CSCMatrix(csc_data, csc_indices, csc_indptr, self.matrix_shape)
 
     def _to_csr(self) -> 'CSRMatrix':
         """
-        Преобразование COOMatrix в CSRMatrix.
+        Преобразование COO в CSR
         """
         from CSR import CSRMatrix
-
-        all_to_sort = list(zip(self.row, self.col, self.data))
-        all_to_sort.sort()
-
-        if all_to_sort:
-            sorted_rows, sorted_cols, sorted_data = zip(*all_to_sort)
+        
+        elements_to_sort = list(zip(self.row_indices, self.col_indices, self.values))
+        elements_to_sort.sort()
+        
+        if elements_to_sort:
+            sorted_rows, sorted_columns, sorted_values = zip(*elements_to_sort)
         else:
-            sorted_rows, sorted_cols, sorted_data = [], [], []
-
-        data = list(sorted_data)
-        indices = list(sorted_cols)
-        n = self.shape[0]
-        indptr = [0] * (n + 1)
-
-        for i in sorted_rows:
-            indptr[i + 1] += 1
-
-        for i in range(n):
-            indptr[i + 1] += indptr[i]
-
-        return CSRMatrix(data, indices, indptr, self.shape)
+            sorted_rows, sorted_columns, sorted_values = [], [], []
+            
+        csr_data = list(sorted_values)
+        csr_indices = list(sorted_columns)
+        
+        rows_count = self.matrix_shape[0]
+        csr_indptr = [0] * (rows_count + 1)
+        
+        for row_index in sorted_rows:
+            csr_indptr[row_index + 1] += 1
+            
+        for row_position in range(rows_count):
+            csr_indptr[row_position + 1] += csr_indptr[row_position]
+            
+        return CSRMatrix(csr_data, csr_indices, csr_indptr, self.matrix_shape)

@@ -4,161 +4,175 @@ from type import Vector
 from typing import Tuple, Optional
 
 
-def lu_decomposition(A: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
+def lu_decomposition(matrix: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]:
     """
     LU-разложение для CSC матрицы
-    Возвращает (L, U) - нижнюю и верхнюю треугольные матрицы
+    Возвращает нижнюю и верхнюю треугольные матрицы(L,U)
     Ожидается, что матрица L хранит единицы на главной диагонали
     """
-    n, m = A.shape
-    if n != m:
+    rows_count, columns_count = matrix.matrix_shape
+    if rows_count != columns_count:
         return None
-
-    row_adj = [dict() for _ in range(n)]
-    col_adj = [dict() for _ in range(n)]
-    for c in range(m):
-        for k in range(A.indptr[c], A.indptr[c + 1]):
-             r = A.indices[k]
-             val = A.data[k]
-             row_adj[r][c] = val
-             col_adj[c][r] = val
-    L_triplets = []
-    U_triplets = []
-    for k in range(n):
-        pivot = col_adj[k].get(k, 0.0)
-        if pivot == 0:
+        
+    rows_dictionary = [dict() for _ in range(rows_count)]
+    columns_dictionary = [dict() for _ in range(rows_count)]
+    
+    for column_index in range(columns_count):
+        for position in range(matrix.column_pointer[column_index], matrix.column_pointer[column_index + 1]):
+            row_index = matrix.row_indices[position]
+            value = matrix.values[position]
+            rows_dictionary[row_index][column_index] = value
+            columns_dictionary[column_index][row_index] = value
+            
+    lower_triplets = []
+    upper_triplets = []
+    
+    for diagonal_index in range(rows_count):
+        pivot_value = columns_dictionary[diagonal_index].get(diagonal_index, 0.0)
+        if pivot_value == 0:
             return None
-        U_triplets.append((k, k, pivot))
-        L_triplets.append((k, k, 1.0))
+            
+        upper_triplets.append((diagonal_index, diagonal_index, pivot_value))
+        lower_triplets.append((diagonal_index, diagonal_index, 1.0))
+        
+        upper_indices = []
+        upper_values = []
+        
+        if rows_dictionary[diagonal_index]:
+            for column, value in sorted(rows_dictionary[diagonal_index].items()):
+                if column > diagonal_index:
+                    if abs(value) > 1e-15:
+                        upper_triplets.append((diagonal_index, column, value))
+                        upper_indices.append(column)
+                        upper_values.append(value)
+                        
+        lower_indices = []
+        lower_values = []
+        
+        if columns_dictionary[diagonal_index]:
+            for row, value in sorted(columns_dictionary[diagonal_index].items()):
+                if row > diagonal_index:
+                    lower_value = value / pivot_value
+                    if abs(lower_value) > 1e-15:
+                        lower_triplets.append((row, diagonal_index, lower_value))
+                        lower_indices.append(row)
+                        lower_values.append(lower_value)
+                        
+        for lower_position in range(len(lower_indices)):
+            row = lower_indices[lower_position]
+            lower_value = lower_values[lower_position]
+            
+            for upper_position in range(len(upper_indices)):
+                column = upper_indices[upper_position]
+                upper_value = upper_values[upper_position]
+                
+                update = lower_value * upper_value
+                old_value = rows_dictionary[row].get(column, 0.0)
+                new_value = old_value - update
+                
+                if abs(new_value) > 1e-15:
+                    rows_dictionary[row][column] = new_value
+                    columns_dictionary[column][row] = new_value
+                elif column in rows_dictionary[row]:
+                    del rows_dictionary[row][column]
+                    del columns_dictionary[column][row]
 
-        u_indices = []
-        u_vals = []
-
-        if row_adj[k]:
-            for c, val in sorted(row_adj[k].items()):
-                if c > k:
-                    if abs(val) > 1e-15:
-                        U_triplets.append((k, c, val))
-                        u_indices.append(c)
-                        u_vals.append(val)
-
-        l_indices = []
-        l_vals = []
-
-        if col_adj[k]:
-            for r, val in sorted(col_adj[k].items()):
-                if r > k:
-                    l_val = val / pivot
-                    if abs(l_val) > 1e-15:
-                        L_triplets.append((r, k, l_val))
-                        l_indices.append(r)
-                        l_vals.append(l_val)
-
-        for i in range(len(l_indices)):
-            r = l_indices[i]
-            l_val = l_vals[i]
-
-            for j in range(len(u_indices)):
-                c = u_indices[j]
-                u_val = u_vals[j]
-
-                update = l_val * u_val
-
-                old_val = row_adj[r].get(c, 0.0)
-                new_val = old_val - update
-
-                if abs(new_val) > 1e-15:
-                    row_adj[r][c] = new_val
-                    col_adj[c][r] = new_val
-                elif c in row_adj[r]:
-                    del row_adj[r][c]
-                    del col_adj[c][r]
-
-    def to_csc(triplets, size):
-        triplets.sort(key=lambda x: (x[1], x[0]))
-
-        data = [x[2] for x in triplets]
-        indices = [x[0] for x in triplets]
-        indptr = [0] * (size + 1)
-
-        curr_col = 0
-        for _, col, _ in triplets:
-            while curr_col < col:
-                curr_col += 1
-                indptr[curr_col + 1] = indptr[curr_col]
-            indptr[curr_col + 1] += 1
-
-        while curr_col < size - 1:
-            curr_col += 1
-            indptr[curr_col + 1] = indptr[curr_col]
-
-        return CSCMatrix(data, indices, indptr, (size, size))
-
-    return to_csc(L_triplets, n), to_csc(U_triplets, n)
+    def convert_to_csc(triplets_list, matrix_size):
+        triplets_list.sort(key=lambda element: (element[1], element[0]))
+        
+        values = [element[2] for element in triplets_list]
+        indices = [element[0] for element in triplets_list]
+        
+        column_pointer = [0] * (matrix_size + 1)
+        current_column = 0
+        
+        for _, column, _ in triplets_list:
+            while current_column < column:
+                current_column += 1
+                column_pointer[current_column + 1] = column_pointer[current_column]
+            column_pointer[current_column + 1] += 1
+            
+        while current_column < matrix_size - 1:
+            current_column += 1
+            column_pointer[current_column + 1] = column_pointer[current_column]
+            
+        return CSCMatrix(values, indices, column_pointer, (matrix_size, matrix_size))
+        
+    return convert_to_csc(lower_triplets, rows_count), convert_to_csc(upper_triplets, rows_count)
 
 
-def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
+def solve_SLAE_lu(matrix: CSCMatrix, right_side: Vector) -> Optional[Vector]:
     """
-    Решение СЛАУ Ax = b через LU-разложение.
+    Решение СЛАУ Ax = b через LU-разложение
     """
-    lu = lu_decomposition(A)
-    if lu is None:
+    decomposition = lu_decomposition(matrix)
+    if decomposition is None:
         return None
-    L, U = lu
-    n = len(b)
-
-    y = list(b)
-    for j in range(n):
-        if y[j] != 0:
-            for k in range(L.indptr[j], L.indptr[j + 1]):
-                row = L.indices[k]
-                val = L.data[k]
-                if row > j:
-                    y[row] -= val * y[j]
-
-    x = list(y)
-    for j in range(n - 1, -1, -1):
-        diag_val = 0
-        for k in range(U.indptr[j], U.indptr[j + 1]):
-            if U.indices[k] == j:
-                diag_val = U.data[k]
+        
+    lower_matrix, upper_matrix = decomposition
+    size = len(right_side)
+    
+    intermediate_y = list(right_side)
+    
+    # Прямая подстановка для Ly = b
+    for column_index in range(size):
+        if intermediate_y[column_index] != 0:
+            for position in range(lower_matrix.column_pointer[column_index], lower_matrix.column_pointer[column_index + 1]):
+                row_index = lower_matrix.row_indices[position]
+                value = lower_matrix.values[position]
+                if row_index > column_index:
+                    intermediate_y[row_index] -= value * intermediate_y[column_index]
+                    
+    solution_x = list(intermediate_y)
+    
+    # Обратная подстановка для Ux = y
+    for column_index in range(size - 1, -1, -1):
+        diagonal_value = 0
+        
+        for position in range(upper_matrix.column_pointer[column_index], upper_matrix.column_pointer[column_index + 1]):
+            if upper_matrix.row_indices[position] == column_index:
+                diagonal_value = upper_matrix.values[position]
                 break
+                
+        if diagonal_value == 0:
+            return None
+            
+        solution_x[column_index] /= diagonal_value
+        
+        if solution_x[column_index] != 0:
+            for position in range(upper_matrix.column_pointer[column_index], upper_matrix.column_pointer[column_index + 1]):
+                row_index = upper_matrix.row_indices[position]
+                value = upper_matrix.values[position]
+                if row_index < column_index:
+                    solution_x[row_index] -= value * solution_x[column_index]
+                    
+    return solution_x
 
-        if diag_val == 0: return None
 
-        x[j] /= diag_val
-
-        if x[j] != 0:
-            for k in range(U.indptr[j], U.indptr[j + 1]):
-                row = U.indices[k]
-                val = U.data[k]
-                if row < j:
-                    x[row] -= val * x[j]
-
-    return x
-
-
-def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
+def find_det_with_lu(matrix: CSCMatrix) -> Optional[float]:
     """
-    Нахождение определителя через LU-разложение.
-    det(A) = det(L) * det(U)
+    Нахождение определителя через LU-разложение
+    Формула: det(A) = det(L) * det(U)
     """
-    lu = lu_decomposition(A)
-    if lu is None:
+    decomposition = lu_decomposition(matrix)
+    if decomposition is None:
         return 0.0
-
-    _, U = lu
-    det = 1
-    n = U.shape[0]
-
-    for j in range(n):
-        diag_found = False
-        for k in range(U.indptr[j], U.indptr[j + 1]):
-            if U.indices[k] == j:
-                det *= U.data[k]
-                diag_found = True
+        
+    _, upper_matrix = decomposition
+    
+    determinant = 1
+    matrix_size = upper_matrix.matrix_shape[0]
+    
+    for column_index in range(matrix_size):
+        diagonal_found = False
+        
+        for position in range(upper_matrix.column_pointer[column_index], upper_matrix.column_pointer[column_index + 1]):
+            if upper_matrix.row_indices[position] == column_index:
+                determinant *= upper_matrix.values[position]
+                diagonal_found = True
                 break
-        if not diag_found:
+                
+        if not diagonal_found:
             return 0.0
-
-    return det
+            
+    return determinant
