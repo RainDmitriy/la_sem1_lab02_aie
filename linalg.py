@@ -10,7 +10,7 @@ def lu_decomposition(matrix: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]
     Возвращает нижнюю и верхнюю треугольные матрицы(L,U)
     Ожидается, что матрица L хранит единицы на главной диагонали
     """
-    rows_count, columns_count = matrix.matrix_shape
+    rows_count, columns_count = matrix.shape
     if rows_count != columns_count:
         return None
         
@@ -18,9 +18,9 @@ def lu_decomposition(matrix: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]
     columns_dictionary = [dict() for _ in range(rows_count)]
     
     for column_index in range(columns_count):
-        for position in range(matrix.column_pointer[column_index], matrix.column_pointer[column_index + 1]):
-            row_index = matrix.row_indices[position]
-            value = matrix.values[position]
+        for position in range(matrix.indptr[column_index], matrix.indptr[column_index + 1]):
+            row_index = matrix.indices[position]
+            value = matrix.data[position]
             rows_dictionary[row_index][column_index] = value
             columns_dictionary[column_index][row_index] = value
             
@@ -83,20 +83,20 @@ def lu_decomposition(matrix: CSCMatrix) -> Optional[Tuple[CSCMatrix, CSCMatrix]]
         values = [element[2] for element in triplets_list]
         indices = [element[0] for element in triplets_list]
         
-        column_pointer = [0] * (matrix_size + 1)
+        indptr = [0] * (matrix_size + 1)
         current_column = 0
         
         for _, column, _ in triplets_list:
             while current_column < column:
                 current_column += 1
-                column_pointer[current_column + 1] = column_pointer[current_column]
-            column_pointer[current_column + 1] += 1
+                indptr[current_column + 1] = indptr[current_column]
+            indptr[current_column + 1] += 1
             
         while current_column < matrix_size - 1:
             current_column += 1
-            column_pointer[current_column + 1] = column_pointer[current_column]
+            indptr[current_column + 1] = indptr[current_column]
             
-        return CSCMatrix(values, indices, column_pointer, (matrix_size, matrix_size))
+        return CSCMatrix(values, indices, indptr, (matrix_size, matrix_size))
         
     return convert_to_csc(lower_triplets, rows_count), convert_to_csc(upper_triplets, rows_count)
 
@@ -117,9 +117,9 @@ def solve_SLAE_lu(matrix: CSCMatrix, right_side: Vector) -> Optional[Vector]:
     # Прямая подстановка для Ly = b
     for column_index in range(size):
         if intermediate_y[column_index] != 0:
-            for position in range(lower_matrix.column_pointer[column_index], lower_matrix.column_pointer[column_index + 1]):
-                row_index = lower_matrix.row_indices[position]
-                value = lower_matrix.values[position]
+            for position in range(lower_matrix.indptr[column_index], lower_matrix.indptr[column_index + 1]):
+                row_index = lower_matrix.indices[position]
+                value = lower_matrix.data[position]
                 if row_index > column_index:
                     intermediate_y[row_index] -= value * intermediate_y[column_index]
                     
@@ -129,9 +129,9 @@ def solve_SLAE_lu(matrix: CSCMatrix, right_side: Vector) -> Optional[Vector]:
     for column_index in range(size - 1, -1, -1):
         diagonal_value = 0
         
-        for position in range(upper_matrix.column_pointer[column_index], upper_matrix.column_pointer[column_index + 1]):
-            if upper_matrix.row_indices[position] == column_index:
-                diagonal_value = upper_matrix.values[position]
+        for position in range(upper_matrix.indptr[column_index], upper_matrix.indptr[column_index + 1]):
+            if upper_matrix.indices[position] == column_index:
+                diagonal_value = upper_matrix.data[position]
                 break
                 
         if diagonal_value == 0:
@@ -140,9 +140,9 @@ def solve_SLAE_lu(matrix: CSCMatrix, right_side: Vector) -> Optional[Vector]:
         solution_x[column_index] /= diagonal_value
         
         if solution_x[column_index] != 0:
-            for position in range(upper_matrix.column_pointer[column_index], upper_matrix.column_pointer[column_index + 1]):
-                row_index = upper_matrix.row_indices[position]
-                value = upper_matrix.values[position]
+            for position in range(upper_matrix.indptr[column_index], upper_matrix.indptr[column_index + 1]):
+                row_index = upper_matrix.indices[position]
+                value = upper_matrix.data[position]
                 if row_index < column_index:
                     solution_x[row_index] -= value * solution_x[column_index]
                     
@@ -161,14 +161,14 @@ def find_det_with_lu(matrix: CSCMatrix) -> Optional[float]:
     _, upper_matrix = decomposition
     
     determinant = 1
-    matrix_size = upper_matrix.matrix_shape[0]
+    matrix_size = upper_matrix.shape[0]
     
     for column_index in range(matrix_size):
         diagonal_found = False
         
-        for position in range(upper_matrix.column_pointer[column_index], upper_matrix.column_pointer[column_index + 1]):
-            if upper_matrix.row_indices[position] == column_index:
-                determinant *= upper_matrix.values[position]
+        for position in range(upper_matrix.indptr[column_index], upper_matrix.indptr[column_index + 1]):
+            if upper_matrix.indices[position] == column_index:
+                determinant *= upper_matrix.data[position]
                 diagonal_found = True
                 break
                 

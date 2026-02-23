@@ -8,13 +8,13 @@ class Matrix(ABC):
 
     @abstractmethod
     def to_dense(self) -> DenseMatrix:
-        """Разреженную матрицу в плотную"""
+        """Преобразует разреженную матрицу в плотную."""
         pass
 
     def __add__(self, other: 'Matrix') -> 'Matrix':
         """Сложение матриц"""
         if self.shape != other.shape:
-            raise ValueError("Размерности матриц не одинаковы")
+            raise ValueError("Размерности матриц не совпадают")
         return self._add_impl(other)
 
     @abstractmethod
