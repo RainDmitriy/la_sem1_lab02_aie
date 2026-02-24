@@ -45,30 +45,45 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
             col = A_csr.indices[idx]
             row_dict[col] = A_csr.data[idx]
         rows[i] = row_dict
+    eps = 1e-12
 
     for k in range(n):
-        if k not in rows[k] or rows[k][k] == 0:
+        pivot_row = None
+        max_val = 0.0
+        for i in range(k, n):
+            val = abs(rows[i].get(k, 0.0))
+            if val > max_val:
+                max_val = val
+                pivot_row = i
+        if pivot_row is None or max_val < eps:
             return None
+
+        if pivot_row != k:
+            rows[k], rows[pivot_row] = rows[pivot_row], rows[k]
+            b[k], b[pivot_row] = b[pivot_row], b[k]
         pivot = rows[k][k]
-        affected_rows = [i for i in range(k+1, n) if k in rows[i]]
-        for i in affected_rows:
+
+        for i in range(k + 1, n):
+            if k not in rows[i]:
+                continue
             factor = rows[i][k] / pivot
 
-            for j, val in rows[k].items():
-                rows[i][j] = rows[i].get(j, 0) - factor * val
-                if abs(rows[i][j]) < 1e-12:
-                    rows[i].pop(j, None)
+            for j, val in list(rows[k].items()):
+                rows[i][j] = rows[i].get(j, 0.0) - factor * val
+                if abs(rows[i][j]) < eps:
+                    rows[i].pop(j)
             b[i] -= factor * b[k]
 
     x = [0.0] * n
     for i in reversed(range(n)):
-        if i not in rows[i] or rows[i][i] == 0:
+        diag = rows[i].get(i, 0.0)
+        if abs(diag) < eps:
             return None
         s = b[i]
         for j, val in rows[i].items():
             if j > i:
                 s -= val * x[j]
-        x[i] = s / rows[i][i]
+        x[i] = s / diag
     return x
 
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
