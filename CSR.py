@@ -135,13 +135,15 @@ class CSRMatrix(Matrix):
         from COO import COOMatrix
         rows, cols = self.shape
         data = []
-        row = []
-        col = []
-        for row in range(rows):
-            start = self.indptr[row]
-            end = self.indptr[row + 1]
+        row_list = []
+        col_list = []
+
+        for r in range(rows):
+            start = self.indptr[r]
+            end = self.indptr[r + 1]
             for idx in range(start, end):
                 data.append(self.data[idx])
-                row.append(row)
-                col.append(self.indices[idx])
-        return COOMatrix(data, row, col, self.shape)
+                row_list.append(r)
+                col_list.append(self.indices[idx])
+
+        return COOMatrix(data, row_list, col_list, self.shape)

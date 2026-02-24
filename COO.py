@@ -27,22 +27,28 @@ class COOMatrix(Matrix):
                  for row_a, row_b in zip(self.to_dense(), other.to_dense())]
             )
 
-        result = {}
+        if self.shape != other.shape:
+            raise ValueError("Shapes must match for addition")
 
-        for data, row, col in zip(self.data, self.row, self.col):
-            result[(row, col)] = result.get((row, col), 0) + data
+        result_dict = {}
 
-        for data, row, col in zip(other.data, other.row, other.col):
-            result[(row, col)] = result.get((row, col), 0) + data
+        for val, r, c in zip(self.data, self.row, self.col):
+            result_dict[(r, c)] = result_dict.get((r, c), 0) + val
 
-        data, row, col = [], [], []
-        for (row, col), data in result.items():
-            if data != 0:
-                data.append(data)
-                row.append(row)
-                col.append(col)
+        for val, r, c in zip(other.data, other.row, other.col):
+            result_dict[(r, c)] = result_dict.get((r, c), 0) + val
 
-        return COOMatrix(data, row, col, self.shape)
+        new_data = []
+        new_row = []
+        new_col = []
+
+        for (r, c), val in result_dict.items():
+            if val != 0:
+                new_data.append(val)
+                new_row.append(r)
+                new_col.append(c)
+
+        return COOMatrix(new_data, new_row, new_col, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение COO на скаляр."""
@@ -107,8 +113,9 @@ class COOMatrix(Matrix):
         nnz = len(self.data)
 
         col_ptr = [0] * (cols + 1)
-        for col in self.col:
-            col_ptr[col + 1] += 1
+
+        for c in self.col:
+            col_ptr[c + 1] += 1
 
         for i in range(1, len(col_ptr)):
             col_ptr[i] += col_ptr[i - 1]
@@ -117,11 +124,11 @@ class COOMatrix(Matrix):
         row_ind = [0] * nnz
         counter = col_ptr.copy()
 
-        for data, row, col in zip(self.data, self.row, self.col):
-            idx = counter[col]
-            data[idx] = data
-            row_ind[idx] = row
-            counter[col] += 1
+        for val, r, c in zip(self.data, self.row, self.col):
+            idx = counter[c]
+            data[idx] = val
+            row_ind[idx] = r
+            counter[c] += 1
 
         return CSCMatrix(data, row_ind, col_ptr, self.shape)
 
@@ -145,10 +152,10 @@ class COOMatrix(Matrix):
         col_ind = [0] * nnz
         counter = row_ptr.copy()
 
-        for data, row, col in zip(self.data, self.row, self.col):
-            idx = counter[row]
-            data[idx] = data
-            col_ind[idx] = col
-            counter[row] += 1
+        for val, r, c in zip(self.data, self.row, self.col):
+            idx = counter[r]
+            data[idx] = val
+            col_ind[idx] = c
+            counter[r] += 1
 
         return CSRMatrix(data, col_ind, row_ptr, self.shape)

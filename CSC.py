@@ -132,15 +132,15 @@ class CSCMatrix(Matrix):
 
         rows, cols = self.shape
         data = []
-        row = []
-        col = []
+        row_list = []
+        col_list = []
 
-        for col in range(cols):
-            start = self.indptr[col]
-            end = self.indptr[col + 1]
+        for c in range(cols):
+            start = self.indptr[c]
+            end = self.indptr[c + 1]
             for idx in range(start, end):
                 data.append(self.data[idx])
-                row.append(self.indices[idx])
-                col.append(col)
+                row_list.append(self.indices[idx])
+                col_list.append(c)
 
-        return COOMatrix(data, row, col, self.shape)
+        return COOMatrix(data, row_list, col_list, self.shape)
