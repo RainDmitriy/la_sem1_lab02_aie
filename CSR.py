@@ -59,43 +59,11 @@ class CSRMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
-        if not isinstance(other, CSRMatrix):
-            other = other._to_csr()
-        n, m = self.shape
-        m2, p = other.shape
-
-        if m != m2:
-            raise ValueError("Shapes not aligned for matmul")
-
-        result_data = []
-        result_indices = []
-        result_indptr = [0]
-
-        for i in range(n):
-            row_result = {}
-            start_a = self.indptr[i]
-            end_a = self.indptr[i + 1]
-
-            for idx_a in range(start_a, end_a):
-                k = self.indices[idx_a]
-                val_a = self.data[idx_a]
-                start_b = other.indptr[k]
-                end_b = other.indptr[k + 1]
-
-                for idx_b in range(start_b, end_b):
-                    j = other.indices[idx_b]
-                    val_b = other.data[idx_b]
-                    row_result[j] = row_result.get(j, 0) + val_a * val_b
-
-            for j in sorted(row_result.keys()):
-                val = row_result[j]
-                if val != 0:
-                    result_data.append(val)
-                    result_indices.append(j)
-
-            result_indptr.append(len(result_data))
-
-        return CSRMatrix(result_data, result_indices, result_indptr, (n, p))
+        rows, _ = self.shape
+        if scalar == 0:
+            return CSRMatrix([], [], [0] * (rows + 1), self.shape)
+        new_data = [val * scalar for val in self.data]
+        return CSRMatrix(new_data, self.indices.copy(), self.indptr.copy(), self.shape)
 
     def transpose(self) -> 'Matrix':
         """
@@ -124,22 +92,47 @@ class CSRMatrix(Matrix):
                 data[pos] = self.data[idx]
                 row_ind[pos] = row
                 counter[col] += 1
-        return CSCMatrix(data, row_ind, col_ptr, (cols, rows))
+        csc = CSCMatrix(data, row_ind, col_ptr, (cols, rows))
+        return csc._to_csr()
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSR матриц."""
-        A = self.to_dense()
-        B = other.to_dense()
+        if not isinstance(other, CSRMatrix):
+            other = other._to_csr()
         n, m = self.shape
-        _, p = other.shape
-        result = [[0 for _ in range(p)] for _ in range(n)]
+        m2, p = other.shape
+        if m != m2:
+            raise ValueError("Shapes not aligned for matmul")
+
+        result_data = []
+        result_indices = []
+        result_indptr = [0]
+
         for i in range(n):
-            for k in range(m):
-                if A[i][k] != 0:
-                    for j in range(p):
-                        if B[k][j] != 0:
-                            result[i][j] += A[i][k] * B[k][j]
-        return CSRMatrix.from_dense(result)
+            row_result = {}
+            start_a = self.indptr[i]
+            end_a = self.indptr[i + 1]
+
+            for idx_a in range(start_a, end_a):
+                k = self.indices[idx_a]
+                val_a = self.data[idx_a]
+                start_b = other.indptr[k]
+                end_b = other.indptr[k + 1]
+
+                for idx_b in range(start_b, end_b):
+                    j = other.indices[idx_b]
+                    val_b = other.data[idx_b]
+                    row_result[j] = row_result.get(j, 0) + val_a * val_b
+
+            for j in sorted(row_result.keys()):
+                val = row_result[j]
+                if val != 0:
+                    result_data.append(val)
+                    result_indices.append(j)
+            result_indptr.append(len(result_data))
+
+        return CSRMatrix(result_data, result_indices, result_indptr, (n, p))
+
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':

@@ -37,43 +37,57 @@ class CSCMatrix(Matrix):
         result_indptr = [0]
 
         for j in range(cols):
-            a_start, a_end = self.indptr[j], self.indptr[j+1]
-            b_start, b_end = other.indptr[j], other.indptr[j+1]
-            a_pos = a_start
-            b_pos = b_start
+            a_entries = list(zip(
+                self.indices[self.indptr[j]:self.indptr[j+1]],
+                self.data[self.indptr[j]:self.indptr[j+1]]
+            ))
+            b_entries = list(zip(
+                other.indices[other.indptr[j]:other.indptr[j+1]],
+                other.data[other.indptr[j]:other.indptr[j+1]]
+            ))
 
-            while a_pos < a_end and b_pos < b_end:
-                a_row = self.indices[a_pos]
-                b_row = other.indices[b_pos]
+            a_entries.sort()
+            b_entries.sort()
+
+            a_pos = 0
+            b_pos = 0
+
+            while a_pos < len(a_entries) and b_pos < len(b_entries):
+                a_row, a_val = a_entries[a_pos]
+                b_row, b_val = b_entries[b_pos]
+
                 if a_row == b_row:
-                    val = self.data[a_pos] + other.data[b_pos]
+                    val = a_val + b_val
                     if val != 0:
                         result_data.append(val)
                         result_indices.append(a_row)
                     a_pos += 1
                     b_pos += 1
                 elif a_row < b_row:
-                    result_data.append(self.data[a_pos])
+                    result_data.append(a_val)
                     result_indices.append(a_row)
                     a_pos += 1
                 else:
-                    result_data.append(other.data[b_pos])
+                    result_data.append(b_val)
                     result_indices.append(b_row)
                     b_pos += 1
 
-            while a_pos < a_end:
-                result_data.append(self.data[a_pos])
-                result_indices.append(self.indices[a_pos])
+            while a_pos < len(a_entries):
+                a_row, a_val = a_entries[a_pos]
+                result_data.append(a_val)
+                result_indices.append(a_row)
                 a_pos += 1
-            while b_pos < b_end:
-                result_data.append(other.data[b_pos])
-                result_indices.append(other.indices[b_pos])
+
+            while b_pos < len(b_entries):
+                b_row, b_val = b_entries[b_pos]
+                result_data.append(b_val)
+                result_indices.append(b_row)
                 b_pos += 1
 
             result_indptr.append(len(result_data))
 
         return CSCMatrix(result_data, result_indices, result_indptr, self.shape)
-
+    
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""
         if scalar == 0:

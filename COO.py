@@ -119,25 +119,20 @@ class COOMatrix(Matrix):
         Преобразование COOMatrix в CSRMatrix.
         """
         from CSR import CSRMatrix
-
         rows, cols = self.shape
-        nnz = len(self.data)
-
-        row_ptr = [0] * (rows + 1)
-        for r in self.row:
-            row_ptr[r + 1] += 1
-
-        for i in range(1, len(row_ptr)):
-            row_ptr[i] += row_ptr[i - 1]
-
-        data = [0] * nnz
-        col_ind = [0] * nnz
-        counter = row_ptr.copy()
+        row_dict = {i: [] for i in range(rows)}
 
         for val, r, c in zip(self.data, self.row, self.col):
-            idx = counter[r]
-            data[idx] = val
-            col_ind[idx] = c
-            counter[r] += 1
+            row_dict[r].append((c, val))
+        data = []
+        col_ind = []
+        row_ptr = [0]
+
+        for i in range(rows):
+            row_entries = sorted(row_dict[i], key=lambda x: x[0])
+            for c, val in row_entries:
+                data.append(val)
+                col_ind.append(c)
+            row_ptr.append(len(data))
 
         return CSRMatrix(data, col_ind, row_ptr, self.shape)
