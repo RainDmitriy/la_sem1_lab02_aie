@@ -22,27 +22,21 @@ class COOMatrix(Matrix):
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение COO матриц."""
         if not isinstance(other, COOMatrix):
-            return COOMatrix.from_dense(
-                [[a + b for a, b in zip(row_a, row_b)]
-                 for row_a, row_b in zip(self.to_dense(), other.to_dense())]
-            )
-
+            other = other._to_coo()
         if self.shape != other.shape:
-            raise ValueError("Shapes must match for addition")
-
-        result_dict = {}
+            raise ValueError("Shapes must match")
+        result = {}
 
         for val, r, c in zip(self.data, self.row, self.col):
-            result_dict[(r, c)] = result_dict.get((r, c), 0) + val
-
+            result[(r, c)] = result.get((r, c), 0) + val
         for val, r, c in zip(other.data, other.row, other.col):
-            result_dict[(r, c)] = result_dict.get((r, c), 0) + val
+            result[(r, c)] = result.get((r, c), 0) + val
 
         new_data = []
         new_row = []
         new_col = []
 
-        for (r, c), val in result_dict.items():
+        for (r, c), val in result.items():
             if val != 0:
                 new_data.append(val)
                 new_row.append(r)

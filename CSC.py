@@ -27,11 +27,52 @@ class CSCMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSC матриц."""
-        A = self.to_dense()
-        B = other.to_dense()
-        rows, cols = self.shape
-        result = [[A[i][j] + B[i][j] for j in range(cols)] for i in range(rows)]
-        return CSCMatrix.from_dense(result)
+        if not isinstance(other, CSCMatrix):
+            other = other._to_csc()
+        if self.shape != other.shape:
+            raise ValueError("Shapes must match")
+        _, cols = self.shape
+        result_data = []
+        result_indices = []
+        result_indptr = [0]
+
+        for j in range(cols):
+            a_start, a_end = self.indptr[j], self.indptr[j+1]
+            b_start, b_end = other.indptr[j], other.indptr[j+1]
+            a_pos = a_start
+            b_pos = b_start
+
+            while a_pos < a_end and b_pos < b_end:
+                a_row = self.indices[a_pos]
+                b_row = other.indices[b_pos]
+                if a_row == b_row:
+                    val = self.data[a_pos] + other.data[b_pos]
+                    if val != 0:
+                        result_data.append(val)
+                        result_indices.append(a_row)
+                    a_pos += 1
+                    b_pos += 1
+                elif a_row < b_row:
+                    result_data.append(self.data[a_pos])
+                    result_indices.append(a_row)
+                    a_pos += 1
+                else:
+                    result_data.append(other.data[b_pos])
+                    result_indices.append(b_row)
+                    b_pos += 1
+
+            while a_pos < a_end:
+                result_data.append(self.data[a_pos])
+                result_indices.append(self.indices[a_pos])
+                a_pos += 1
+            while b_pos < b_end:
+                result_data.append(other.data[b_pos])
+                result_indices.append(other.indices[b_pos])
+                b_pos += 1
+
+            result_indptr.append(len(result_data))
+
+        return CSCMatrix(result_data, result_indices, result_indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSC на скаляр."""

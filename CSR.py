@@ -27,11 +27,35 @@ class CSRMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSR матриц."""
-        A = self.to_dense()
-        B = other.to_dense()
-        rows, cols = self.shape
-        result = [[A[i][j] + B[i][j] for j in range(cols)] for i in range(rows)]
-        return CSRMatrix.from_dense(result)
+        if not isinstance(other, CSRMatrix):
+            other = other._to_csr()
+        if self.shape != other.shape:
+            raise ValueError("Shapes must match")
+        n, _ = self.shape
+        result_data = []
+        result_indices = []
+        result_indptr = [0]
+
+        for i in range(n):
+            row_vals = {}
+
+            for idx in range(self.indptr[i], self.indptr[i+1]):
+                col = self.indices[idx]
+                row_vals[col] = self.data[idx]
+
+            for idx in range(other.indptr[i], other.indptr[i+1]):
+                col = other.indices[idx]
+                row_vals[col] = row_vals.get(col, 0) + other.data[idx]
+
+            for col in sorted(row_vals.keys()):
+                val = row_vals[col]
+                if val != 0:
+                    result_data.append(val)
+                    result_indices.append(col)
+
+            result_indptr.append(len(result_data))
+
+        return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
