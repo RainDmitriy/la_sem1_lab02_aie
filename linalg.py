@@ -32,21 +32,42 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     """
     Решение СЛАУ Ax = b через LU-разложение.
     """
-    result = lu_decomposition(A)
-    if result is None:
+    n, m = A.shape
+    if n != m:
         return None
-    L, U = result
-    Ld = L.to_dense()
-    Ud = U.to_dense()
-    n = len(b)
-    y = [0.0]*n
+    A = A._to_csr()
+    rows = {}
     for i in range(n):
-        y[i] = b[i] - sum(Ld[i][j]*y[j] for j in range(i))
+        row_dict = {}
+        for idx in range(A.indptr[i], A.indptr[i+1]):
+            col = A.indices[idx]
+            row_dict[col] = A.data[idx]
+        rows[i] = row_dict
+    b = list(b)
+
+    for k in range(n):
+        if k not in rows[k] or rows[k][k] == 0:
+            return None
+        pivot = rows[k][k]
+        for i in range(k+1, n):
+            if k in rows[i]:
+                factor = rows[i][k] / pivot
+                for j, val in rows[k].items():
+                    rows[i][j] = rows[i].get(j, 0) - factor * val
+                    if abs(rows[i][j]) < 1e-12:
+                        rows[i].pop(j, None)
+                b[i] -= factor * b[k]
+
     x = [0.0]*n
     for i in reversed(range(n)):
-        if Ud[i][i] == 0:
+        if i not in rows[i] or rows[i][i] == 0:
             return None
-        x[i] = (y[i] - sum(Ud[i][j]*x[j] for j in range(i+1, n))) / Ud[i][i]
+        s = b[i]
+        for j, val in rows[i].items():
+            if j > i:
+                s -= val * x[j]
+        x[i] = s / rows[i][i]
+
     return x
 
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
