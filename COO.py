@@ -129,8 +129,7 @@ class COOMatrix(Matrix):
         row_ptr = [0]
 
         for i in range(rows):
-            row_entries = sorted(row_dict[i], key=lambda x: x[0])
-            for c, val in row_entries:
+            for c, val in row_dict[i]:
                 data.append(val)
                 col_ind.append(c)
             row_ptr.append(len(data))

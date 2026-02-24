@@ -47,7 +47,7 @@ class CSRMatrix(Matrix):
                 col = other.indices[idx]
                 row_vals[col] = row_vals.get(col, 0) + other.data[idx]
 
-            for col in sorted(row_vals.keys()):
+            for col, val in row_vals.items():
                 val = row_vals[col]
                 if val != 0:
                     result_data.append(val)
@@ -124,8 +124,7 @@ class CSRMatrix(Matrix):
                     val_b = other.data[idx_b]
                     row_result[j] = row_result.get(j, 0) + val_a * val_b
 
-            for j in sorted(row_result.keys()):
-                val = row_result[j]
+            for j, val in row_result.items():
                 if val != 0:
                     result_data.append(val)
                     result_indices.append(j)

@@ -46,9 +46,8 @@ class CSCMatrix(Matrix):
             for idx in range(other.indptr[j], other.indptr[j+1]):
                 r = other.indices[idx]
                 col_dict[r] = col_dict.get(r, 0) + other.data[idx]
-            sorted_rows = sorted(col_dict.keys())
 
-            for r in sorted_rows:
+            for r, val in col_dict.items():
                 val = col_dict[r]
                 if val != 0:
                     result_data.append(val)
