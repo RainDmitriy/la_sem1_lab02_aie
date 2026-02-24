@@ -46,8 +46,8 @@ class CSCMatrix(Matrix):
                 other.data[other.indptr[j]:other.indptr[j+1]]
             ))
 
-            a_entries.sort()
-            b_entries.sort()
+            a_entries.sort(key=lambda x: x[0])
+            b_entries.sort(key=lambda x: x[0])
 
             a_pos = 0
             b_pos = 0
