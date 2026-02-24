@@ -35,30 +35,32 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
     n, m = A.shape
     if n != m:
         return None
-    A = A._to_csr()
+    A_csr = A._to_csr()
+    b = list(b)
+
     rows = {}
     for i in range(n):
         row_dict = {}
-        for idx in range(A.indptr[i], A.indptr[i+1]):
-            col = A.indices[idx]
-            row_dict[col] = A.data[idx]
+        for idx in range(A_csr.indptr[i], A_csr.indptr[i+1]):
+            col = A_csr.indices[idx]
+            row_dict[col] = A_csr.data[idx]
         rows[i] = row_dict
-    b = list(b)
 
     for k in range(n):
         if k not in rows[k] or rows[k][k] == 0:
             return None
         pivot = rows[k][k]
-        for i in range(k+1, n):
-            if k in rows[i]:
-                factor = rows[i][k] / pivot
-                for j, val in rows[k].items():
-                    rows[i][j] = rows[i].get(j, 0) - factor * val
-                    if abs(rows[i][j]) < 1e-12:
-                        rows[i].pop(j, None)
-                b[i] -= factor * b[k]
+        affected_rows = [i for i in range(k+1, n) if k in rows[i]]
+        for i in affected_rows:
+            factor = rows[i][k] / pivot
 
-    x = [0.0]*n
+            for j, val in rows[k].items():
+                rows[i][j] = rows[i].get(j, 0) - factor * val
+                if abs(rows[i][j]) < 1e-12:
+                    rows[i].pop(j, None)
+            b[i] -= factor * b[k]
+
+    x = [0.0] * n
     for i in reversed(range(n)):
         if i not in rows[i] or rows[i][i] == 0:
             return None
@@ -67,7 +69,6 @@ def solve_SLAE_lu(A: CSCMatrix, b: Vector) -> Optional[Vector]:
             if j > i:
                 s -= val * x[j]
         x[i] = s / rows[i][i]
-
     return x
 
 def find_det_with_lu(A: CSCMatrix) -> Optional[float]:
