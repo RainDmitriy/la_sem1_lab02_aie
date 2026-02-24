@@ -56,22 +56,10 @@ class CSCMatrix(Matrix):
 
     def _matmul_impl(self, other: 'Matrix') -> 'Matrix':
         """Умножение CSC матриц."""
-        A = self.to_dense()
-        B = other.to_dense()
-
-        n, m = self.shape
-        _, p = other.shape
-
-        result = [[0 for _ in range(p)] for _ in range(n)]
-
-        for i in range(n):
-            for k in range(m):
-                if A[i][k] != 0:
-                    for j in range(p):
-                        if B[k][j] != 0:
-                            result[i][j] += A[i][k] * B[k][j]
-
-        return CSCMatrix.from_dense(result)
+        A_csr = self._to_csr()
+        B_csr = other._to_csr()
+        result_csr = A_csr._matmul_impl(B_csr)
+        return result_csr._to_csc()
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSCMatrix':

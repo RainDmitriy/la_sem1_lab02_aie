@@ -35,10 +35,43 @@ class CSRMatrix(Matrix):
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
-        if scalar == 0:
-            return CSRMatrix([], [], [0]*(self.shape[0]+1), self.shape)
-        data = [v * scalar for v in self.data]
-        return CSRMatrix(data, self.indices, self.indptr, self.shape)
+        if not isinstance(other, CSRMatrix):
+            other = other._to_csr()
+        n, m = self.shape
+        m2, p = other.shape
+
+        if m != m2:
+            raise ValueError("Shapes not aligned for matmul")
+
+        result_data = []
+        result_indices = []
+        result_indptr = [0]
+
+        for i in range(n):
+            row_result = {}
+            start_a = self.indptr[i]
+            end_a = self.indptr[i + 1]
+
+            for idx_a in range(start_a, end_a):
+                k = self.indices[idx_a]
+                val_a = self.data[idx_a]
+                start_b = other.indptr[k]
+                end_b = other.indptr[k + 1]
+
+                for idx_b in range(start_b, end_b):
+                    j = other.indices[idx_b]
+                    val_b = other.data[idx_b]
+                    row_result[j] = row_result.get(j, 0) + val_a * val_b
+
+            for j in sorted(row_result.keys()):
+                val = row_result[j]
+                if val != 0:
+                    result_data.append(val)
+                    result_indices.append(j)
+
+            result_indptr.append(len(result_data))
+
+        return CSRMatrix(result_data, result_indices, result_indptr, (n, p))
 
     def transpose(self) -> 'Matrix':
         """
