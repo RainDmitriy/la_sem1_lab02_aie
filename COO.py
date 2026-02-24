@@ -129,9 +129,10 @@ class COOMatrix(Matrix):
         row_ptr = [0]
 
         for i in range(rows):
-            for c, val in row_dict[i]:
+            row_entries = row_dict[i]
+            row_entries.sort()
+            for c, val in row_entries:
                 data.append(val)
                 col_ind.append(c)
-            row_ptr.append(len(data))
 
         return CSRMatrix(data, col_ind, row_ptr, self.shape)
