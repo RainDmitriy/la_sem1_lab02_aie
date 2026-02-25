@@ -77,9 +77,8 @@ class CSRMatrix(Matrix):
         """Умножение CSR матриц."""
         if not isinstance(other, CSRMatrix):
             other = other._to_csr()
-        B = other._to_csc()
         n, m = self.shape
-        m2, p = B.shape
+        m2, p = other.shape
         if m != m2:
             raise ValueError("Shapes not aligned for matmul")
         result_data = []
@@ -87,30 +86,24 @@ class CSRMatrix(Matrix):
         result_indptr = [0]
 
         for i in range(n):
+            row_result = {}
             row_start = self.indptr[i]
             row_end = self.indptr[i + 1]
 
-            for j in range(p):
-                col_start = B.indptr[j]
-                col_end = B.indptr[j + 1]
-                pa = row_start
-                pb = col_start
-                s = 0
+            for idx_a in range(row_start, row_end):
+                k = self.indices[idx_a]
+                val_a = self.data[idx_a]
+                b_start = other.indptr[k]
+                b_end = other.indptr[k + 1]
 
-                while pa < row_end and pb < col_end:
-                    col_a = self.indices[pa]
-                    row_b = B.indices[pb]
-                    if col_a == row_b:
-                        s += self.data[pa] * B.data[pb]
-                        pa += 1
-                        pb += 1
-                    elif col_a < row_b:
-                        pa += 1
-                    else:
-                        pb += 1
+                for idx_b in range(b_start, b_end):
+                    j = other.indices[idx_b]
+                    val_b = other.data[idx_b]
+                    row_result[j] = row_result.get(j, 0) + val_a * val_b
 
-                if s != 0:
-                    result_data.append(s)
+            for j in sorted(row_result.keys()):
+                if row_result[j] != 0:
+                    result_data.append(row_result[j])
                     result_indices.append(j)
             result_indptr.append(len(result_data))
         return CSRMatrix(result_data, result_indices, result_indptr, (n, p))
