@@ -27,53 +27,13 @@ class CSRMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSR матриц."""
+        from COO import COOMatrix
         if not isinstance(other, CSRMatrix):
             other = other._to_csr()
-        if self.shape != other.shape:
-            raise ValueError("Shapes must match")
-        n, _ = self.shape
-        result_data = []
-        result_indices = []
-        result_indptr = [0]
-
-        for i in range(n):
-            a_start = self.indptr[i]
-            a_end = self.indptr[i + 1]
-            b_start = other.indptr[i]
-            b_end = other.indptr[i + 1]
-            pa = a_start
-            pb = b_start
-
-            while pa < a_end and pb < b_end:
-                col_a = self.indices[pa]
-                col_b = other.indices[pb]
-                if col_a == col_b:
-                    val = self.data[pa] + other.data[pb]
-                    if val != 0:
-                        result_data.append(val)
-                        result_indices.append(col_a)
-                    pa += 1
-                    pb += 1
-                elif col_a < col_b:
-                    result_data.append(self.data[pa])
-                    result_indices.append(col_a)
-                    pa += 1
-                else:
-                    result_data.append(other.data[pb])
-                    result_indices.append(col_b)
-                    pb += 1
-
-            while pa < a_end:
-                result_data.append(self.data[pa])
-                result_indices.append(self.indices[pa])
-                pa += 1
-
-            while pb < b_end:
-                result_data.append(other.data[pb])
-                result_indices.append(other.indices[pb])
-                pb += 1
-            result_indptr.append(len(result_data))
-        return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
+        A_coo = self._to_coo()
+        B_coo = other._to_coo()
+        C_coo = A_coo._add_impl(B_coo)
+        return C_coo._to_csr()
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
