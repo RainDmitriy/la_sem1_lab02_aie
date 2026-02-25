@@ -37,25 +37,42 @@ class CSRMatrix(Matrix):
         result_indptr = [0]
 
         for i in range(n):
-            row_vals = {}
+            a_start = self.indptr[i]
+            a_end = self.indptr[i + 1]
+            b_start = other.indptr[i]
+            b_end = other.indptr[i + 1]
+            pa = a_start
+            pb = b_start
 
-            for idx in range(self.indptr[i], self.indptr[i+1]):
-                col = self.indices[idx]
-                row_vals[col] = self.data[idx]
+            while pa < a_end and pb < b_end:
+                col_a = self.indices[pa]
+                col_b = other.indices[pb]
+                if col_a == col_b:
+                    val = self.data[pa] + other.data[pb]
+                    if val != 0:
+                        result_data.append(val)
+                        result_indices.append(col_a)
+                    pa += 1
+                    pb += 1
+                elif col_a < col_b:
+                    result_data.append(self.data[pa])
+                    result_indices.append(col_a)
+                    pa += 1
+                else:
+                    result_data.append(other.data[pb])
+                    result_indices.append(col_b)
+                    pb += 1
 
-            for idx in range(other.indptr[i], other.indptr[i+1]):
-                col = other.indices[idx]
-                row_vals[col] = row_vals.get(col, 0) + other.data[idx]
+            while pa < a_end:
+                result_data.append(self.data[pa])
+                result_indices.append(self.indices[pa])
+                pa += 1
 
-            items = [(col, val) for col, val in row_vals.items() if val != 0]
-            items.sort()
-
-            for col, val in items:
-                result_data.append(val)
-                result_indices.append(col)
-
+            while pb < b_end:
+                result_data.append(other.data[pb])
+                result_indices.append(other.indices[pb])
+                pb += 1
             result_indptr.append(len(result_data))
-
         return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
 
     def _mul_impl(self, scalar: float) -> 'Matrix':
@@ -100,41 +117,43 @@ class CSRMatrix(Matrix):
         """Умножение CSR матриц."""
         if not isinstance(other, CSRMatrix):
             other = other._to_csr()
+        B = other._to_csc()
         n, m = self.shape
-        m2, p = other.shape
+        m2, p = B.shape
         if m != m2:
             raise ValueError("Shapes not aligned for matmul")
-
         result_data = []
         result_indices = []
         result_indptr = [0]
 
         for i in range(n):
-            row_result = {}
-            start_a = self.indptr[i]
-            end_a = self.indptr[i + 1]
+            row_start = self.indptr[i]
+            row_end = self.indptr[i + 1]
 
-            for idx_a in range(start_a, end_a):
-                k = self.indices[idx_a]
-                val_a = self.data[idx_a]
-                start_b = other.indptr[k]
-                end_b = other.indptr[k + 1]
+            for j in range(p):
+                col_start = B.indptr[j]
+                col_end = B.indptr[j + 1]
+                pa = row_start
+                pb = col_start
+                s = 0
 
-                for idx_b in range(start_b, end_b):
-                    j = other.indices[idx_b]
-                    val_b = other.data[idx_b]
-                    row_result[j] = row_result.get(j, 0) + val_a * val_b
+                while pa < row_end and pb < col_end:
+                    col_a = self.indices[pa]
+                    row_b = B.indices[pb]
+                    if col_a == row_b:
+                        s += self.data[pa] * B.data[pb]
+                        pa += 1
+                        pb += 1
+                    elif col_a < row_b:
+                        pa += 1
+                    else:
+                        pb += 1
 
-            items = [(j, val) for j, val in row_result.items() if val != 0]
-            items.sort()
-
-            for j, val in items:
-                result_data.append(val)
-                result_indices.append(j)
+                if s != 0:
+                    result_data.append(s)
+                    result_indices.append(j)
             result_indptr.append(len(result_data))
-
         return CSRMatrix(result_data, result_indices, result_indptr, (n, p))
-
 
     @classmethod
     def from_dense(cls, dense_matrix: DenseMatrix) -> 'CSRMatrix':
