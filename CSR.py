@@ -27,30 +27,14 @@ class CSRMatrix(Matrix):
 
     def _add_impl(self, other: 'Matrix') -> 'Matrix':
         """Сложение CSR матриц."""
+        from COO import COOMatrix
         if not isinstance(other, CSRMatrix):
             other = other._to_csr()
-        n, _ = self.shape
-        result_data = []
-        result_indices = []
-        result_indptr = [0]
+        A_coo = self._to_coo()
+        B_coo = other._to_coo()
+        C_coo = A_coo._add_impl(B_coo)
+        return C_coo._to_csr()
 
-        for i in range(n):
-            row = {}
-            for idx in range(self.indptr[i], self.indptr[i + 1]):
-                j = self.indices[idx]
-                row[j] = self.data[idx]
-
-            for idx in range(other.indptr[i], other.indptr[i + 1]):
-                j = other.indices[idx]
-                row[j] = row.get(j, 0) + other.data[idx]
-
-            for j, val in row.items():
-                if val != 0:
-                    result_data.append(val)
-                    result_indices.append(j)
-            result_indptr.append(len(result_data))
-        return CSRMatrix(result_data, result_indices, result_indptr, self.shape)
-    
     def _mul_impl(self, scalar: float) -> 'Matrix':
         """Умножение CSR на скаляр."""
         rows, _ = self.shape
@@ -117,9 +101,9 @@ class CSRMatrix(Matrix):
                     val_b = other.data[idx_b]
                     row_result[j] = row_result.get(j, 0) + val_a * val_b
 
-            for j, val in row_result.items():
-                if val != 0:
-                    result_data.append(val)
+            for j in sorted(row_result.keys()):
+                if row_result[j] != 0:
+                    result_data.append(row_result[j])
                     result_indices.append(j)
             result_indptr.append(len(result_data))
         return CSRMatrix(result_data, result_indices, result_indptr, (n, p))
